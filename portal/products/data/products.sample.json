@@ -1,0 +1,10 @@
+[
+  {
+    "sku": "SKU-1001",
+    "name": "Sample Product",
+    "description": "Initial sample record",
+    "price": 49.99,
+    "currency": "USD",
+    "status": "active"
+  }
+]
