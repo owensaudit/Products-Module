@@ -1,0 +1,53 @@
+:root {
+  --ink: #141210;
+  --ink-soft: #2a2620;
+  --paper: #f3efe6;
+  --paper-muted: #e4ddd0;
+  --brass: #b8956a;
+  --brass-bright: #d4b483;
+  --mist: rgba(243, 239, 230, 0.78);
+  --line: rgba(20, 18, 16, 0.12);
+  --shadow: 0 24px 60px rgba(12, 10, 8, 0.35);
+  --font-display: "Cormorant Garamond", Georgia, serif;
+  --font-body: "Outfit", system-ui, sans-serif;
+  color: var(--paper);
+  background: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 400;
+  line-height: 1.5;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font: inherit;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+#root {
+  min-height: 100svh;
+}
