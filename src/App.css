@@ -19,7 +19,7 @@
     linear-gradient(105deg, rgba(12, 11, 10, 0.92) 18%, rgba(12, 11, 10, 0.55) 48%, rgba(12, 11, 10, 0.35) 100%),
     linear-gradient(180deg, rgba(20, 18, 16, 0.25) 0%, rgba(20, 18, 16, 0.85) 100%),
     radial-gradient(ellipse 80% 60% at 70% 40%, rgba(184, 149, 106, 0.22), transparent 55%),
-    url("https://images.unsplash.com/photo-1523987355523-c7b5b0dd90a7?auto=format&fit=crop&w=2400&q=80")
+    url("https://images.unsplash.com/photo-1571528122012-eff3e9a3f49b?auto=format&fit=crop&w=2400&q=80")
       center / cover no-repeat;
   animation: atmosphere-drift 28s ease-in-out infinite alternate;
 }
