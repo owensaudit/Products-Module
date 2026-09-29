@@ -94,6 +94,12 @@ export function createPortalServer(store) {
         return;
       }
 
+      if (request.method === "GET" && pathname === "/favicon.ico") {
+        response.writeHead(204);
+        response.end();
+        return;
+      }
+
       if (request.method === "GET" && pathname === "/api/health") {
         sendJson(response, 200, { ok: true });
         return;

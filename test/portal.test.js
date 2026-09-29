@@ -202,6 +202,8 @@ test("http api schedules a visit and hides contact details by default", async ()
 
     const page = await fetch(`${base}/`);
     assert.match(await page.text(), /Ministering visits/);
+    const favicon = await fetch(`${base}/favicon.ico`);
+    assert.equal(favicon.status, 204);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
