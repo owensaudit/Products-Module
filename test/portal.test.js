@@ -18,7 +18,7 @@ import {
   setVisitStatus,
   slotsForMonth,
 } from "../lib/model.js";
-import { brotherSheetToState } from "../lib/roster.js";
+import { brotherSheetToState, canonicalRosterStatus, rosterStatusKey } from "../lib/roster.js";
 import { createStore } from "../lib/store.js";
 import { createPortalServer } from "../server.js";
 
@@ -213,6 +213,8 @@ test("a brother sheet keeps names filterable and hides contact details", () => {
   assert.equal(view.people[0].phone, "");
   assert.equal(view.people[0].email, "");
   assert.equal(view.people[1].rosterStatus, "Reach Out");
+  assert.equal(rosterStatusKey("Re-Schedule, Visited"), "visited");
+  assert.equal(canonicalRosterStatus("Re-Schedule, Visited"), "Visited");
   const revealed = presentState(state, "2026-09", { includePrivate: true });
   assert.equal(revealed.people[0].phone, "555-0100");
   assert.equal(JSON.stringify(view).includes("555-0100"), false);

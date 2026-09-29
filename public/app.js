@@ -8,12 +8,12 @@ const STATUS_LABELS = {
   reach_out: "Reach Out",
   no_response: "No Response",
   reschedule: "Re-Schedule",
-  reschedule_visited: "Re-Schedule, Visited",
+  reschedule_visited: "Visited",
   visited: "Visited",
   none: "No status",
 };
 
-const ROSTER_STATUS_ORDER = ["reach_out", "no_response", "reschedule", "reschedule_visited", "scheduled", "visited", "declined", "none"];
+const ROSTER_STATUS_ORDER = ["reach_out", "no_response", "reschedule", "scheduled", "visited", "declined", "none"];
 
 const WHO = { JO: "Josh Owens" };
 
