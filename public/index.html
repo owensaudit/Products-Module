@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ministering Visit Portal</title>
-    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/styles.css?v=3">
   </head>
   <body>
     <a class="skip" href="#app">Skip to the portal</a>
@@ -14,21 +14,9 @@
         <h1>Ministering visits</h1>
         <p class="lede">Find a brother by name, then filter by status or priesthood.</p>
       </div>
-      <div class="header-tools">
-        <label>Month
-          <input id="month" type="month" aria-label="Month">
-        </label>
-        <label>Your name
-          <input id="author-name" type="text" maxlength="80" placeholder="Name for comments" autocomplete="name">
-        </label>
-        <label class="check">
-          <input id="reveal-private" type="checkbox">
-          Show contact details
-        </label>
-      </div>
     </header>
     <p id="notice" class="notice" role="status" hidden></p>
     <main id="app" tabindex="-1"></main>
-    <script src="/app.js" type="module"></script>
+    <script src="/app.js?v=3" type="module"></script>
   </body>
 </html>

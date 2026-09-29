@@ -41,23 +41,26 @@ let importCsv = "";
 let importFileName = "";
 let importResult = null;
 
-authorInput.value = localStorage.getItem("mvp-author") || "";
-revealInput.checked = sessionStorage.getItem("mvp-private") === "1";
-monthInput.value = currentMonth();
-
-authorInput.addEventListener("change", () => {
-  localStorage.setItem("mvp-author", authorInput.value.trim());
-});
-
-revealInput.addEventListener("change", () => {
-  sessionStorage.setItem("mvp-private", revealInput.checked ? "1" : "0");
-  refresh().catch(showError);
-});
-
-monthInput.addEventListener("change", () => {
-  selectedSlotId = null;
-  refresh().catch(showError);
-});
+if (authorInput) {
+  authorInput.value = localStorage.getItem("mvp-author") || "";
+  authorInput.addEventListener("change", () => {
+    localStorage.setItem("mvp-author", authorInput.value.trim());
+  });
+}
+if (revealInput) {
+  revealInput.checked = sessionStorage.getItem("mvp-private") === "1";
+  revealInput.addEventListener("change", () => {
+    sessionStorage.setItem("mvp-private", revealInput.checked ? "1" : "0");
+    refresh().catch(showError);
+  });
+}
+if (monthInput) {
+  monthInput.value = currentMonth();
+  monthInput.addEventListener("change", () => {
+    selectedSlotId = null;
+    refresh().catch(showError);
+  });
+}
 
 app.addEventListener("change", (event) => {
   const target = event.target;
@@ -105,7 +108,7 @@ app.addEventListener("click", (event) => {
     view = "month";
     const visit = selectedPerson()?.visits?.find((item) => item.status === "scheduled");
     if (visit) {
-      monthInput.value = visit.date.slice(0, 7);
+      if (monthInput) monthInput.value = visit.date.slice(0, 7);
       selectedSlotId = `${visit.date}:${visit.slotKey}`;
       refresh().catch(showError);
       return;
@@ -182,12 +185,13 @@ app.addEventListener("submit", (event) => {
     post("/api/comments", {
       targetType: data.get("targetType"),
       targetId: data.get("targetId"),
-      authorName: data.get("authorName") || authorInput.value,
+      authorName: data.get("authorName") || savedAuthor(),
       body: data.get("body"),
     }).then(() => {
       if (data.get("authorName")) {
-        authorInput.value = data.get("authorName");
-        localStorage.setItem("mvp-author", authorInput.value.trim());
+        const enteredName = String(data.get("authorName") || "").trim();
+        if (authorInput) authorInput.value = enteredName;
+        localStorage.setItem("mvp-author", enteredName);
       }
       detailForm = detailForm === "comment" ? null : detailForm;
       render();
@@ -255,7 +259,7 @@ function clearError() {
 }
 
 async function refresh() {
-  const next = await api(`/api/state?month=${monthInput.value}&private=${revealInput.checked ? "1" : "0"}`);
+  const next = await api(`/api/state?month=${encodeURIComponent(monthValue())}&private=${privateOn() ? "1" : "0"}`);
   state = next;
   if (selectedPersonId && !state.people.some((person) => person.id === selectedPersonId)) selectedPersonId = null;
   render();
@@ -266,7 +270,7 @@ function post(path, body) {
   return api(path, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ ...body, month: monthInput.value, includePrivate: revealInput.checked }),
+    body: JSON.stringify({ ...body, month: monthValue(), includePrivate: privateOn() }),
   }).then((next) => {
     if (next.slots && next.people) state = next;
     return next;
@@ -322,7 +326,20 @@ function renderPeopleList() {
   list.innerHTML = personButtons();
 }
 
+function monthValue() {
+  return monthInput?.value || currentMonth();
+}
+
+function privateOn() {
+  return Boolean(revealInput?.checked);
+}
+
+function savedAuthor() {
+  return (authorInput?.value || localStorage.getItem("mvp-author") || "").trim();
+}
+
 function tabs() {
+  if (state?.rosterMode) return "";
   return `<nav class="tabs" aria-label="Portal sections">
     ${tab("people", "People")}
     ${tab("month", "Month schedule")}
@@ -708,7 +725,7 @@ function commentForm(targetType, targetId) {
   return `<form class="stack" data-form="comment">
     <input type="hidden" name="targetType" value="${esc(targetType)}">
     <input type="hidden" name="targetId" value="${esc(targetId)}">
-    ${authorInput.value ? "" : `<label>Your name <input name="authorName" required></label>`}
+    ${savedAuthor() ? "" : `<label>Your name <input name="authorName" required></label>`}
     <label>Comment <textarea name="body" required placeholder="A note others can read"></textarea></label>
     <button class="primary" type="submit">Add comment</button>
   </form>`;
