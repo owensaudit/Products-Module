@@ -57,8 +57,12 @@ app.addEventListener("click", (event) => {
     render();
   } else if (action === "filter") {
     statusFilter = button.dataset.status;
+    search = "";
     view = "people";
+    const current = selectedPerson();
+    if (current && statusFilter !== "all" && current.outreachStatus !== statusFilter) selectedPersonId = null;
     render();
+    document.querySelector("#people-card")?.scrollIntoView({ block: "start" });
   } else if (action === "select-person") {
     selectedPersonId = button.dataset.id;
     view = "people";
@@ -318,25 +322,30 @@ function countStatuses() {
 }
 
 function peopleView() {
+  const people = filteredPeople();
+  const title = statusFilter === "all" ? "People" : STATUS_LABELS[statusFilter];
   return `<section class="layout">
-    <div class="card">
+    <div class="card" id="people-card">
       <div class="row">
-        <h2>People</h2>
+        <h2>${esc(title)}</h2>
         <button type="button" class="ghost" data-action="form" data-form="add-person">Add a person</button>
       </div>
+      <p class="muted">${people.length} in this list</p>
       <input id="search" class="search" type="search" placeholder="Search by name" value="${esc(search)}" aria-label="Search by name">
-      <div id="person-list" class="person-list">${personButtons()}</div>
+      <div id="person-list" class="person-list">${personButtons(people)}</div>
     </div>
     <div class="card">${detailForm === "add-person" ? addPersonForm() : personDetail()}</div>
   </section>`;
 }
 
-function personButtons() {
-  const people = filteredPeople();
+function personButtons(people = filteredPeople()) {
   if (!state.people.length) {
     return `<p class="empty">No one is loaded yet. The outreach spreadsheet is not readable from here, so this list starts empty. Import a CSV or add a person. No sample members are included.</p>`;
   }
-  if (!people.length) return `<p class="empty">No one matches this filter.</p>`;
+  if (!people.length) {
+    const label = statusFilter === "all" ? "this search" : STATUS_LABELS[statusFilter];
+    return `<p class="empty">No one is in ${esc(label)}. Choose Everyone to see the full roster.</p>`;
+  }
   return people.map((person) => `<button type="button" class="person ${person.outreachStatus}" data-action="select-person" data-id="${esc(person.id)}" aria-current="${person.id === selectedPersonId}">
       <strong>${esc(personLabel(person))}</strong>
       <span class="pill ${person.outreachStatus}">${STATUS_LABELS[person.outreachStatus]}</span>
@@ -348,9 +357,14 @@ function filteredPeople() {
   const needle = search.trim().toLowerCase();
   return state.people
     .filter((person) => statusFilter === "all" || person.outreachStatus === statusFilter)
-    .filter((person) => !needle || person.displayName.toLowerCase().includes(needle) || person.household.toLowerCase().includes(needle))
+    .filter((person) => {
+      if (!needle) return true;
+      const name = String(person.displayName || "").toLowerCase();
+      const household = String(person.household || "").toLowerCase();
+      return name.includes(needle) || household.includes(needle);
+    })
     .slice()
-    .sort((a, b) => STATUS_ORDER.indexOf(a.outreachStatus) - STATUS_ORDER.indexOf(b.outreachStatus) || a.displayName.localeCompare(b.displayName));
+    .sort((a, b) => STATUS_ORDER.indexOf(a.outreachStatus) - STATUS_ORDER.indexOf(b.outreachStatus) || String(a.displayName).localeCompare(String(b.displayName)));
 }
 
 function personLabel(person) {

@@ -125,7 +125,11 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
   margin-bottom: 16px;
 }
 
-.filters button[aria-pressed="true"] { border-color: var(--ink); }
+.summary button[aria-pressed="true"] {
+  background: var(--green);
+  color: white;
+  border-color: var(--green);
+}
 
 .pill {
   display: inline-flex;

@@ -132,6 +132,46 @@ test("csv import keeps extra columns and does not invent blank rows", () => {
   assert.equal(revealed.people[0].phone, "CONTACT-TOKEN-PHONE");
 });
 
+test("a Not Contacted row stays in the not-contacted list", () => {
+  const parsed = parseCsv("Name,Channel,Date,Status\nAda Example,Text,9/1/2026,Not Contacted\nBea Example,Text,9/2/2026,Contacted\n");
+  const imported = importRows(emptyState(), {
+    headers: parsed.headers,
+    rows: parsed.rows,
+    kind: "people",
+    mapping: suggestMapping(parsed.headers),
+  }, deps());
+  const view = presentState(imported.state, "2026-09");
+  const ada = view.people.find((person) => person.displayName === "Ada Example");
+  const bea = view.people.find((person) => person.displayName === "Bea Example");
+  assert.equal(ada.outreachStatus, "not_contacted");
+  assert.equal(bea.outreachStatus, "awaiting_reply");
+  assert.equal(imported.state.outreachAttempts.filter((attempt) => attempt.personId === ada.id).length, 0);
+
+  const createdAt = "2026-09-01T00:00:00.000Z";
+  const legacyPerson = {
+    id: "per_legacy",
+    displayName: "Legacy Example",
+    phone: "",
+    email: "",
+    household: "",
+    notes: "",
+    sheetColumns: { Status: "Not Contacted" },
+    createdAt,
+    updatedAt: createdAt,
+  };
+  const legacyAttempts = [{
+    id: "out_legacy",
+    personId: legacyPerson.id,
+    channel: "text",
+    date: "2026-09-01",
+    status: "contacted",
+    notes: "",
+    sheetColumns: {},
+    createdAt,
+  }];
+  assert.equal(personOutreachStatus(legacyPerson.id, legacyAttempts, [], legacyPerson), "not_contacted");
+});
+
 test("a people row with a channel and date also becomes an outreach attempt", () => {
   const parsed = parseCsv("Name,Channel,Date,Status\nAda Example,Text,9/2/2026,No reply\n");
   const imported = importRows(emptyState(), {
