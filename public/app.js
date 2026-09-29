@@ -273,7 +273,22 @@ function render() {
     app.innerHTML = `<p class="empty">Loading the portal…</p>`;
     return;
   }
+  if (!state.people.length && view === "people") {
+    app.innerHTML = `${tabs()}${rosterNeeded()}`;
+    return;
+  }
   app.innerHTML = `${tabs()}${summary()}${view === "people" ? peopleView() : view === "month" ? monthView() : importView()}`;
+}
+
+function rosterNeeded() {
+  return `<section class="card stack">
+    <h2>The quorum list is not here yet</h2>
+    <p>The outreach Google Sheet is still private, so this page has no names, no contact history, and no phone numbers or email addresses. Nothing was filled in as a sample.</p>
+    <p>What is needed from that sheet is one CSV export: File, Download, Comma-separated values. Import it and the people list, outreach status, and open visit slots can be used.</p>
+    <div class="actions">
+      <button type="button" class="primary" data-action="view" data-view="import">Import a CSV</button>
+    </div>
+  </section>`;
 }
 
 function renderPeopleList() {
@@ -384,7 +399,7 @@ function latestLine(person) {
 function personDetail() {
   const person = selectedPerson();
   if (!person) {
-    return `<h2>Outreach record</h2><p class="empty">Select a person to see contact history, log a reply, and schedule a visit. Phone numbers and email addresses stay hidden until you turn on contact details.</p>${structureNote()}`;
+    return `<h2>Outreach record</h2><p class="empty">Select a person to see contact history, log a reply, and schedule a visit. Phone numbers and email addresses stay hidden until you turn on contact details.</p>`;
   }
   return `<h2>${esc(person.displayName)}</h2>
     ${person.household ? `<p class="muted">${esc(person.household)}</p>` : ""}
@@ -400,19 +415,6 @@ function personDetail() {
     <h3>Comments <span class="muted">${person.commentCount}</span></h3>
     ${commentList("person", person.id)}
     ${commentForm("person", person.id)}`;
-}
-
-function structureNote() {
-  return `<div class="banner">
-    <strong>What this portal keeps</strong>
-    <ul>
-      <li>People, separate from the spreadsheet grid</li>
-      <li>Outreach attempts with channel, date, status, and notes</li>
-      <li>Wednesday 7:00, 7:15, 7:30, and 7:45 pm slots, plus Sunday before and after church</li>
-      <li>A scheduled visit recorded for the Elders Quorum Calendar and the presidency</li>
-      <li>Comments on a person or a visit</li>
-    </ul>
-  </div>`;
 }
 
 function stepper(person) {
@@ -657,7 +659,8 @@ function importView() {
   const preview = importPreview;
   return `<section class="card stack">
     <h2>Import a spreadsheet export</h2>
-    <p>The Google Sheet is private from this app, so nothing was copied into the portal. Export each tab as CSV and upload it here. Imported rows stay in the local data file, which is gitignored. Extra columns are kept on each person. Phone and email columns stay hidden until you show contact details.</p>
+    <p>Export the outreach sheet as CSV and upload it here. Extra columns stay on each person. Phone and email columns stay hidden until you show contact details.</p>
+    <p>This portal has no login. Do not import phone numbers or email addresses unless only people you trust can open this site.</p>
     <p><a href="/template.csv">Download a header-only template</a>. It has no member rows.</p>
     <label>CSV file <input id="csv-file" type="file" accept=".csv,text/csv"></label>
     ${preview ? previewBlock(preview) : ""}
