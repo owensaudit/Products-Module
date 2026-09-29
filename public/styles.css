@@ -1,0 +1,265 @@
+:root {
+  --paper: #f3efe6;
+  --card: #fffdf8;
+  --ink: #1c2430;
+  --muted: #5c6570;
+  --line: #e2dacb;
+  --green: #1d4a38;
+  --green-soft: #e7f2ec;
+  --gold: #8a5a12;
+  --gold-soft: #f8efd8;
+  --blue: #1d4e89;
+  --blue-soft: #e7f0fa;
+  --rose: #8d3d4a;
+  --rose-soft: #f8e8eb;
+  --slate: #4d5968;
+  --shadow: 0 12px 30px rgba(48, 38, 18, 0.06);
+  --sans: "Avenir Next", "Segoe UI", sans-serif;
+  --serif: "Iowan Old Style", Palatino, Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(1200px 400px at 10% -10%, rgba(29, 74, 56, 0.08), transparent 50%),
+    var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+button { cursor: pointer; }
+
+.skip {
+  position: absolute;
+  left: 12px;
+  top: -40px;
+  background: var(--ink);
+  color: white;
+  padding: 8px 12px;
+}
+
+.skip:focus { top: 12px; }
+
+.site-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 28px 32px 8px;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 12px;
+  color: var(--green);
+  font-weight: 600;
+}
+
+h1, h2, h3 { font-family: var(--serif); font-weight: 600; letter-spacing: -0.02em; }
+
+h1 { margin: 0; font-size: 40px; line-height: 1.05; }
+
+.lede { margin: 8px 0 0; max-width: 46ch; color: var(--muted); }
+
+.header-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  align-items: end;
+  justify-content: flex-end;
+}
+
+label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+
+input[type="text"], input[type="month"], input[type="date"], input[type="email"], input[type="tel"], select, textarea {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  min-width: 0;
+}
+
+textarea { min-height: 72px; width: 100%; resize: vertical; }
+
+.check { display: flex; align-items: center; gap: 8px; padding-bottom: 8px; }
+
+.notice {
+  max-width: 1180px;
+  margin: 8px auto 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--rose-soft);
+  color: var(--rose);
+}
+
+#app { max-width: 1180px; margin: 0 auto; padding: 16px 32px 48px; }
+
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+
+.tabs button, .filters button, .ghost, .primary, .slot, .person {
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  padding: 8px 14px;
+}
+
+.tabs button[aria-selected="true"] {
+  background: var(--green);
+  color: white;
+  border-color: var(--green);
+}
+
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.filters button[aria-pressed="true"] { border-color: var(--ink); }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 13px;
+  background: #ece7dc;
+  color: var(--slate);
+}
+
+.pill.not_contacted { background: #ece7dc; }
+.pill.awaiting_reply { background: var(--gold-soft); color: var(--gold); }
+.pill.replied { background: var(--blue-soft); color: var(--blue); }
+.pill.scheduled, .pill.completed { background: var(--green-soft); color: var(--green); }
+.pill.declined { background: var(--rose-soft); color: var(--rose); }
+.pill.open { background: white; border: 1px dashed var(--green); color: var(--green); }
+.pill.taken { background: var(--green); color: white; }
+
+.layout { display: grid; grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1.1fr); gap: 16px; align-items: start; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  padding: 16px;
+}
+
+.person-list { display: grid; gap: 8px; }
+
+.person {
+  width: 100%;
+  text-align: left;
+  border-radius: 14px;
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+}
+
+.person strong { font-size: 16px; }
+
+.person small, .muted { color: var(--muted); }
+
+.person[aria-current="true"] { border-color: var(--green); box-shadow: inset 3px 0 0 var(--green); }
+
+.person.replied { box-shadow: inset 3px 0 0 var(--blue); }
+.person.awaiting_reply { box-shadow: inset 3px 0 0 var(--gold); }
+
+.steps { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+
+.step {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #efeae0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.step.done { background: var(--green-soft); color: var(--green); }
+
+.actions, .row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.primary {
+  background: var(--green);
+  color: white;
+  border-color: var(--green);
+}
+
+.ghost { background: transparent; }
+
+.stack { display: grid; gap: 10px; }
+
+.day { margin-bottom: 14px; }
+
+.day h3 { margin: 0 0 4px; font-size: 22px; }
+
+.slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
+
+.slot {
+  border-radius: 14px;
+  text-align: left;
+  min-height: 84px;
+  display: grid;
+  align-content: start;
+  gap: 4px;
+}
+
+.slot.open { border-style: dashed; border-color: #8eae9d; }
+.slot.scheduled, .slot.completed { background: var(--green-soft); border-color: #b7d4c6; }
+.slot[aria-pressed="true"] { outline: 2px solid var(--green); }
+
+.history { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+
+.history li, .comment {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.presidency { margin: 8px 0 0; padding-left: 18px; }
+
+.presidency li { margin: 2px 0; }
+
+.search { width: 100%; margin-bottom: 8px; }
+
+.empty {
+  padding: 8px 0 0;
+  color: var(--muted);
+}
+
+.banner {
+  background: var(--blue-soft);
+  border-radius: 12px;
+  padding: 12px;
+  margin: 8px 0 12px;
+}
+
+.counts { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 12px; }
+
+.count {
+  background: #f6f1e6;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.private-flag { color: var(--gold); }
+
+@media (max-width: 800px) {
+  .site-header, #app { padding-left: 16px; padding-right: 16px; }
+  .site-header, .layout { display: block; }
+  h1 { font-size: 32px; }
+  .header-tools { justify-content: flex-start; margin-top: 16px; }
+  .header-tools label { width: 100%; }
+  input[type="month"], #author-name { width: 100%; }
+}
