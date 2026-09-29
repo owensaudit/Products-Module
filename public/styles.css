@@ -162,10 +162,26 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
   margin-bottom: 16px;
 }
 
+.summary button {
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: white;
+  padding: 8px 16px;
+}
+
+.summary button[data-status="reach_out"] { background: var(--gold-soft); color: var(--gold); border-color: #ead7a8; }
+.summary button[data-status="no_response"],
+.summary button[data-status="none"] { background: #ece7dc; color: var(--slate); border-color: #ddd4c4; }
+.summary button[data-status="reschedule"],
+.summary button[data-status="reschedule_visited"] { background: var(--blue-soft); color: var(--blue); border-color: #c5dcea; }
+.summary button[data-status="scheduled"],
+.summary button[data-status="visited"],
+.summary button[data-status="completed"] { background: var(--green-soft); color: var(--green); border-color: #c5ddd0; }
+.summary button[data-status="declined"] { background: var(--rose-soft); color: var(--rose); border-color: #efd0d6; }
+
 .summary button[aria-pressed="true"] {
-  background: var(--church-deep);
-  color: white;
-  border-color: var(--church-deep);
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
 }
 
 .pill {
