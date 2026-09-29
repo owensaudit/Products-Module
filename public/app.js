@@ -396,7 +396,8 @@ function countStatuses() {
 function peopleView() {
   const people = filteredPeople();
   const title = statusFilter === "all" ? "People" : STATUS_LABELS[statusFilter];
-  return `<section class="layout">
+  const showDetail = !state.rosterMode || Boolean(selectedPersonId) || detailForm === "add-person";
+  return `<section class="layout${showDetail ? "" : " layout-single"}">
     <div class="card" id="people-card">
       <div class="row">
         <h2>${esc(title)}</h2>
@@ -406,7 +407,7 @@ function peopleView() {
       <input id="search" class="search" type="search" placeholder="Search by name" value="${esc(search)}" aria-label="Search by name">
       <div id="person-list" class="person-list">${personButtons(people)}</div>
     </div>
-    <div class="card">${detailForm === "add-person" ? addPersonForm() : personDetail()}</div>
+    ${showDetail ? `<div class="card">${detailForm === "add-person" ? addPersonForm() : personDetail()}</div>` : ""}
   </section>`;
 }
 
@@ -420,9 +421,20 @@ function personButtons(people = filteredPeople()) {
   }
   return people.map((person) => `<button type="button" class="person ${state.rosterMode ? person.rosterStatusKey : person.outreachStatus}" data-action="select-person" data-id="${esc(person.id)}" aria-current="${person.id === selectedPersonId}">
       <strong>${esc(personLabel(person))}</strong>
+      ${visitedMark(person)}
       <span class="pill ${state.rosterMode ? person.rosterStatusKey : person.outreachStatus}">${esc(state.rosterMode ? (person.rosterStatus || "No status") : STATUS_LABELS[person.outreachStatus])}</span>
       <small>${esc(state.rosterMode ? rosterLine(person) : latestLine(person))}</small>
     </button>`).join("");
+}
+
+function hasBeenVisited(person) {
+  if (state.rosterMode) return person.rosterStatusKey === "visited" || person.rosterStatusKey === "reschedule_visited";
+  return person.outreachStatus === "completed";
+}
+
+function visitedMark(person) {
+  if (!hasBeenVisited(person)) return "";
+  return `<span class="visited-check" aria-label="Visited">✓</span>`;
 }
 
 function rosterLine(person) {
