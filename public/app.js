@@ -19,9 +19,10 @@ const WHO = { JO: "Josh Owens" };
 
 const STATUS_ORDER = ["replied", "awaiting_reply", "not_contacted", "scheduled", "completed", "declined"];
 
-const CHANNEL_LABELS = { text: "Text", phone: "Phone", email: "Email", driveby: "Drive-by" };
+const CHANNEL_LABELS = { text: "Text", phone: "Call", email: "Email", driveby: "Drive-by", in_person: "In person" };
 
 const app = document.querySelector("#app");
+const presidencyHost = document.querySelector("#presidency");
 const notice = document.querySelector("#notice");
 const monthInput = document.querySelector("#month");
 const authorInput = document.querySelector("#author-name");
@@ -157,7 +158,8 @@ app.addEventListener("submit", (event) => {
       personId: selectedPersonId,
       channel: data.get("channel"),
       date: data.get("date"),
-      status: data.get("status"),
+      status: data.get("status") || "contacted",
+      by: data.get("by"),
       notes: data.get("notes"),
     }).then(() => {
       detailForm = null;
@@ -297,7 +299,21 @@ function mappingFromForm(data) {
   return mapping;
 }
 
+presidencyHost?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const data = new FormData(event.target);
+  const members = (state?.presidency || []).map((_, index) => ({
+    name: data.get(`name-${index}`),
+    role: data.get(`role-${index}`),
+  }));
+  post("/api/presidency", { members }).then((next) => {
+    state = next;
+    render();
+  }).catch(showError);
+});
+
 function render() {
+  renderPresidency();
   if (!state) {
     app.innerHTML = `<p class="empty">Loading the portal…</p>`;
     return;
@@ -307,6 +323,23 @@ function render() {
     return;
   }
   app.innerHTML = `${tabs()}${summary()}${view === "people" ? peopleView() : view === "month" ? monthView() : importView()}`;
+}
+
+function renderPresidency() {
+  if (!presidencyHost) return;
+  const members = state?.presidency || [];
+  if (!members.length) {
+    presidencyHost.innerHTML = "";
+    return;
+  }
+  presidencyHost.innerHTML = `<form class="presidency-board">
+    <p class="eyebrow">EQ Presidency</p>
+    ${members.map((member, index) => `<div class="pres-row">
+      <label>Name <input name="name-${index}" value="${esc(member.name)}" required autocomplete="off"></label>
+      <label>Position <input name="role-${index}" value="${esc(member.role)}" required autocomplete="off"></label>
+    </div>`).join("")}
+    <button class="primary" type="submit">Save presidency</button>
+  </form>`;
 }
 
 function rosterNeeded() {
@@ -540,8 +573,6 @@ function rosterDetail(person) {
     ${person.appointment ? `<p><strong>Appointment</strong> ${esc(person.appointment)}</p>` : `<p class="muted">No appointment date yet.</p>`}
     ${person.notes ? `<p>${esc(person.notes)}</p>` : ""}
     ${contactLine(person)}
-    <div class="actions"><button type="button" class="ghost" data-action="form" data-form="outreach">Log outreach</button></div>
-    ${detailForm === "outreach" ? outreachForm() : ""}
     <h3>Outreach</h3>
     ${attemptList(person)}
     <h3>Comments <span class="muted">${person.commentCount}</span></h3>
@@ -705,6 +736,7 @@ function sheetColumnList(columns, privateColumns = []) {
 
 function attemptList(person) {
   const attempts = personTouches(person).slice().reverse();
+  if (state.rosterMode) return outreachTable(attempts);
   if (!attempts.length) return `<p class="empty">No attempts yet.</p>`;
   return `<ul class="history">${attempts.map((attempt) => `<li>
       <strong>${esc(whoLabel(attempt) || CHANNEL_LABELS[attempt.channel] || attempt.channel)}</strong>
@@ -713,6 +745,40 @@ function attemptList(person) {
       ${state.rosterMode ? "" : ` · ${esc(STATUS_LABELS[attempt.status] || attempt.status)}`}
       ${attempt.notes ? `<div>${esc(attempt.notes)}</div>` : ""}
     </li>`).join("")}</ul>`;
+}
+
+function outreachTable(attempts) {
+  const rows = attempts.map((attempt) => `<div class="cell-row">
+      <span>${esc(whoLabel(attempt) || "—")}</span>
+      <span>${esc(CHANNEL_LABELS[attempt.channel] || attempt.channel)}</span>
+      <span>${esc(formatShortDate(attempt.date))}</span>
+    </div>`).join("");
+  return `<div class="cell-table">
+    <div class="cell-row cell-head"><span>Who</span><span>How</span><span>Date</span></div>
+    ${rows || `<p class="empty">No outreach yet.</p>`}
+    ${outreachCells()}
+  </div>`;
+}
+
+function outreachCells() {
+  const members = state.presidency || [];
+  return `<form class="outreach-cells" data-form="outreach">
+    <label>Who
+      <select name="by" required>
+        ${members.map((member) => `<option value="${esc(member.name)}">${esc(member.name)} — ${esc(member.role)}</option>`).join("")}
+      </select>
+    </label>
+    <label>How
+      <select name="channel" required>
+        <option value="text">Text</option>
+        <option value="phone">Call</option>
+        <option value="email">Email</option>
+        <option value="in_person">In person</option>
+      </select>
+    </label>
+    <label>Date <input name="date" type="date" required value="${todayIso()}"></label>
+    <button class="primary" type="submit">Add</button>
+  </form>`;
 }
 
 function commentList(targetType, targetId) {

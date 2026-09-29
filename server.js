@@ -12,6 +12,7 @@ import {
   importRows,
   logOutreach,
   presentState,
+  setPresidency,
   previewImport,
   scheduleVisit,
   setVisitStatus,
@@ -126,6 +127,12 @@ export function createPortalServer(store) {
         if (pathname === "/api/people") {
           const next = await store.update((state) => addPerson(state, body));
           sendJson(response, 201, presentState(next, month, viewOptions));
+          return;
+        }
+
+        if (pathname === "/api/presidency") {
+          const next = await store.update((state) => setPresidency(state, body.members));
+          sendJson(response, 200, presentState(next, month, viewOptions));
           return;
         }
 

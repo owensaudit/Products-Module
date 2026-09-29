@@ -11,6 +11,8 @@ import {
   addComment,
   emptyState,
   importRows,
+  logOutreach,
+  setPresidency,
   personOutreachStatus,
   previewImport,
   presentState,
@@ -219,6 +221,36 @@ test("a brother sheet keeps names filterable and hides contact details", () => {
   assert.equal(revealed.people[0].phone, "555-0100");
   assert.equal(JSON.stringify(view).includes("555-0100"), false);
   assert.equal(JSON.stringify(view).includes("ada@example.com"), false);
+});
+
+test("an outreach row records a presidency member, how they reached out, and the date", () => {
+  let state = emptyState();
+  state = {
+    ...state,
+    people: [{ id: "per_1", displayName: "Ada Example", phone: "", email: "", household: "", notes: "", sheetColumns: {}, createdAt: "2026-09-29T12:00:00.000Z", updatedAt: "2026-09-29T12:00:00.000Z" }],
+  };
+  state = logOutreach(state, {
+    personId: "per_1",
+    channel: "in_person",
+    date: "2026-09-29",
+    status: "contacted",
+    by: "Josh Owens",
+  }, deps());
+  assert.equal(state.outreachAttempts[0].channel, "in_person");
+  assert.equal(state.outreachAttempts[0].date, "2026-09-29");
+  assert.equal(state.outreachAttempts[0].sheetColumns.By, "Josh Owens");
+
+  state = setPresidency(state, [
+    { name: "Mark Lillenberg", role: "EQ President" },
+    { name: "Tyler Sanders", role: "EQ Counselor" },
+    { name: "Brad Conger", role: "EQ Counselor" },
+    { name: "Ada Example", role: "EQ Secretary" },
+    { name: "Harrison Bardo", role: "EQ Assistant Secretary" },
+  ]);
+  const view = presentState(state, "2026-09");
+  assert.equal(view.presidency[3].name, "Ada Example");
+  assert.equal(view.presidency[3].role, "EQ Secretary");
+  assert.equal(view.presidency.length, 5);
 });
 
 test("the fresh portal and the csv template contain no member rows", async () => {
