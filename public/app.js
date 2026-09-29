@@ -456,14 +456,19 @@ function filteredPeople() {
     })
     .slice()
     .sort((a, b) => {
-      if (state.rosterMode) return String(a.sheetName || a.displayName).localeCompare(String(b.sheetName || b.displayName));
+      if (state.rosterMode) return nameKey(a).localeCompare(nameKey(b), "en", { sensitivity: "base" });
       return STATUS_ORDER.indexOf(a.outreachStatus) - STATUS_ORDER.indexOf(b.outreachStatus) || String(a.displayName).localeCompare(String(b.displayName));
     });
 }
 
+function nameKey(person) {
+  return String((state.rosterMode && person.sheetName) || person.displayName || "");
+}
+
 function personLabel(person) {
-  const duplicates = state.people.filter((item) => item.displayName === person.displayName).length > 1;
-  return duplicates && person.household ? `${person.displayName} (${person.household})` : person.displayName;
+  const name = nameKey(person);
+  const duplicates = state.people.filter((item) => nameKey(item) === name).length > 1;
+  return duplicates && person.household ? `${name} (${person.household})` : name;
 }
 
 function latestLine(person) {
@@ -500,8 +505,7 @@ function personDetail() {
 
 function rosterDetail(person) {
   const facts = [person.priesthood, person.age ? `Age ${person.age}` : "", person.birthday ? `Birthday ${person.birthday}` : ""].filter(Boolean);
-  return `<h2>${esc(person.displayName)}</h2>
-    ${person.sheetName && person.sheetName !== person.displayName ? `<p class="muted">${esc(person.sheetName)}</p>` : ""}
+  return `<h2>${esc(personLabel(person))}</h2>
     <p><span class="pill ${person.rosterStatusKey}">${esc(person.rosterStatus || "No status")}</span></p>
     ${facts.length ? `<p>${esc(facts.join(" · "))}</p>` : ""}
     ${person.appointment ? `<p><strong>Appointment</strong> ${esc(person.appointment)}</p>` : `<p class="muted">No appointment date yet.</p>`}
@@ -618,7 +622,7 @@ function outreachForm() {
 function scheduleForm(person) {
   const openSlots = state.slots.filter((slot) => slot.status === "open");
   return `<form class="stack banner" data-form="schedule">
-      <h3>Schedule ${esc(person.displayName)}</h3>
+      <h3>Schedule ${esc(personLabel(person))}</h3>
       <p>They replied. Recording the visit saves the reply channel, the slot, and that it belongs on the ${esc(state.calendarName)} for the presidency. Nothing is sent to Google Calendar.</p>
       ${channelFields("replyChannel")}
       <label>Reply date <input name="replyDate" type="date" required value="${todayIso()}"></label>
@@ -749,7 +753,7 @@ function slotDetail(slot) {
   const person = state.people.find((item) => item.id === slot.personId);
   if (!visit) return `<p>That slot is no longer taken.</p>`;
   return `<h2>${esc(formatDate(visit.date))}</h2>
-    <p><strong>${esc(visit.slotLabel)}</strong> · ${esc(person?.displayName || "Person")}</p>
+    <p><strong>${esc(visit.slotLabel)}</strong> · ${esc(person ? personLabel(person) : "Person")}</p>
     <p>Reply by ${esc(CHANNEL_LABELS[visit.replyChannel] || visit.replyChannel)}. Status: ${esc(visit.status)}.</p>
     <p>Recorded for the ${esc(visit.calendar.name)}. ${visit.calendar.externalEventId ? "Linked to Google Calendar." : "Not sent to Google Calendar yet."}</p>
     ${presidencyList()}
@@ -770,7 +774,7 @@ function scheduleSlotForm(slot) {
     ${state.people.length ? `<label>Who replied
       <select name="personId" required>
         <option value="">Choose a person</option>
-        ${state.people.map((person) => `<option value="${esc(person.id)}" ${person.id === selectedPersonId ? "selected" : ""}>${esc(personLabel(person))}</option>`).join("")}
+        ${state.people.slice().sort((a, b) => nameKey(a).localeCompare(nameKey(b), "en", { sensitivity: "base" })).map((person) => `<option value="${esc(person.id)}" ${person.id === selectedPersonId ? "selected" : ""}>${esc(personLabel(person))}</option>`).join("")}
       </select>
     </label>` : `<p>Add or import a person before scheduling this slot.</p>`}
     ${channelFields("replyChannel")}
