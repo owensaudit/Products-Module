@@ -18,6 +18,7 @@ import {
   setVisitStatus,
   slotsForMonth,
 } from "../lib/model.js";
+import { brotherSheetToState } from "../lib/roster.js";
 import { createStore } from "../lib/store.js";
 import { createPortalServer } from "../server.js";
 
@@ -184,6 +185,38 @@ test("a people row with a channel and date also becomes an outreach attempt", ()
   assert.equal(imported.state.outreachAttempts[0].date, "2026-09-02");
   assert.equal(imported.state.outreachAttempts[0].status, "no_reply");
   assert.equal(personOutreachStatus(imported.state.people[0].id, imported.state.outreachAttempts, []), "awaiting_reply");
+});
+
+test("a brother sheet keeps names filterable and hides contact details", () => {
+  const sheet = [
+    "Brother\tApt Date\tNOTES\tStatus\tPriesthood\tAge\tBirthday\tPhone Number\tEmail\tName\tDay\tType\tName\tDay\tType\tColumn 20\tColumn 21",
+    "Example, Ada\t07/03 5:30 PM\tPrefers a text\tVisited\tElder\t40\t1 Jan 1986\t555-0100\tada@example.com\tJO\t06/02\tText\tDE\tMay 2026\t\t08/28\tText",
+    "Sample, Bea\t\tNo number on file\tReach Out\tPriest\t22\t2 Feb 2004\tNo Phone\tNo Email\tJO\t09/29\tDriveby",
+  ].join("\n");
+  const state = brotherSheetToState(sheet, deps());
+  assert.equal(state.people.length, 2);
+  assert.equal(state.people[0].displayName, "Ada Example");
+  assert.equal(state.people[0].phone, "555-0100");
+  assert.equal(state.people[0].sheetColumns.Status, "Visited");
+  assert.equal(state.people[0].sheetColumns["Phone Number"], undefined);
+  assert.equal(state.outreachAttempts.filter((attempt) => attempt.personId === state.people[0].id).length, 3);
+  assert.equal(state.outreachAttempts.some((attempt) => attempt.channel === "driveby"), true);
+  assert.equal(state.people[1].phone, "");
+  assert.equal(state.people[1].email, "");
+  assert.match(state.people[1].notes, /No number on file/);
+
+  const view = presentState(state, "2026-09");
+  assert.equal(view.rosterMode, true);
+  assert.equal(view.people[0].rosterStatusKey, "visited");
+  assert.equal(view.people[0].priesthood, "Elder");
+  assert.equal(view.people[0].appointment, "07/03 5:30 PM");
+  assert.equal(view.people[0].phone, "");
+  assert.equal(view.people[0].email, "");
+  assert.equal(view.people[1].rosterStatus, "Reach Out");
+  const revealed = presentState(state, "2026-09", { includePrivate: true });
+  assert.equal(revealed.people[0].phone, "555-0100");
+  assert.equal(JSON.stringify(view).includes("555-0100"), false);
+  assert.equal(JSON.stringify(view).includes("ada@example.com"), false);
 });
 
 test("the fresh portal and the csv template contain no member rows", async () => {

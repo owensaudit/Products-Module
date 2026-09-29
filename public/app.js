@@ -5,11 +5,21 @@ const STATUS_LABELS = {
   scheduled: "Visit scheduled",
   completed: "Visit complete",
   declined: "Declined",
+  reach_out: "Reach Out",
+  no_response: "No Response",
+  reschedule: "Re-Schedule",
+  reschedule_visited: "Re-Schedule, Visited",
+  visited: "Visited",
+  none: "No status",
 };
+
+const ROSTER_STATUS_ORDER = ["reach_out", "no_response", "reschedule", "reschedule_visited", "scheduled", "visited", "declined", "none"];
+
+const WHO = { JO: "Josh Owens" };
 
 const STATUS_ORDER = ["replied", "awaiting_reply", "not_contacted", "scheduled", "completed", "declined"];
 
-const CHANNEL_LABELS = { text: "Text", phone: "Phone", email: "Email" };
+const CHANNEL_LABELS = { text: "Text", phone: "Phone", email: "Email", driveby: "Drive-by" };
 
 const app = document.querySelector("#app");
 const notice = document.querySelector("#notice");
@@ -20,6 +30,8 @@ const revealInput = document.querySelector("#reveal-private");
 let state = null;
 let view = "people";
 let statusFilter = "all";
+let officeFilter = "all";
+let appointmentFilter = "all";
 let search = "";
 let selectedPersonId = null;
 let selectedSlotId = null;
@@ -47,6 +59,19 @@ monthInput.addEventListener("change", () => {
   refresh().catch(showError);
 });
 
+app.addEventListener("change", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLSelectElement)) return;
+  if (target.dataset.action === "office") officeFilter = target.value;
+  if (target.dataset.action === "appointment") appointmentFilter = target.value;
+  if (target.dataset.action === "office" || target.dataset.action === "appointment") {
+    view = "people";
+    const current = selectedPerson();
+    if (current && !personMatchesFilters(current)) selectedPersonId = null;
+    render();
+  }
+});
+
 app.addEventListener("click", (event) => {
   const button = event.target.closest("[data-action]");
   if (!button) return;
@@ -60,7 +85,7 @@ app.addEventListener("click", (event) => {
     search = "";
     view = "people";
     const current = selectedPerson();
-    if (current && statusFilter !== "all" && current.outreachStatus !== statusFilter) selectedPersonId = null;
+    if (current && !personMatchesFilters(current)) selectedPersonId = null;
     render();
     document.querySelector("#people-card")?.scrollIntoView({ block: "start" });
   } else if (action === "select-person") {
@@ -310,6 +335,7 @@ function tab(id, label) {
 }
 
 function summary() {
+  if (state.rosterMode) return rosterSummary();
   const counts = countStatuses();
   const open = state.slots.filter((slot) => slot.status === "open").length;
   const taken = state.slots.length - open;
@@ -323,6 +349,37 @@ function summary() {
     ${filterButton("declined", counts.declined)}
     <span class="pill open">${open} open</span>
     <span class="pill taken">${taken} taken</span>
+  </div>`;
+}
+
+function rosterSummary() {
+  const counts = {};
+  for (const person of state.people) {
+    const key = person.rosterStatusKey || "none";
+    counts[key] = (counts[key] || 0) + 1;
+  }
+  const keys = ROSTER_STATUS_ORDER.filter((key) => counts[key]);
+  for (const key of Object.keys(counts)) {
+    if (!keys.includes(key)) keys.push(key);
+  }
+  const offices = [...new Set(state.people.map((person) => person.priesthood).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const withAppointment = state.people.filter((person) => person.appointment).length;
+  return `<div class="summary" aria-label="Brother filters">
+    ${filterButton("all", state.people.length, "Everyone")}
+    ${keys.map((key) => filterButton(key, counts[key] || 0, STATUS_LABELS[key] || key)).join("")}
+    <label class="inline-filter">Priesthood
+      <select data-action="office" aria-label="Filter by priesthood">
+        <option value="all" ${officeFilter === "all" ? "selected" : ""}>All offices</option>
+        ${offices.map((office) => `<option value="${esc(office)}" ${officeFilter === office ? "selected" : ""}>${esc(office)}</option>`).join("")}
+      </select>
+    </label>
+    <label class="inline-filter">Appointment
+      <select data-action="appointment" aria-label="Filter by appointment">
+        <option value="all" ${appointmentFilter === "all" ? "selected" : ""}>All brothers</option>
+        <option value="yes" ${appointmentFilter === "yes" ? "selected" : ""}>Has a date (${withAppointment})</option>
+        <option value="no" ${appointmentFilter === "no" ? "selected" : ""}>No date yet</option>
+      </select>
+    </label>
   </div>`;
 }
 
@@ -345,7 +402,7 @@ function peopleView() {
         <h2>${esc(title)}</h2>
         <button type="button" class="ghost" data-action="form" data-form="add-person">Add a person</button>
       </div>
-      <p class="muted">${people.length} in this list</p>
+      <p class="muted">${people.length} ${state.rosterMode ? (people.length === 1 ? "brother" : "brothers") : "in this list"}</p>
       <input id="search" class="search" type="search" placeholder="Search by name" value="${esc(search)}" aria-label="Search by name">
       <div id="person-list" class="person-list">${personButtons(people)}</div>
     </div>
@@ -361,25 +418,47 @@ function personButtons(people = filteredPeople()) {
     const label = statusFilter === "all" ? "this search" : STATUS_LABELS[statusFilter];
     return `<p class="empty">No one is in ${esc(label)}. Choose Everyone to see the full roster.</p>`;
   }
-  return people.map((person) => `<button type="button" class="person ${person.outreachStatus}" data-action="select-person" data-id="${esc(person.id)}" aria-current="${person.id === selectedPersonId}">
+  return people.map((person) => `<button type="button" class="person ${state.rosterMode ? person.rosterStatusKey : person.outreachStatus}" data-action="select-person" data-id="${esc(person.id)}" aria-current="${person.id === selectedPersonId}">
       <strong>${esc(personLabel(person))}</strong>
-      <span class="pill ${person.outreachStatus}">${STATUS_LABELS[person.outreachStatus]}</span>
-      <small>${esc(latestLine(person))}</small>
+      <span class="pill ${state.rosterMode ? person.rosterStatusKey : person.outreachStatus}">${esc(state.rosterMode ? (person.rosterStatus || "No status") : STATUS_LABELS[person.outreachStatus])}</span>
+      <small>${esc(state.rosterMode ? rosterLine(person) : latestLine(person))}</small>
     </button>`).join("");
+}
+
+function rosterLine(person) {
+  const bits = [person.priesthood, person.appointment ? `Appt ${person.appointment}` : ""].filter(Boolean);
+  const touch = lastTouch(person);
+  if (touch) bits.push(touch);
+  return bits.join(" · ") || person.sheetName || "";
+}
+
+function personMatchesFilters(person) {
+  if (statusFilter !== "all") {
+    const key = state.rosterMode ? person.rosterStatusKey || "none" : person.outreachStatus;
+    if (key !== statusFilter) return false;
+  }
+  if (state.rosterMode && officeFilter !== "all" && person.priesthood !== officeFilter) return false;
+  if (state.rosterMode && appointmentFilter === "yes" && !person.appointment) return false;
+  if (state.rosterMode && appointmentFilter === "no" && person.appointment) return false;
+  return true;
 }
 
 function filteredPeople() {
   const needle = search.trim().toLowerCase();
   return state.people
-    .filter((person) => statusFilter === "all" || person.outreachStatus === statusFilter)
+    .filter((person) => personMatchesFilters(person))
     .filter((person) => {
       if (!needle) return true;
       const name = String(person.displayName || "").toLowerCase();
+      const sheetName = String(person.sheetName || "").toLowerCase();
       const household = String(person.household || "").toLowerCase();
-      return name.includes(needle) || household.includes(needle);
+      return name.includes(needle) || sheetName.includes(needle) || household.includes(needle);
     })
     .slice()
-    .sort((a, b) => STATUS_ORDER.indexOf(a.outreachStatus) - STATUS_ORDER.indexOf(b.outreachStatus) || String(a.displayName).localeCompare(String(b.displayName)));
+    .sort((a, b) => {
+      if (state.rosterMode) return String(a.sheetName || a.displayName).localeCompare(String(b.sheetName || b.displayName));
+      return STATUS_ORDER.indexOf(a.outreachStatus) - STATUS_ORDER.indexOf(b.outreachStatus) || String(a.displayName).localeCompare(String(b.displayName));
+    });
 }
 
 function personLabel(person) {
@@ -399,8 +478,10 @@ function latestLine(person) {
 function personDetail() {
   const person = selectedPerson();
   if (!person) {
+    if (state.rosterMode) return `<h2>Brothers</h2><p class="empty">Choose a name. Status, priesthood, appointment, and each text or drive-by show here. Phone numbers and email addresses stay hidden until you turn on contact details.</p>`;
     return `<h2>Outreach record</h2><p class="empty">Select a person to see contact history, log a reply, and schedule a visit. Phone numbers and email addresses stay hidden until you turn on contact details.</p>`;
   }
+  if (state.rosterMode) return rosterDetail(person);
   return `<h2>${esc(person.displayName)}</h2>
     ${person.household ? `<p class="muted">${esc(person.household)}</p>` : ""}
     <p><span class="pill ${person.outreachStatus}">${STATUS_LABELS[person.outreachStatus]}</span></p>
@@ -415,6 +496,50 @@ function personDetail() {
     <h3>Comments <span class="muted">${person.commentCount}</span></h3>
     ${commentList("person", person.id)}
     ${commentForm("person", person.id)}`;
+}
+
+function rosterDetail(person) {
+  const facts = [person.priesthood, person.age ? `Age ${person.age}` : "", person.birthday ? `Birthday ${person.birthday}` : ""].filter(Boolean);
+  return `<h2>${esc(person.displayName)}</h2>
+    ${person.sheetName && person.sheetName !== person.displayName ? `<p class="muted">${esc(person.sheetName)}</p>` : ""}
+    <p><span class="pill ${person.rosterStatusKey}">${esc(person.rosterStatus || "No status")}</span></p>
+    ${facts.length ? `<p>${esc(facts.join(" · "))}</p>` : ""}
+    ${person.appointment ? `<p><strong>Appointment</strong> ${esc(person.appointment)}</p>` : `<p class="muted">No appointment date yet.</p>`}
+    ${person.notes ? `<p>${esc(person.notes)}</p>` : ""}
+    ${contactLine(person)}
+    <div class="actions"><button type="button" class="ghost" data-action="form" data-form="outreach">Log outreach</button></div>
+    ${detailForm === "outreach" ? outreachForm() : ""}
+    <h3>Outreach</h3>
+    ${attemptList(person)}
+    <h3>Comments <span class="muted">${person.commentCount}</span></h3>
+    ${commentList("person", person.id)}
+    ${commentForm("person", person.id)}`;
+}
+
+function contactLine(person) {
+  const revealed = state.privateVisible;
+  const phone = person.phoneOnFile ? (revealed ? person.phone : "Hidden") : "None on file";
+  const email = person.emailOnFile ? (revealed ? person.email : "Hidden") : "None on file";
+  return `<p>Phone: ${esc(phone)} · Email: ${esc(email)}</p>`;
+}
+
+function lastTouch(person) {
+  const attempt = personTouches(person)[0];
+  if (!attempt) return "";
+  const who = whoLabel(attempt);
+  return `${who ? `${who} · ` : ""}${CHANNEL_LABELS[attempt.channel] || attempt.channel} · ${formatShortDate(attempt.date)}`;
+}
+
+function whoLabel(attempt) {
+  const by = attempt.sheetColumns?.By || "";
+  return WHO[by] || by;
+}
+
+function personTouches(person) {
+  return state.outreachAttempts
+    .filter((attempt) => attempt.personId === person.id)
+    .slice()
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.createdAt).localeCompare(String(a.createdAt)));
 }
 
 function stepper(person) {
@@ -546,12 +671,13 @@ function sheetColumnList(columns, privateColumns = []) {
 }
 
 function attemptList(person) {
-  const attempts = state.outreachAttempts.filter((attempt) => attempt.personId === person.id);
+  const attempts = personTouches(person).slice().reverse();
   if (!attempts.length) return `<p class="empty">No attempts yet.</p>`;
-  return `<ul class="history">${attempts.slice().reverse().map((attempt) => `<li>
-      <strong>${esc(CHANNEL_LABELS[attempt.channel] || attempt.channel)}</strong>
-      · ${esc(formatDate(attempt.date))}
-      · ${esc(STATUS_LABELS[attempt.status] || attempt.status)}
+  return `<ul class="history">${attempts.map((attempt) => `<li>
+      <strong>${esc(whoLabel(attempt) || CHANNEL_LABELS[attempt.channel] || attempt.channel)}</strong>
+      · ${esc(CHANNEL_LABELS[attempt.channel] || attempt.channel)}
+      · ${esc(formatShortDate(attempt.date))}
+      ${state.rosterMode ? "" : ` · ${esc(STATUS_LABELS[attempt.status] || attempt.status)}`}
       ${attempt.notes ? `<div>${esc(attempt.notes)}</div>` : ""}
     </li>`).join("")}</ul>`;
 }
@@ -718,6 +844,17 @@ function skipReasons(skipped) {
   const counts = {};
   for (const item of skipped) counts[item.reason] = (counts[item.reason] || 0) + 1;
   return ` ${Object.entries(counts).map(([reason, count]) => `${count} ${reason}`).join(", ")}.`;
+}
+
+function formatShortDate(iso) {
+  if (!iso) return "";
+  const [year, month, day] = iso.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 }
 
 function formatDate(iso) {

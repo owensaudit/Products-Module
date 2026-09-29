@@ -147,6 +147,11 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
 .pill.replied { background: var(--blue-soft); color: var(--blue); }
 .pill.scheduled, .pill.completed { background: var(--green-soft); color: var(--green); }
 .pill.declined { background: var(--rose-soft); color: var(--rose); }
+.pill.visited { background: var(--green-soft); color: var(--green); }
+.pill.reach_out { background: var(--gold-soft); color: var(--gold); }
+.pill.no_response { background: #ece7dc; color: var(--slate); }
+.pill.reschedule, .pill.reschedule_visited { background: var(--blue-soft); color: var(--blue); }
+.pill.none { background: #ece7dc; color: var(--slate); }
 .pill.open { background: white; border: 1px dashed var(--green); color: var(--green); }
 .pill.taken { background: var(--green); color: white; }
 
@@ -177,8 +182,11 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
 
 .person[aria-current="true"] { border-color: var(--green); box-shadow: inset 3px 0 0 var(--green); }
 
-.person.replied { box-shadow: inset 3px 0 0 var(--blue); }
-.person.awaiting_reply { box-shadow: inset 3px 0 0 var(--gold); }
+.person.replied, .person.reschedule, .person.reschedule_visited { box-shadow: inset 3px 0 0 var(--blue); }
+.person.awaiting_reply, .person.reach_out { box-shadow: inset 3px 0 0 var(--gold); }
+.person.visited { box-shadow: inset 3px 0 0 var(--green); }
+.person.declined { box-shadow: inset 3px 0 0 var(--rose); }
+.person.no_response, .person.none { box-shadow: inset 3px 0 0 var(--slate); }
 
 .steps { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
 
@@ -236,6 +244,10 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
 
 .search { width: 100%; margin-bottom: 8px; }
 
+.inline-filter { align-items: center; }
+
+.inline-filter select { min-width: 10rem; }
+
 .empty {
   padding: 8px 0 0;
   color: var(--muted);
@@ -258,6 +270,10 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
 }
 
 .private-flag { color: var(--gold); }
+
+@media (min-width: 801px) {
+  .person-list { max-height: calc(100vh - 240px); overflow: auto; padding-right: 4px; }
+}
 
 @media (max-width: 800px) {
   .site-header, #app { padding-left: 16px; padding-right: 16px; }
