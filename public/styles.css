@@ -571,20 +571,17 @@ input.person-name:focus {
 }
 
 .presidency-board input.pres-name {
-  text-align: right;
-}
-
-.presidency-board input.pres-name {
   width: auto;
-  min-width: 4.5rem;
+  min-width: 0;
   max-width: 14rem;
   field-sizing: content;
+  text-align: left;
 }
 
 .pres-name-line {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 6px;
 }
 
