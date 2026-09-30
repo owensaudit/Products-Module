@@ -165,7 +165,6 @@ app.addEventListener("click", (event) => {
     const current = selectedPerson();
     if (current && personIsArchived(current)) selectedPersonId = null;
     render();
-    document.querySelector("#people-card")?.scrollIntoView({ block: "start" });
   } else if (action === "archive") {
     archiveOpen = !archiveOpen;
     statusFilter = "all";
@@ -176,7 +175,6 @@ app.addEventListener("click", (event) => {
     const current = selectedPerson();
     if (current && personIsArchived(current) !== archiveOpen) selectedPersonId = null;
     render();
-    document.querySelector("#people-card")?.scrollIntoView({ block: "start" });
   } else if (action === "toggle-archive") {
     archiveChoicesFor = archiveChoicesFor === selectedPersonId ? "" : selectedPersonId;
     render();
@@ -190,7 +188,6 @@ app.addEventListener("click", (event) => {
     const current = selectedPerson();
     if (current && !personMatchesFilters(current)) selectedPersonId = null;
     render();
-    document.querySelector("#people-card")?.scrollIntoView({ block: "start" });
   } else if (action === "select-person") {
     selectedPersonId = button.dataset.id;
     view = "people";
