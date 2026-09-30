@@ -1653,7 +1653,9 @@ function youthEntryButton(entry, quorum = "") {
     </div>`;
   }
   const place = entry.quorum === "teachers" ? "Teachers" : "Priests";
-  return `<div class="person leader-row${tone}"><strong>${esc(entry.name)}</strong><small>${esc(entry.role)}${entry.role ? ` · ${place}` : place}</small>${ministeringLines(entry.name)}</div>`;
+  const person = findPersonByName(entry.name);
+  const open = person ? ` data-action="select-person" data-id="${esc(person.id)}" aria-current="${person.id === selectedPersonId}"` : "";
+  return `<div class="person leader-row${tone}"${open}><strong>${esc(entry.name)}</strong><small>${esc(entry.role)}${entry.role ? ` · ${place}` : place}</small>${ministeringLines(entry.name)}</div>`;
 }
 
 function ministeringLines(name) {
