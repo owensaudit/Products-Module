@@ -11,6 +11,7 @@ import {
   resolveComment,
   updateComment,
   addPerson,
+  removePerson,
   emptyState,
   importRows,
   logOutreach,
@@ -157,6 +158,13 @@ export function createPortalServer(store) {
         const personStatus = pathname.match(/^\/api\/people\/([^/]+)\/status$/);
         if (personStatus) {
           const next = await store.update((state) => setPersonStatus(state, decodeURIComponent(personStatus[1]), body.status));
+          sendJson(response, 200, presentState(next, month, viewOptions));
+          return;
+        }
+
+        const personDelete = pathname.match(/^\/api\/people\/([^/]+)\/delete$/);
+        if (personDelete) {
+          const next = await store.update((state) => removePerson(state, decodeURIComponent(personDelete[1])));
           sendJson(response, 200, presentState(next, month, viewOptions));
           return;
         }

@@ -323,6 +323,8 @@ app.addEventListener("click", (event) => {
       if (editingCommentId === button.dataset.id) editingCommentId = "";
       render();
     }).catch(showError);
+  } else if (action === "clear-assignment") {
+    post(`/api/people/${button.dataset.id}/delete`, {}).then(render).catch(showError);
   } else if (action === "reset") {
     if (confirm("Clear everyone, outreach, visits, and comments stored in this portal?")) {
       post("/api/reset", {}).then(() => {
@@ -343,6 +345,10 @@ app.addEventListener("submit", (event) => {
   event.preventDefault();
   const data = new FormData(form);
   const kind = form.dataset.form;
+  if (kind === "add-assignment") {
+    addYouthAssignment(form.dataset.youthId, data.get("assignment")).catch(showError);
+    return;
+  }
   if (kind === "add-person") {
     const known = new Set((state?.people || []).map((person) => person.id));
     const payload = {
@@ -484,6 +490,19 @@ app.addEventListener("input", (event) => {
 });
 
 app.addEventListener("focusout", (event) => {
+  const companion = event.target.closest?.(".companion-input");
+  if (companion) {
+    const card = companion.closest(".ministering-card");
+    const stay = event.relatedTarget instanceof Node && card?.contains(event.relatedTarget);
+    saveYouthCompanion(companion.dataset.youthId, companion.value, { render: !stay }).catch(showError);
+    if (stay) event.stopPropagation();
+    return;
+  }
+  const assignment = event.target.closest?.("[data-assignment-id]");
+  if (assignment) {
+    saveAssignmentName(assignment.dataset.assignmentId, assignment.value).catch(showError);
+    return;
+  }
   if (!event.target.closest?.("form[data-form='contact'], form[data-form='facts'], .special-notes, .person-name")) return;
   clearTimeout(contactTimer);
   saveContactFields();
@@ -840,6 +859,48 @@ function restoreContactDraft(draft) {
   if ((field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) && typeof draft.start === "number" && typeof draft.end === "number") {
     field.setSelectionRange(draft.start, draft.end);
   }
+}
+
+function saveYouthCompanion(youthId, companion, options = {}) {
+  const youth = (state?.people || []).find((person) => person.id === youthId);
+  if (!youth) return Promise.resolve();
+  const next = String(companion || "").trim();
+  const current = ministeringCompanionValue(youth, ministeringForYouth(nameKey(youth)).families);
+  if (next === current) return Promise.resolve();
+  const families = ministeringForYouth(nameKey(youth)).families;
+  const saved = post(`/api/people/${youthId}/contact`, { companion: next }).then(async () => {
+    for (const family of families) {
+      const assigned = [nameKey(youth)];
+      if (next) assigned.push(next);
+      await post(`/api/people/${family.id}/contact`, { assigned });
+    }
+  });
+  return options.render === false ? saved : saved.then(render);
+}
+
+function saveAssignmentName(personId, name) {
+  const person = (state?.people || []).find((item) => item.id === personId);
+  const next = String(name || "").trim();
+  if (!person || !next || next === nameKey(person)) return Promise.resolve();
+  return post(`/api/people/${personId}/contact`, { name: next }).then(render);
+}
+
+function addYouthAssignment(youthId, familyName) {
+  const youth = (state?.people || []).find((person) => person.id === youthId);
+  const name = String(familyName || "").trim();
+  if (!youth || !name) return Promise.resolve();
+  const companion = ministeringCompanionValue(youth, ministeringForYouth(nameKey(youth)).families);
+  const assigned = [nameKey(youth)];
+  if (companion) assigned.push(companion);
+  const existing = youthVisits().find((person) => nameKey(person).toLowerCase() === name.toLowerCase());
+  const request = existing
+    ? post(`/api/people/${existing.id}/contact`, { assigned })
+    : post("/api/people", {
+      displayName: name,
+      list: "youth",
+      sheetColumns: { Brother: name, Assigned: assigned.join(" | ") },
+    });
+  return request.then(render);
 }
 
 function saveContactFields() {
@@ -1377,6 +1438,11 @@ function ministeringForYouth(name) {
   return { companion, families: visits };
 }
 
+function ministeringCompanionValue(person, families) {
+  const fromVisit = (families || []).map((item) => item.assigned?.[1]).find((item) => String(item || "").trim());
+  return fromVisit || person.sheetColumns?.Companion || "";
+}
+
 function ministeringRows(quorum) {
   const needle = search.trim().toLowerCase();
   return youthMembers(quorum)
@@ -1390,20 +1456,31 @@ function ministeringRows(quorum) {
     .sort((a, b) => nameKey(a.person).localeCompare(nameKey(b.person), "en", { sensitivity: "base" }));
 }
 
-function ministeringTable(quorum) {
+function ministeringCards(quorum) {
   const rows = ministeringRows(quorum);
   if (!rows.length) return "";
-  const assignmentButton = (person) => `<button type="button" class="ministering-name" data-action="select-person" data-id="${esc(person.id)}">${esc(nameKey(person))}</button>`;
-  return `<table class="ministering-table quorum-${quorum}">
-    <thead><tr><th>Name</th><th>Companion</th><th>Assignment(s)</th></tr></thead>
-    <tbody>
-      ${rows.map((row) => `<tr>
-        <td>${assignmentButton(row.person)}</td>
-        <td>${row.companion ? esc(row.companion) : ""}</td>
-        <td>${row.families.map(assignmentButton).join("")}</td>
-      </tr>`).join("")}
-    </tbody>
-  </table>`;
+  return `<div class="ministering-cards quorum-${quorum}">
+    <div class="ministering-head"><span>Name</span><span>Companion</span><span>Assignment(s)</span></div>
+    ${rows.map((row) => {
+      const companion = ministeringCompanionValue(row.person, row.families);
+      const assignments = row.families.map((family) => `<span class="assignment-line">
+        <input data-assignment-id="${esc(family.id)}" value="${esc(nameKey(family))}" aria-label="Assignment">
+        <button type="button" class="text-button" data-action="select-person" data-id="${esc(family.id)}">Open</button>
+        <button type="button" class="text-button" data-action="clear-assignment" data-id="${esc(family.id)}">Remove</button>
+      </span>`).join("");
+      return `<article class="ministering-card">
+        <button type="button" class="ministering-name" data-action="select-person" data-id="${esc(row.person.id)}">${esc(nameKey(row.person))}</button>
+        <input class="companion-input" data-youth-id="${esc(row.person.id)}" value="${esc(companion)}" aria-label="Companion" placeholder="Companion">
+        <div class="assignment-editor">
+          ${assignments}
+          <form data-form="add-assignment" data-youth-id="${esc(row.person.id)}">
+            <input name="assignment" placeholder="Add assignment" aria-label="Add assignment">
+            <button type="submit">Add</button>
+          </form>
+        </div>
+      </article>`;
+    }).join("")}
+  </div>`;
 }
 
 function youthVisibleLists() {
@@ -1465,7 +1542,7 @@ function youthListMarkup() {
   return lists.map(([id, label, quorum]) => {
     const body = id === "leaders"
       ? visibleLeaders().map((entry) => youthEntryButton(entry, entry.quorum)).join("")
-      : ministeringTable(quorum);
+      : ministeringCards(quorum);
     if (!body) return "";
     return `<section class="youth-list-block">
       ${single ? "" : `<h3>${esc(label)}</h3>`}

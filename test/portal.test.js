@@ -26,6 +26,7 @@ import {
   setPresidency,
   setYouthLeadership,
   addPerson,
+  removePerson,
   personOutreachStatus,
   previewImport,
   presentState,
@@ -230,6 +231,10 @@ test("a phone number and email can be saved on a person", () => {
   assert.equal(state.people[0].sheetColumns.Assigned, "Ada Example");
   state = setPersonContact(state, "per_1", { assigned: [] });
   assert.equal(state.people[0].sheetColumns.Assigned, undefined);
+  state = setPersonContact(state, "per_1", { companion: " Companion " });
+  assert.equal(state.people[0].sheetColumns.Companion, "Companion");
+  state = setPersonContact(state, "per_1", { companion: "" });
+  assert.equal(state.people[0].sheetColumns.Companion, undefined);
 });
 
 test("moved, mission, do not contact, not interested, no contact info, declined, and visited are archive statuses", () => {
@@ -554,6 +559,16 @@ test("an outreach row records a presidency member, how they reached out, and the
     "Secretary: Harrison Bardo",
     "Asst. Secretary: Josh Owens",
   ]);
+});
+
+test("removing a youth assignment deletes that household", () => {
+  const ids = deps();
+  let state = emptyState();
+  state = addPerson(state, { displayName: "Example, Ada", group: "priests", sheetColumns: { Brother: "Example, Ada" } }, ids);
+  state = addPerson(state, { displayName: "Guest, Cam", list: "youth", sheetColumns: { Brother: "Guest, Cam", Assigned: "Example, Ada" } }, ids);
+  const removed = removePerson(state, "per_2");
+  assert.equal(removed.people.map((person) => person.id).join(","), "per_1");
+  assert.throws(() => removePerson(removed, "per_1"), /youth assignment/);
 });
 
 test("a youth member keeps a quorum and a blank leadership name", async () => {

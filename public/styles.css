@@ -946,6 +946,52 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
   text-transform: uppercase;
 }
 
+.ministering-cards { display: grid; gap: 10px; min-width: 36rem; }
+.ministering-head,
+.ministering-card {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.9fr) minmax(150px, 0.9fr) minmax(220px, 1.3fr);
+  gap: 12px;
+  align-items: start;
+}
+.ministering-head {
+  padding: 0 12px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+.ministering-card {
+  background: white;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.ministering-cards.quorum-priests .ministering-card { box-shadow: 0 0 0 3px #ffe56a; }
+.ministering-cards.quorum-teachers .ministering-card { box-shadow: 0 0 0 3px #3caf62; }
+.assignment-editor { display: grid; gap: 6px; }
+.assignment-line,
+.assignment-editor form { display: flex; gap: 6px; align-items: center; }
+.companion-input,
+.assignment-line input,
+.assignment-editor form input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font: inherit;
+  color: var(--ink);
+  background: white;
+}
+.assignment-editor .text-button {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: var(--church);
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
 .ministering-table {
   width: 100%;
   min-width: 36rem;
