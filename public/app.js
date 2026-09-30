@@ -44,6 +44,7 @@ let officeFilter = "all";
 let search = "";
 let dayFilter = "";
 let focusReachOutDate = false;
+let messagesOpen = false;
 let editingCommentId = "";
 let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let selectedPersonId = null;
@@ -542,6 +543,12 @@ presidencyHost?.addEventListener("submit", (event) => {
   event.preventDefault();
 });
 
+document.querySelector("#message-inbox")?.addEventListener("click", () => {
+  messagesOpen = !messagesOpen;
+  render();
+  if (messagesOpen) document.querySelector("#messages")?.scrollIntoView({ block: "nearest" });
+});
+
 document.querySelector("#month-calendar")?.addEventListener("click", (event) => {
   const control = event.target.closest("[data-action]");
   if (!control) return;
@@ -623,15 +630,16 @@ function render() {
   const contactDraft = readContactDraft();
   renderPresidency();
   renderCalendar();
+  renderMessageInbox();
   if (!state) {
     app.innerHTML = `<p class="empty">Loading the portal…</p>`;
     return;
   }
   if (!state.people.length && view === "people") {
-    app.innerHTML = `${tabs()}${rosterNeeded()}`;
+    app.innerHTML = `${messagesPanel()}${tabs()}${rosterNeeded()}`;
     return;
   }
-  app.innerHTML = `${tabs()}${summary()}${view === "people" ? peopleView() : view === "month" ? monthView() : importView()}`;
+  app.innerHTML = `${messagesPanel()}${tabs()}${summary()}${view === "people" ? peopleView() : view === "month" ? monthView() : importView()}`;
   restoreContactDraft(contactDraft);
   if (focusReachOutDate) {
     focusReachOutDate = false;
@@ -739,6 +747,42 @@ function peopleForDay(iso) {
       const rank = (person) => (prefer.has(person.rosterStatusKey) ? 0 : 1);
       return rank(a) - rank(b) || nameKey(a).localeCompare(nameKey(b), "en", { sensitivity: "base" });
     });
+}
+
+function renderMessageInbox() {
+  const button = document.querySelector("#message-inbox");
+  if (!button) return;
+  const count = state?.openMessages?.length || 0;
+  const bubble = button.querySelector(".message-bubble");
+  if (bubble) {
+    bubble.hidden = count === 0;
+    bubble.textContent = String(count);
+  }
+  button.setAttribute("aria-expanded", messagesOpen ? "true" : "false");
+  button.classList.toggle("is-open", messagesOpen);
+}
+
+function messagesPanel() {
+  if (!messagesOpen || !state) return "";
+  const items = state.openMessages || [];
+  const cards = items.length
+    ? items.map((message) => messageCard(message)).join("")
+    : `<p class="empty">No messages need an answer.</p>`;
+  return `<section class="card messages-panel" id="messages">
+    <h2>Messages</h2>
+    <p class="muted">A note that mentions someone stays here until it gets a response or is resolved.</p>
+    ${cards}
+  </section>`;
+}
+
+function messageCard(message) {
+  const about = message.personName ? `<button type="button" class="ghost" data-action="select-person" data-id="${esc(message.personId)}">${esc(message.personName)}</button>` : "";
+  return `<article class="message-card">
+    <p class="muted">Question for ${esc(message.mentions.join(", "))}</p>
+    ${about}
+    ${commentBody(message)}
+    ${answerTools(message.id)}
+  </article>`;
 }
 
 function rosterNeeded() {
@@ -1379,8 +1423,14 @@ function commentList(targetType, targetId) {
   if (!threads.length) return "";
   return threads.map(({ comment, replies }) => `<article class="comment">
     ${commentBody(comment)}
+    ${commentNeedsAnswer(comment) ? `<p class="needs-answer">Needs an answer</p>${answerTools(comment.id)}` : ""}
+    ${comment.resolvedAt ? `<p class="muted">Resolved</p>` : ""}
     ${replies.map((reply) => `<div class="reply">${commentBody(reply)}</div>`).join("")}
   </article>`).join("");
+}
+
+function commentNeedsAnswer(comment) {
+  return (state.openMessages || []).some((message) => message.id === comment.id);
 }
 
 function commentBody(comment) {
@@ -1400,6 +1450,18 @@ function commentBody(comment) {
       <button type="button" class="tiny" data-action="edit-comment" data-id="${esc(comment.id)}">Edit</button>
       <button type="button" class="tiny" data-action="delete-comment" data-id="${esc(comment.id)}">Delete</button>
     </div>`;
+}
+
+function answerTools(commentId) {
+  return `<form class="stack reply-form" data-form="reply">
+    <input type="hidden" name="parentId" value="${esc(commentId)}">
+    <label>Response <textarea name="body" required placeholder="Write a response"></textarea></label>
+    <div class="mention-menu" hidden></div>
+    <div class="comment-actions">
+      <button class="tiny primary" type="submit">Respond</button>
+      <button type="button" class="tiny" data-action="resolve-comment" data-id="${esc(commentId)}">Resolve</button>
+    </div>
+  </form>`;
 }
 
 function mentionHtml(body) {
