@@ -979,6 +979,24 @@ article.role-card { cursor: default; }
 }
 .role-card small { color: var(--muted); }
 .contact-line { white-space: pre-line; }
+.address-pill {
+  display: inline-block;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: white;
+  box-shadow: 0 0 0 3px var(--status-peach);
+  color: var(--ink);
+  text-decoration: none;
+  white-space: pre-line;
+  font-size: 14px;
+  line-height: 1.35;
+  justify-self: start;
+}
+.address-pill:hover { color: var(--church-deep); }
+.person > .address-pill { grid-column: 1 / -1; }
 .ministering-cards.quorum-priests .role-card { box-shadow: 0 0 0 3px #ffe56a; }
 .ministering-cards.quorum-teachers .role-card { box-shadow: 0 0 0 3px #3caf62; }
 .role-card.role-assignment,

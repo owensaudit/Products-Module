@@ -167,7 +167,7 @@ app.addEventListener("input", (event) => {
 });
 
 app.addEventListener("click", (event) => {
-  if (event.target.closest("select, input, textarea")) return;
+  if (event.target.closest("select, input, textarea, a.address-pill")) return;
   const button = event.target.closest("[data-action]");
   if (!button) return;
   const action = button.dataset.action;
@@ -1510,15 +1510,31 @@ function findPersonByName(name) {
   return (state?.people || []).find((person) => nameKey(person).trim().toLowerCase() === key) || null;
 }
 
+function mapsHref(address) {
+  const query = String(address || "").replace(/\s+/g, " ").trim();
+  if (!query) return "";
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
+function addressPill(address) {
+  const text = String(address || "").trim();
+  const href = mapsHref(text);
+  if (!href) return "";
+  return `<a class="address-pill" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(text)}</a>`;
+}
+
 function contactLines(person) {
   if (!person) return "";
-  const lines = [
-    String(person.household || "").trim(),
-    String(person.sheetColumns?.Address || "").trim(),
-    String(person.phone || "").trim(),
-    String(person.email || "").trim(),
-  ].filter(Boolean);
-  return lines.map((line) => `<small class="contact-line">${esc(line)}</small>`).join("");
+  const parts = [];
+  const household = String(person.household || "").trim();
+  const address = String(person.sheetColumns?.Address || "").trim();
+  const phone = String(person.phone || "").trim();
+  const email = String(person.email || "").trim();
+  if (household) parts.push(`<small class="contact-line">${esc(household)}</small>`);
+  if (address) parts.push(addressPill(address));
+  if (phone) parts.push(`<small class="contact-line">${esc(phone)}</small>`);
+  if (email) parts.push(`<small class="contact-line">${esc(email)}</small>`);
+  return parts.join("");
 }
 
 function roleCard(person, kind, fallback = "") {
@@ -1528,6 +1544,7 @@ function roleCard(person, kind, fallback = "") {
   const facts = kind === "Assignment" ? contactLines(person) : "";
   const body = `<span class="role-kicker">${esc(kind)}</span><strong>${esc(title)}</strong>${facts}`;
   if (!person) return `<article class="role-card${tone}">${body}</article>`;
+  if (kind === "Assignment") return `<div class="role-card${tone}" data-action="select-person" data-id="${esc(person.id)}">${body}</div>`;
   return `<button type="button" class="role-card${tone}" data-action="select-person" data-id="${esc(person.id)}">${body}</button>`;
 }
 
@@ -2157,6 +2174,7 @@ function contactFields(person, details = false) {
     </label>
     <label class="wide">Address
       <textarea name="address" rows="3">${esc(person.sheetColumns?.Address || "")}</textarea>
+      ${addressPill(person.sheetColumns?.Address)}
     </label>` : "";
   return `<form class="contact-fields" data-form="contact">
     ${household}
@@ -2181,6 +2199,14 @@ function syncContactLinks(form) {
   const emailInput = form.querySelector("[name=email]");
   const phone = phoneInput?.value.trim() || "";
   const email = emailInput?.value.trim() || "";
+  const addressInput = form.querySelector("[name=address]");
+  const addressLink = form.querySelector("a.address-pill");
+  if (addressInput && addressLink) {
+    const address = addressInput.value.trim();
+    addressLink.hidden = !address;
+    addressLink.textContent = address;
+    addressLink.href = mapsHref(address) || "#";
+  }
   phoneInput?.classList.toggle("is-missing", !phone);
   emailInput?.classList.toggle("is-missing", !email);
   const call = form.querySelector("[data-contact=call]");
