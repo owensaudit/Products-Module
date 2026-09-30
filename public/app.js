@@ -37,6 +37,7 @@ let search = "";
 let dayFilter = "";
 let messagesOpen = false;
 let editingCommentId = "";
+let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let selectedPersonId = null;
 let selectedSlotId = null;
 let detailForm = null;
@@ -420,9 +421,14 @@ presidencyHost?.addEventListener("submit", (event) => {
 });
 
 document.querySelector("#month-calendar")?.addEventListener("click", (event) => {
-  const day = event.target.closest("[data-action='open-day']");
-  if (!day) return;
-  openCalendarDay(day.dataset.date);
+  const control = event.target.closest("[data-action]");
+  if (!control) return;
+  if (control.dataset.action === "shift-month") {
+    calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + Number(control.dataset.delta), 1);
+    renderCalendar();
+    return;
+  }
+  if (control.dataset.action === "open-day") openCalendarDay(control.dataset.date);
 });
 
 document.querySelector("#message-inbox")?.addEventListener("click", () => {
@@ -467,12 +473,13 @@ function renderCalendar() {
   const host = document.querySelector("#month-calendar");
   if (!host) return;
   const now = new Date();
-  const year = now.getFullYear();
-  const monthIndex = now.getMonth();
+  const year = calendarMonth.getFullYear();
+  const monthIndex = calendarMonth.getMonth();
   const monthKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
-  const title = now.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const title = calendarMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" });
   const firstWeekday = new Date(year, monthIndex, 1).getDay();
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  const viewingNow = year === now.getFullYear() && monthIndex === now.getMonth();
   const marks = state?.calendarMarks || {};
   const weekdays = ["S", "M", "T", "W", "T", "F", "S"];
   const cells = weekdays.map((label) => `<span class="cal-dow">${label}</span>`);
@@ -486,10 +493,10 @@ function renderCalendar() {
       const label = kind === "scheduled" ? "Visit scheduled" : "Reach out";
       return `<span class="cal-dot ${kind}" title="${label}"></span>`;
     }).join("");
-    const described = [`${title.split(" ")[0]} ${day}`];
+    const described = [`${title} ${day}`];
     if (kinds.includes("scheduled")) described.push("visit scheduled");
     if (kinds.includes("reach_out")) described.push("reach out");
-    const today = day === now.getDate() ? " is-today" : "";
+    const today = viewingNow && day === now.getDate() ? " is-today" : "";
     const open = dayFilter === iso ? " is-open" : "";
     const inner = `<span class="cal-marks">${dots}</span><span class="cal-num">${day}</span>`;
     if (people.length) {
@@ -499,7 +506,11 @@ function renderCalendar() {
       cells.push(`<span class="cal-day${today}" data-date="${iso}" data-marks="${esc(kinds.join(" "))}" aria-label="${esc(described.join(", "))}">${inner}</span>`);
     }
   }
-  host.innerHTML = `<p class="cal-title">${esc(title)}</p>
+  host.innerHTML = `<div class="cal-nav">
+      <button type="button" class="cal-shift" data-action="shift-month" data-delta="-1" aria-label="Previous month">‹</button>
+      <p class="cal-title">${esc(title)}</p>
+      <button type="button" class="cal-shift" data-action="shift-month" data-delta="1" aria-label="Next month">›</button>
+    </div>
     <div class="cal-grid">${cells.join("")}</div>
     <p class="cal-legend">
       <span><i class="cal-dot scheduled"></i> Visit scheduled</span>

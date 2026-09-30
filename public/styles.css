@@ -204,8 +204,30 @@ h1 { margin: 0; font-size: 40px; line-height: 1.05; }
   padding: 10px 12px 12px;
 }
 
+.cal-nav {
+  display: grid;
+  grid-template-columns: 28px 1fr 28px;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.cal-shift {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--church);
+  font-size: 20px;
+  line-height: 1;
+  padding: 0;
+}
+
+.cal-shift:hover { background: #e8f4f8; }
+
 .cal-title {
-  margin: 0 0 8px;
+  margin: 0;
   text-align: center;
   color: var(--church);
   font-size: 13px;
