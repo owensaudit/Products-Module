@@ -367,8 +367,8 @@ app.addEventListener("submit", (event) => {
       return;
     }
     const place = String(data.get("place") || "");
-    if ((plan === "scheduled" || plan === "reschedule") && place !== "church" && place !== "home") {
-      showError(new Error("Choose Church or Home"));
+    if ((plan === "scheduled" || plan === "reschedule") && place !== "church" && place !== "home" && place !== "driveby") {
+      showError(new Error("Choose Church, Home, or Driveby"));
       return;
     }
     const path = plan === "reach_out" ? `/api/people/${selectedPersonId}/reach-out` : `/api/people/${selectedPersonId}/appointment`;
@@ -1177,9 +1177,21 @@ function homeIcon() {
   return `<svg class="place-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11.2 12 4.2l8.5 7V20.5h-6.2v-5.4H9.7v5.4H3.5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
 }
 
+function drivebyIcon() {
+  return `<svg class="place-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15.5h16M6.2 15.5 7.6 11.3h8.8L17.8 15.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="7.5" cy="16.4" r="1.3" fill="currentColor"/><circle cx="16.5" cy="16.4" r="1.3" fill="currentColor"/></svg>`;
+}
+
+function placeIcon(place) {
+  if (place === "Church") return churchIcon();
+  if (place === "Home") return homeIcon();
+  if (place === "Driveby") return drivebyIcon();
+  return "";
+}
+
 function placeMark(place) {
-  if (place !== "Church" && place !== "Home") return "";
-  return `<span class="place-mark">${place === "Church" ? churchIcon() : homeIcon()}${esc(place)}</span>`;
+  const icon = placeIcon(place);
+  if (!icon) return "";
+  return `<span class="place-mark">${icon}${esc(place)}</span>`;
 }
 
 function placeChoice(place) {
@@ -1187,7 +1199,7 @@ function placeChoice(place) {
     <input type="radio" name="place" value="${value}" ${place === label ? "checked" : ""}>
     ${icon}${label}
   </label>`;
-  return `<span class="place-choices">${option("church", "Church", churchIcon())}${option("home", "Home", homeIcon())}</span>`;
+  return `<span class="place-choices">${option("church", "Church", churchIcon())}${option("home", "Home", homeIcon())}${option("driveby", "Driveby", drivebyIcon())}</span>`;
 }
 
 function planLine(person) {

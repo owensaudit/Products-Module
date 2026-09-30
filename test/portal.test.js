@@ -102,7 +102,7 @@ test("an appointment is a date and time that marks the brother scheduled", () =>
     ...state,
     people: [{ id: "per_1", displayName: "Ada Example", phone: "", email: "", household: "", notes: "", sheetColumns: {}, createdAt: "2026-09-29T12:00:00.000Z", updatedAt: "2026-09-29T12:00:00.000Z" }],
   };
-  assert.throws(() => setAppointment(state, "per_1", { date: "2026-10-21", time: "19:00" }), /Church or Home/);
+  assert.throws(() => setAppointment(state, "per_1", { date: "2026-10-21", time: "19:00" }), /Church, Home, or Driveby/);
   state = setAppointment(state, "per_1", { date: "2026-10-21", time: "19:00", place: "church" });
   assert.equal(state.people[0].sheetColumns["Apt Date"], "10/21 7:00 PM");
   assert.equal(state.people[0].sheetColumns["Apt Place"], "Church");
@@ -140,6 +140,10 @@ test("an appointment is a date and time that marks the brother scheduled", () =>
   state = setAppointment(state, "per_1", { date: "2026-11-04", time: "18:00", kind: "reschedule", place: "home" });
   assert.equal(state.people[0].sheetColumns.Status, "Re-Schedule");
   assert.equal(state.people[0].sheetColumns["Apt Date"], "11/4 6:00 PM");
+  state = setAppointment(state, "per_1", { date: "2026-11-05", time: "18:30", kind: "scheduled", place: "drive-by" });
+  assert.equal(state.people[0].sheetColumns["Apt Place"], "Driveby");
+  assert.equal(state.people[0].sheetColumns.Status, "Scheduled");
+  assert.equal(presentState(state, "2026-11").people[0].appointmentPlace, "Driveby");
 });
 
 test("a reach out needs a date and marks that calendar day", () => {
