@@ -122,6 +122,17 @@ test("an appointment is a date and time that marks the brother scheduled", () =>
   assert.equal(state.people[0].sheetColumns.Status, "Re-Schedule");
   assert.equal(state.people[0].sheetColumns["Apt Date"], "10/20 10:50 PM");
   assert.deepEqual(presentState(state, "2026-10").calendarMarks["2026-10-20"], { kinds: ["reschedule"], people: ["per_1"] });
+  state = setReachOutDate(state, "per_1", { date: "2026-11-02" });
+  assert.equal(state.people[0].sheetColumns.Status, "Reach Out");
+  assert.equal(state.people[0].sheetColumns["Reach Out Date"], "11/2");
+  assert.equal(state.people[0].sheetColumns["Apt Date"], undefined);
+  assert.equal(presentState(state, "2026-10").calendarMarks["2026-10-20"], undefined);
+  state = setAppointment(state, "per_1", { date: "2026-11-03", time: "19:00", kind: "scheduled" });
+  assert.equal(state.people[0].sheetColumns.Status, "Scheduled");
+  assert.equal(state.people[0].sheetColumns["Reach Out Date"], undefined);
+  state = setAppointment(state, "per_1", { date: "2026-11-04", time: "18:00", kind: "reschedule" });
+  assert.equal(state.people[0].sheetColumns.Status, "Re-Schedule");
+  assert.equal(state.people[0].sheetColumns["Apt Date"], "11/4 6:00 PM");
 });
 
 test("a reach out needs a date and marks that calendar day", () => {

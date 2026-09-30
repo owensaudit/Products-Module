@@ -164,7 +164,8 @@ h1 { margin: 0; font-size: 40px; line-height: 1.05; }
 }
 
 .appointment-row input[type="date"],
-.appointment-row input[type="time"] {
+.appointment-row input[type="time"],
+.appointment-row select {
   width: auto;
   background: var(--card);
   border: 1px solid var(--line);

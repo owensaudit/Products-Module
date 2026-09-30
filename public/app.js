@@ -300,9 +300,21 @@ app.addEventListener("submit", (event) => {
       detailForm = "visit";
       render();
     }).catch(showError);
-  } else if (kind === "reach-out") {
+  } else if (kind === "plan") {
     const date = String(data.get("date") || "");
-    post(`/api/people/${selectedPersonId}/reach-out`, { date }).then(() => {
+    const plan = String(data.get("kind") || "");
+    const time = String(data.get("time") || "");
+    if (!plan) {
+      showError(new Error("Choose Reach out, Scheduled Appt, or Re-Schedule"));
+      return;
+    }
+    if ((plan === "scheduled" || plan === "reschedule") && !time) {
+      showError(new Error("Add a time for a scheduled appointment"));
+      return;
+    }
+    const path = plan === "reach_out" ? `/api/people/${selectedPersonId}/reach-out` : `/api/people/${selectedPersonId}/appointment`;
+    const body = plan === "reach_out" ? { date } : { date, time, kind: plan };
+    post(path, body).then(() => {
       if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
         const [year, month] = date.split("-").map(Number);
         calendarMonth = new Date(year, month - 1, 1);
@@ -310,19 +322,7 @@ app.addEventListener("submit", (event) => {
         statusFilter = "all";
         officeFilter = "all";
         search = "";
-      }
-      render();
-    }).catch(showError);
-  } else if (kind === "appointment") {
-    const date = String(data.get("date") || "");
-    post(`/api/people/${selectedPersonId}/appointment`, { date, time: data.get("time") }).then(() => {
-      if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-        const [year, month] = date.split("-").map(Number);
-        calendarMonth = new Date(year, month - 1, 1);
-        dayFilter = date;
-        statusFilter = "all";
-        officeFilter = "all";
-        search = "";
+        archiveOpen = false;
       }
       render();
     }).catch(showError);
@@ -515,7 +515,7 @@ function render() {
   app.innerHTML = `${messagesPanel()}${tabs()}${summary()}${view === "people" ? peopleView() : view === "month" ? monthView() : importView()}`;
   if (focusReachOutDate) {
     focusReachOutDate = false;
-    document.querySelector('form[data-form="reach-out"] input[name="date"]')?.focus();
+    document.querySelector('form[data-form="plan"] input[name="date"]')?.focus();
   }
 }
 
@@ -963,10 +963,8 @@ function rosterDetail(person) {
   return `<h2>${esc(personLabel(person))}</h2>
     <p class="status-row">${statusSelect(person)}${archiveControl(person)}</p>
     ${facts.length ? `<p>${esc(facts.join(" · "))}</p>` : ""}
-    ${person.reachOutDate ? `<p><strong>Reach out</strong> ${esc(person.reachOutDate)}</p>` : `<p class="muted">Pick a date to schedule the reach out.</p>`}
-    ${reachOutForm(person)}
-    ${person.appointment ? `<p><strong>Appointment</strong> ${esc(person.appointment)}</p>` : `<p class="muted">No appointment date yet.</p>`}
-    ${appointmentForm(person)}
+    ${planLine(person)}
+    ${planForm(person)}
     ${person.notes ? `<p>${esc(person.notes)}</p>` : ""}
     ${contactLine(person)}
     <h3>Outreach</h3>
@@ -976,19 +974,49 @@ function rosterDetail(person) {
     ${commentForm("person", person.id)}`;
 }
 
+function planLine(person) {
+  const key = person.rosterStatusKey;
+  if (key === "reach_out" && person.reachOutDate) return `<p><strong>Reach out</strong> ${esc(person.reachOutDate)}</p>`;
+  if (key === "scheduled" && person.appointment) return `<p><strong>Scheduled Appt</strong> ${esc(person.appointment)}</p>`;
+  if (key === "reschedule" && person.appointment) return `<p><strong>Re-Schedule</strong> ${esc(person.appointment)}</p>`;
+  if (person.appointment) return `<p><strong>Scheduled Appt</strong> ${esc(person.appointment)}</p>`;
+  if (person.reachOutDate) return `<p><strong>Reach out</strong> ${esc(person.reachOutDate)}</p>`;
+  return `<p class="muted">No date yet.</p>`;
+}
+
+function planParts(person) {
+  const key = person.rosterStatusKey;
+  if (key === "reach_out" && person.reachOutDate) return { date: reachOutParts(person.reachOutDate), time: "", kind: "reach_out" };
+  if (person.appointment && (key === "scheduled" || key === "reschedule")) {
+    return { ...appointmentParts(person.appointment), kind: key === "reschedule" ? "reschedule" : "scheduled" };
+  }
+  if (person.reachOutDate) return { date: reachOutParts(person.reachOutDate), time: "", kind: "" };
+  if (person.appointment) return { ...appointmentParts(person.appointment), kind: "" };
+  return { date: "", time: "", kind: "" };
+}
+
+function planForm(person) {
+  const current = planParts(person);
+  const choice = (value, label) => `<option value="${value}" ${current.kind === value ? "selected" : ""}>${label}</option>`;
+  return `<form class="appointment-row" data-form="plan">
+    <input name="date" type="date" aria-label="Date" required value="${esc(current.date)}">
+    <input name="time" type="time" aria-label="Time" value="${esc(current.time)}">
+    <select name="kind" aria-label="What this date is" required>
+      <option value="">What</option>
+      ${choice("reach_out", "Reach out")}
+      ${choice("scheduled", "Scheduled Appt")}
+      ${choice("reschedule", "Re-Schedule")}
+    </select>
+    <button class="tiny primary" type="submit">Schedule</button>
+  </form>`;
+}
+
 function reachOutParts(value) {
   const match = String(value || "").trim().match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/);
   if (!match) return "";
   let year = match[3] ? Number(match[3]) : 2026;
   if (year < 100) year += 2000;
   return `${year}-${match[1].padStart(2, "0")}-${match[2].padStart(2, "0")}`;
-}
-
-function reachOutForm(person) {
-  return `<form class="appointment-row" data-form="reach-out">
-    <input name="date" type="date" aria-label="Reach out date" required value="${esc(reachOutParts(person.reachOutDate))}">
-    <button class="tiny primary" type="submit">Schedule</button>
-  </form>`;
 }
 
 function appointmentParts(appointment) {
@@ -1003,15 +1031,6 @@ function appointmentParts(appointment) {
     date: `${year}-${match[1].padStart(2, "0")}-${match[2].padStart(2, "0")}`,
     time: `${String(hour).padStart(2, "0")}:${match[5]}`,
   };
-}
-
-function appointmentForm(person) {
-  const current = appointmentParts(person.appointment);
-  return `<form class="appointment-row" data-form="appointment">
-    <input name="date" type="date" aria-label="Appointment date" required value="${esc(current.date)}">
-    <input name="time" type="time" aria-label="Appointment time" required value="${esc(current.time)}">
-    <button class="tiny primary" type="submit">Schedule</button>
-  </form>`;
 }
 
 function contactLine(person) {
