@@ -724,6 +724,7 @@ function openPage(next) {
   archiveOpen = false;
   viewAll = false;
   assigneeFilter = "";
+  dayFilter = "";
   view = "people";
   render();
 }
