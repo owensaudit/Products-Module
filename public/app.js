@@ -44,7 +44,7 @@ let officeFilter = "all";
 let search = "";
 let dayFilter = "";
 let focusReachOutDate = false;
-let messagesOpen = false;
+let messageCursor = 0;
 let editingCommentId = "";
 let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let selectedPersonId = null;
@@ -549,9 +549,23 @@ presidencyHost?.addEventListener("submit", (event) => {
 });
 
 document.querySelector("#message-inbox")?.addEventListener("click", () => {
-  messagesOpen = !messagesOpen;
+  const messages = state?.openMessages || [];
+  if (!messages.length) return;
+  const message = messages[messageCursor % messages.length];
+  messageCursor = (messageCursor + 1) % messages.length;
+  const person = state.people.find((item) => item.id === message.personId);
+  if (person) {
+    selectedPersonId = person.id;
+    archiveOpen = personIsArchived(person);
+    archiveChoicesFor = "";
+    statusFilter = "all";
+    search = "";
+    dayFilter = "";
+    officeFilter = "all";
+    view = "people";
+  }
   render();
-  if (messagesOpen) document.querySelector("#messages")?.scrollIntoView({ block: "nearest" });
+  document.getElementById(`comment-${message.id}`)?.scrollIntoView({ block: "nearest" });
 });
 
 document.querySelector("#month-calendar")?.addEventListener("click", (event) => {
@@ -641,10 +655,10 @@ function render() {
     return;
   }
   if (!state.people.length && view === "people") {
-    app.innerHTML = `${messagesPanel()}${tabs()}${rosterNeeded()}`;
+    app.innerHTML = `${tabs()}${rosterNeeded()}`;
     return;
   }
-  app.innerHTML = `${messagesPanel()}${tabs()}${summary()}${view === "people" ? peopleView() : view === "month" ? monthView() : importView()}`;
+  app.innerHTML = `${tabs()}${summary()}${view === "people" ? peopleView() : view === "month" ? monthView() : importView()}`;
   restoreContactDraft(contactDraft);
   if (focusReachOutDate) {
     focusReachOutDate = false;
@@ -763,31 +777,6 @@ function renderMessageInbox() {
     bubble.hidden = count === 0;
     bubble.textContent = String(count);
   }
-  button.setAttribute("aria-expanded", messagesOpen ? "true" : "false");
-  button.classList.toggle("is-open", messagesOpen);
-}
-
-function messagesPanel() {
-  if (!messagesOpen || !state) return "";
-  const items = state.openMessages || [];
-  const cards = items.length
-    ? items.map((message) => messageCard(message)).join("")
-    : `<p class="empty">No messages need an answer.</p>`;
-  return `<section class="card messages-panel" id="messages">
-    <h2>Messages</h2>
-    <p class="muted">A note that mentions someone stays here until it gets a response or is resolved.</p>
-    ${cards}
-  </section>`;
-}
-
-function messageCard(message) {
-  const about = message.personName ? `<button type="button" class="ghost" data-action="select-person" data-id="${esc(message.personId)}">${esc(message.personName)}</button>` : "";
-  return `<article class="message-card">
-    <p class="muted">Question for ${esc(message.mentions.join(", "))}</p>
-    ${about}
-    ${commentBody(message)}
-    ${answerTools(message.id)}
-  </article>`;
 }
 
 function rosterNeeded() {
@@ -1452,7 +1441,7 @@ function commentThreads(targetType, targetId) {
 function commentList(targetType, targetId) {
   const threads = commentThreads(targetType, targetId);
   if (!threads.length) return "";
-  return threads.map(({ comment, replies }) => `<article class="comment">
+  return threads.map(({ comment, replies }) => `<article class="comment" id="comment-${esc(comment.id)}">
     ${commentBody(comment)}
     ${commentNeedsAnswer(comment) ? `<p class="needs-answer">Needs an answer</p>${answerTools(comment.id)}` : ""}
     ${comment.resolvedAt ? `<p class="muted">Resolved</p>` : ""}

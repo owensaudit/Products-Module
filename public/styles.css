@@ -123,8 +123,6 @@ h1 { margin: 0; font-size: 40px; line-height: 1.05; }
 
 .message-inbox svg { width: 22px; height: 22px; }
 
-.message-inbox.is-open { outline: 2px solid var(--church); }
-
 .message-bubble {
   position: absolute;
   top: -4px;
@@ -139,16 +137,6 @@ h1 { margin: 0; font-size: 40px; line-height: 1.05; }
   font-weight: 700;
   line-height: 18px;
   text-align: center;
-}
-
-.messages-panel { margin-bottom: 16px; }
-
-.message-card {
-  border-top: 1px solid var(--line);
-  padding-top: 12px;
-  margin-top: 12px;
-  display: grid;
-  gap: 8px;
 }
 
 .needs-answer { margin: 8px 0 0; color: var(--gold); font-weight: 600; }
