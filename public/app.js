@@ -1037,7 +1037,7 @@ function personDetail() {
     ${contactBlock(person)}
     <h3>Outreach</h3>
     ${attemptList(person)}
-    <h3>Comments <span class="muted">${person.commentCount}</span></h3>
+    <h3>Comments${person.commentCount ? ` <span class="muted">${person.commentCount}</span>` : ""}</h3>
     ${commentList("person", person.id)}
     ${commentForm("person", person.id)}`;
 }
@@ -1052,7 +1052,7 @@ function rosterDetail(person) {
     ${planForm(person)}
     <h3>Outreach</h3>
     ${attemptList(person)}
-    <h3>Comments <span class="muted">${person.commentCount}</span></h3>
+    <h3>Comments${person.commentCount ? ` <span class="muted">${person.commentCount}</span>` : ""}</h3>
     ${commentList("person", person.id)}
     ${commentForm("person", person.id)}`;
 }
@@ -1064,7 +1064,7 @@ function planLine(person) {
   if (key === "reschedule" && person.appointment) return `<p><strong>Re-Schedule</strong> ${esc(person.appointment)}</p>`;
   if (person.appointment) return `<p><strong>Scheduled Appt</strong> ${esc(person.appointment)}</p>`;
   if (person.reachOutDate) return `<p><strong>Reach out</strong> ${esc(person.reachOutDate)}</p>`;
-  return `<p class="muted">No date yet.</p>`;
+  return "";
 }
 
 function planParts(person) {
@@ -1302,7 +1302,7 @@ function sheetColumnList(columns, privateColumns = []) {
 function attemptList(person) {
   const attempts = personTouches(person);
   if (state.rosterMode) return outreachTable(attempts);
-  if (!attempts.length) return `<p class="empty">No attempts yet.</p>`;
+  if (!attempts.length) return "";
   return `<ul class="history">${attempts.map((attempt) => `<li>
       <strong>${esc(whoLabel(attempt) || CHANNEL_LABELS[attempt.channel] || attempt.channel)}</strong>
       · ${esc(CHANNEL_LABELS[attempt.channel] || attempt.channel)}
@@ -1356,7 +1356,7 @@ function commentThreads(targetType, targetId) {
 
 function commentList(targetType, targetId) {
   const threads = commentThreads(targetType, targetId);
-  if (!threads.length) return `<p class="empty">No comments yet. Type @ to mention someone.</p>`;
+  if (!threads.length) return "";
   return threads.map(({ comment, replies }) => `<article class="comment">
     ${commentBody(comment)}
     ${commentNeedsAnswer(comment) ? `<p class="needs-answer">Needs an answer</p>${answerTools(comment.id)}` : ""}
