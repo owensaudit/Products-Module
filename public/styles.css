@@ -84,7 +84,7 @@ button { cursor: pointer; }
 
 .site-header {
   display: grid;
-  grid-template-columns: max-content minmax(200px, 280px) minmax(460px, 1fr);
+  grid-template-columns: max-content minmax(200px, 280px) minmax(280px, 1fr);
   align-items: start;
   gap: 24px;
   padding: 28px 32px 8px;
@@ -280,7 +280,7 @@ h1 { margin: 0; font-size: 40px; line-height: 1.05; }
 }
 
 .presidency-board {
-  grid-template-columns: minmax(0, 1.1fr) minmax(88px, 0.8fr) minmax(120px, 1.2fr) max-content;
+  grid-template-columns: minmax(7.5rem, 1fr) 4.75rem 6.75rem max-content;
   column-gap: 10px;
   row-gap: 4px;
   align-items: center;
@@ -487,14 +487,23 @@ input[type="text"], input[type="month"], input[type="date"], input[type="email"]
   border-bottom: 1px solid var(--line);
 }
 
-.presidency-board input[name^="phone-"]:not(:placeholder-shown),
-.presidency-board input[name^="email-"]:not(:placeholder-shown) {
-  -webkit-text-security: disc;
+.presidency-board input[name^="phone-"],
+.presidency-board input[name^="email-"] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.presidency-board input[name^="phone-"]:not(:placeholder-shown):is(:hover, :focus),
-.presidency-board input[name^="email-"]:not(:placeholder-shown):is(:hover, :focus) {
-  -webkit-text-security: none;
+.presidency-board input[name^="phone-"]:is(:hover, :focus),
+.presidency-board input[name^="email-"]:is(:hover, :focus) {
+  overflow: visible;
+  text-overflow: clip;
+  width: max-content;
+  min-width: 100%;
+  field-sizing: content;
+  z-index: 2;
+  background: var(--paper);
+  box-shadow: 0 0 0 3px var(--paper);
 }
 
 textarea { min-height: 72px; width: 100%; resize: vertical; }
