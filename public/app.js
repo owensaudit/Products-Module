@@ -912,7 +912,7 @@ function sheetColumnList(columns, privateColumns = []) {
 }
 
 function attemptList(person) {
-  const attempts = personTouches(person).slice().reverse();
+  const attempts = personTouches(person);
   if (state.rosterMode) return outreachTable(attempts);
   if (!attempts.length) return `<p class="empty">No attempts yet.</p>`;
   return `<ul class="history">${attempts.map((attempt) => `<li>
