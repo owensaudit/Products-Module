@@ -419,6 +419,8 @@ app.addEventListener("input", (event) => {
     renderPeopleList();
   }
   if (event.target.closest?.("form[data-form='contact'], form[data-form='facts'], .special-notes")) {
+    const contact = event.target.closest("form[data-form='contact']");
+    if (contact) syncContactLinks(contact);
     clearTimeout(contactTimer);
     contactTimer = setTimeout(saveContactFields, 400);
   }
@@ -1272,10 +1274,43 @@ function specialNotes(person) {
 }
 
 function contactFields(person) {
+  const phone = String(person.phone || "").trim();
+  const email = String(person.email || "").trim();
   return `<form class="contact-fields" data-form="contact">
-    <label>Phone <input name="phone" type="tel" autocomplete="off" inputmode="tel" value="${esc(person.phone || "")}"></label>
-    <label>Email <input name="email" type="email" autocomplete="off" inputmode="email" value="${esc(person.email || "")}"></label>
+    <div>
+      <label>Phone <input name="phone" type="tel" autocomplete="off" inputmode="tel" value="${esc(phone)}"></label>
+      <span class="contact-actions">
+        <a class="tiny" data-contact="call" href="${phone ? `tel:${esc(phone)}` : ""}" ${phone ? "" : "hidden"}>Call</a>
+        <a class="tiny" data-contact="text" href="${phone ? `sms:${esc(phone)}` : ""}" ${phone ? "" : "hidden"}>Text</a>
+      </span>
+    </div>
+    <div>
+      <label>Email <input name="email" type="email" autocomplete="off" inputmode="email" value="${esc(email)}"></label>
+      <span class="contact-actions">
+        <a class="tiny" data-contact="mail" href="${email ? `mailto:${esc(email)}` : ""}" ${email ? "" : "hidden"}>Email</a>
+      </span>
+    </div>
   </form>`;
+}
+
+function syncContactLinks(form) {
+  const phone = form.querySelector("[name=phone]")?.value.trim() || "";
+  const email = form.querySelector("[name=email]")?.value.trim() || "";
+  const call = form.querySelector("[data-contact=call]");
+  const text = form.querySelector("[data-contact=text]");
+  const mail = form.querySelector("[data-contact=mail]");
+  if (call) {
+    call.hidden = !phone;
+    call.href = phone ? `tel:${phone}` : "";
+  }
+  if (text) {
+    text.hidden = !phone;
+    text.href = phone ? `sms:${phone}` : "";
+  }
+  if (mail) {
+    mail.hidden = !email;
+    mail.href = email ? `mailto:${email}` : "";
+  }
 }
 
 function contactLine(person) {
