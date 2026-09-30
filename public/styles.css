@@ -530,6 +530,10 @@ input[type="text"], input[type="month"], input[type="date"], input[type="email"]
   min-width: 0;
 }
 
+.contact-fields input.is-missing {
+  border: 1px dotted #e7a3a3;
+}
+
 .presidency-board input {
   background: transparent;
   border: 0;

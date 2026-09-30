@@ -663,6 +663,8 @@ function restoreContactDraft(draft) {
   if (priesthood) priesthood.value = draft.priesthood;
   if (age) age.value = draft.age;
   if (birthday) birthday.value = draft.birthday;
+  const contact = card.querySelector("form[data-form='contact']");
+  if (contact) syncContactLinks(contact);
   const field = card.querySelector(`[name="${draft.field}"]`);
   if (!(field instanceof HTMLInputElement) && !(field instanceof HTMLTextAreaElement) && !(field instanceof HTMLSelectElement)) return;
   field.focus();
@@ -1317,14 +1319,14 @@ function contactFields(person) {
   const email = String(person.email || "").trim();
   return `<form class="contact-fields" data-form="contact">
     <div>
-      <label>Phone <input name="phone" type="tel" autocomplete="off" inputmode="tel" value="${esc(phone)}"></label>
+      <label>Phone <input name="phone" type="tel" autocomplete="off" inputmode="tel" value="${esc(phone)}" class="${phone ? "" : "is-missing"}"></label>
       <span class="contact-actions">
         <a class="tiny" data-contact="call" href="${phone ? `tel:${esc(phone)}` : ""}" ${phone ? "" : "hidden"}>Call</a>
         <a class="tiny" data-contact="text" href="${phone ? `sms:${esc(phone)}` : ""}" ${phone ? "" : "hidden"}>Text</a>
       </span>
     </div>
     <div>
-      <label>Email <input name="email" type="email" autocomplete="off" inputmode="email" value="${esc(email)}"></label>
+      <label>Email <input name="email" type="email" autocomplete="off" inputmode="email" value="${esc(email)}" class="${email ? "" : "is-missing"}"></label>
       <span class="contact-actions">
         <a class="tiny" data-contact="mail" href="${email ? `mailto:${esc(email)}` : ""}" ${email ? "" : "hidden"}>Email</a>
       </span>
@@ -1333,8 +1335,12 @@ function contactFields(person) {
 }
 
 function syncContactLinks(form) {
-  const phone = form.querySelector("[name=phone]")?.value.trim() || "";
-  const email = form.querySelector("[name=email]")?.value.trim() || "";
+  const phoneInput = form.querySelector("[name=phone]");
+  const emailInput = form.querySelector("[name=email]");
+  const phone = phoneInput?.value.trim() || "";
+  const email = emailInput?.value.trim() || "";
+  phoneInput?.classList.toggle("is-missing", !phone);
+  emailInput?.classList.toggle("is-missing", !email);
   const call = form.querySelector("[data-contact=call]");
   const text = form.querySelector("[data-contact=text]");
   const mail = form.querySelector("[data-contact=mail]");
