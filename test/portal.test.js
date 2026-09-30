@@ -182,6 +182,18 @@ test("a phone number and email can be saved on a person", () => {
   state = setPersonContact(state, "per_1", { notes: "  Knock first  " });
   assert.equal(state.people[0].notes, "Knock first");
   assert.equal(state.people[0].phone, "");
+  state = setPersonContact(state, "per_1", { priesthood: "High Priest", age: " 46 ", birthday: "26 Jun 1979" });
+  assert.equal(state.people[0].sheetColumns.Priesthood, "High Priest");
+  assert.equal(state.people[0].sheetColumns.Age, "46");
+  assert.equal(state.people[0].sheetColumns.Birthday, "26 Jun 1979");
+  assert.equal(state.people[0].notes, "Knock first");
+  const profile = presentState(state, "2026-09");
+  assert.equal(profile.people[0].priesthood, "High Priest");
+  assert.equal(profile.people[0].age, "46");
+  assert.equal(profile.people[0].birthday, "26 Jun 1979");
+  state = setPersonContact(state, "per_1", { priesthood: "" });
+  assert.equal(state.people[0].sheetColumns.Priesthood, undefined);
+  assert.equal(state.people[0].sheetColumns.Age, "46");
 });
 
 test("moved, mission, do not contact, not interested, no contact info, declined, and visited are archive statuses", () => {

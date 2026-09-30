@@ -18,6 +18,7 @@ const STATUS_LABELS = {
   no_contact_info: "No Contact Info",
 };
 
+const PRIESTHOOD_OFFICES = ["Unordained", "Deacon", "Teacher", "Priest", "Elder", "High Priest"];
 const ROSTER_STATUS_ORDER = ["reach_out", "no_response", "reschedule", "scheduled", "none"];
 const ARCHIVE_STATUS_ORDER = ["moved", "mission", "do_not_contact", "not_interested", "no_contact_info", "declined", "visited"];
 
@@ -98,6 +99,11 @@ app.addEventListener("change", (event) => {
         render();
       }).catch(showError);
     }
+    return;
+  }
+  if (target.closest?.("form[data-form='facts']")) {
+    clearTimeout(contactTimer);
+    saveContactFields();
     return;
   }
   if (!(target instanceof HTMLSelectElement)) return;
@@ -297,7 +303,7 @@ app.addEventListener("submit", (event) => {
       detailForm = "visit";
       render();
     }).catch(showError);
-  } else if (kind === "contact") {
+  } else if (kind === "contact" || kind === "facts") {
     clearTimeout(contactTimer);
     saveContactFields();
   } else if (kind === "plan") {
@@ -367,14 +373,14 @@ app.addEventListener("input", (event) => {
     search = event.target.value;
     renderPeopleList();
   }
-  if (event.target.closest?.("form[data-form='contact'], .special-notes")) {
+  if (event.target.closest?.("form[data-form='contact'], form[data-form='facts'], .special-notes")) {
     clearTimeout(contactTimer);
     contactTimer = setTimeout(saveContactFields, 400);
   }
 });
 
 app.addEventListener("focusout", (event) => {
-  if (!event.target.closest?.("form[data-form='contact'], .special-notes")) return;
+  if (!event.target.closest?.("form[data-form='contact'], form[data-form='facts'], .special-notes")) return;
   clearTimeout(contactTimer);
   saveContactFields();
 });
@@ -520,13 +526,16 @@ function readContactDraft() {
   const card = contactCard();
   const field = document.activeElement;
   if (!card || !field || !card.contains(field)) return null;
-  if (!field.closest?.("form[data-form='contact'], .special-notes")) return null;
+  if (!field.closest?.("form[data-form='contact'], form[data-form='facts'], .special-notes")) return null;
   return {
     personId: selectedPersonId,
     field: field.name || "",
     notes: card.querySelector(".special-notes [name=notes]")?.value ?? "",
     phone: card.querySelector("form[data-form='contact'] [name=phone]")?.value ?? "",
     email: card.querySelector("form[data-form='contact'] [name=email]")?.value ?? "",
+    priesthood: card.querySelector("form[data-form='facts'] [name=priesthood]")?.value ?? "",
+    age: card.querySelector("form[data-form='facts'] [name=age]")?.value ?? "",
+    birthday: card.querySelector("form[data-form='facts'] [name=birthday]")?.value ?? "",
     start: field.selectionStart,
     end: field.selectionEnd,
   };
@@ -539,13 +548,21 @@ function restoreContactDraft(draft) {
   const notes = card.querySelector(".special-notes [name=notes]");
   const phone = card.querySelector("form[data-form='contact'] [name=phone]");
   const email = card.querySelector("form[data-form='contact'] [name=email]");
+  const priesthood = card.querySelector("form[data-form='facts'] [name=priesthood]");
+  const age = card.querySelector("form[data-form='facts'] [name=age]");
+  const birthday = card.querySelector("form[data-form='facts'] [name=birthday]");
   if (notes) notes.value = draft.notes;
   if (phone) phone.value = draft.phone;
   if (email) email.value = draft.email;
+  if (priesthood) priesthood.value = draft.priesthood;
+  if (age) age.value = draft.age;
+  if (birthday) birthday.value = draft.birthday;
   const field = card.querySelector(`[name="${draft.field}"]`);
-  if (!(field instanceof HTMLInputElement) && !(field instanceof HTMLTextAreaElement)) return;
+  if (!(field instanceof HTMLInputElement) && !(field instanceof HTMLTextAreaElement) && !(field instanceof HTMLSelectElement)) return;
   field.focus();
-  if (typeof draft.start === "number" && typeof draft.end === "number") field.setSelectionRange(draft.start, draft.end);
+  if ((field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) && typeof draft.start === "number" && typeof draft.end === "number") {
+    field.setSelectionRange(draft.start, draft.end);
+  }
 }
 
 function saveContactFields() {
@@ -554,10 +571,14 @@ function saveContactFields() {
   const notes = card.querySelector(".special-notes [name=notes]")?.value.trim() ?? "";
   const phone = card.querySelector("form[data-form='contact'] [name=phone]")?.value.trim() ?? "";
   const email = card.querySelector("form[data-form='contact'] [name=email]")?.value.trim() ?? "";
+  const priesthood = card.querySelector("form[data-form='facts'] [name=priesthood]")?.value.trim() ?? "";
+  const age = card.querySelector("form[data-form='facts'] [name=age]")?.value.trim() ?? "";
+  const birthday = card.querySelector("form[data-form='facts'] [name=birthday]")?.value.trim() ?? "";
   const person = selectedPerson();
-  if (person && notes === (person.notes || "") && phone === (person.phone || "") && email === (person.email || "")) return;
-  post(`/api/people/${selectedPersonId}/contact`, { notes, phone, email }).then((next) => {
+  if (person && notes === (person.notes || "") && phone === (person.phone || "") && email === (person.email || "") && priesthood === (person.priesthood || "") && age === (person.age || "") && birthday === (person.birthday || "")) return;
+  post(`/api/people/${selectedPersonId}/contact`, { notes, phone, email, priesthood, age, birthday }).then((next) => {
     state = next;
+    render();
   }).catch(showError);
 }
 
@@ -1022,12 +1043,11 @@ function personDetail() {
 }
 
 function rosterDetail(person) {
-  const facts = [person.priesthood, person.age ? `Age ${person.age}` : "", person.birthday ? `Birthday ${person.birthday}` : ""].filter(Boolean);
   return `<h2>${esc(personLabel(person))}</h2>
     ${specialNotes(person)}
     <p class="status-row">${statusSelect(person)}${archiveControl(person)}</p>
     ${contactFields(person)}
-    ${facts.length ? `<p>${esc(facts.join(" · "))}</p>` : ""}
+    ${factsForm(person)}
     ${planLine(person)}
     ${planForm(person)}
     <h3>Outreach</h3>
@@ -1094,6 +1114,22 @@ function appointmentParts(appointment) {
     date: `${year}-${match[1].padStart(2, "0")}-${match[2].padStart(2, "0")}`,
     time: `${String(hour).padStart(2, "0")}:${match[5]}`,
   };
+}
+
+function factsForm(person) {
+  const current = person.priesthood || "";
+  const offices = PRIESTHOOD_OFFICES.includes(current) || !current ? PRIESTHOOD_OFFICES : [current, ...PRIESTHOOD_OFFICES];
+  const option = (office) => `<option value="${esc(office)}" ${office === current ? "selected" : ""}>${esc(office)}</option>`;
+  return `<form class="facts-row" data-form="facts">
+    <label>Priesthood
+      <select name="priesthood" aria-label="Priesthood">
+        <option value="" ${current ? "" : "selected"}></option>
+        ${offices.map(option).join("")}
+      </select>
+    </label>
+    <label>Age <input name="age" inputmode="numeric" autocomplete="off" value="${esc(person.age || "")}" aria-label="Age"></label>
+    <label>Birthday <input name="birthday" autocomplete="off" value="${esc(person.birthday || "")}" aria-label="Birthday"></label>
+  </form>`;
 }
 
 function specialNotes(person) {
