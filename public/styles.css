@@ -45,7 +45,7 @@ body {
   gap: 14px;
 }
 
-.church-mark { width: 34px; height: 46px; flex: none; }
+.church-mark { width: 46px; height: 64px; flex: none; }
 
 .church-name {
   margin: 0;
