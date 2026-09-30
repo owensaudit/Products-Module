@@ -44,6 +44,7 @@ let officeFilter = "all";
 let search = "";
 let dayFilter = "";
 let viewAll = false;
+let blankPlanFor = "";
 let focusReachOutDate = false;
 let messageCursor = 0;
 let editingCommentId = "";
@@ -353,6 +354,7 @@ app.addEventListener("submit", (event) => {
     const path = plan === "reach_out" ? `/api/people/${selectedPersonId}/reach-out` : `/api/people/${selectedPersonId}/appointment`;
     const body = plan === "reach_out" ? { date } : { date, time, kind: plan, place };
     post(path, body).then(() => {
+      blankPlanFor = selectedPersonId;
       render();
     }).catch(showError);
   } else if (kind === "comment") {
@@ -661,6 +663,7 @@ function saveContactFields() {
 }
 
 function render() {
+  if (blankPlanFor && blankPlanFor !== selectedPersonId) blankPlanFor = "";
   const contactDraft = readContactDraft();
   renderPresidency();
   renderCalendar();
@@ -1172,13 +1175,13 @@ function planParts(person) {
 }
 
 function planForm(person) {
-  const current = planParts(person);
+  const current = blankPlanFor === person.id ? { date: "", time: "", kind: "", place: "" } : planParts(person);
   const choice = (value, label) => `<option value="${value}" ${current.kind === value ? "selected" : ""}>${label}</option>`;
   return `<form class="appointment-row" data-form="plan">
     <input name="date" type="date" aria-label="Date" required value="${esc(current.date)}">
     <input name="time" type="time" aria-label="Time" value="${esc(current.time)}">
     <select name="kind" aria-label="What this date is" required>
-      <option value="">What</option>
+      <option value="" ${current.kind ? "" : "selected"}>What</option>
       ${choice("reach_out", "Reach out")}
       ${choice("scheduled", "Scheduled Appt")}
       ${choice("reschedule", "Re-Schedule")}
