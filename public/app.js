@@ -46,7 +46,7 @@ let dayFilter = "";
 let viewAll = false;
 let blankPlanFor = "";
 let focusReachOutDate = false;
-let messageCursor = 0;
+let commentsOpen = false;
 let editingCommentId = "";
 let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let selectedPersonId = null;
@@ -567,22 +567,8 @@ presidencyHost?.addEventListener("submit", (event) => {
 
 document.querySelector("#message-inbox")?.addEventListener("click", () => {
   const messages = state?.openMessages || [];
-  if (!messages.length) return;
-  const message = messages[messageCursor % messages.length];
-  messageCursor = (messageCursor + 1) % messages.length;
-  const person = state.people.find((item) => item.id === message.personId);
-  if (person) {
-    selectedPersonId = person.id;
-    archiveOpen = personIsArchived(person);
-    archiveChoicesFor = "";
-    statusFilter = "all";
-    search = "";
-    dayFilter = "";
-    officeFilter = "all";
-    view = "people";
-  }
+  commentsOpen = messages.length > 0 && !commentsOpen;
   render();
-  document.getElementById(`comment-${message.id}`)?.scrollIntoView({ block: "nearest" });
 });
 
 document.querySelector("#month-calendar")?.addEventListener("click", (event) => {
@@ -664,12 +650,17 @@ function saveContactFields() {
 
 function render() {
   if (blankPlanFor && blankPlanFor !== selectedPersonId) blankPlanFor = "";
+  if (commentsOpen && !(state?.openMessages || []).length) commentsOpen = false;
   const contactDraft = readContactDraft();
   renderPresidency();
   renderCalendar();
   renderMessageInbox();
   if (!state) {
     app.innerHTML = `<p class="empty">Loading the portal…</p>`;
+    return;
+  }
+  if (commentsOpen) {
+    app.innerHTML = commentsView();
     return;
   }
   if (!state.people.length && view === "people") {
@@ -759,6 +750,7 @@ function renderCalendar() {
 function openCalendarDay(iso) {
   const people = peopleForDay(iso);
   if (!people.length) return;
+  commentsOpen = false;
   viewAll = false;
   dayFilter = iso;
   archiveOpen = people.every((person) => personIsArchived(person));
@@ -787,9 +779,22 @@ function peopleForDay(iso) {
     });
 }
 
+function commentsView() {
+  const messages = state.openMessages || [];
+  return `<section class="comment-list" aria-label="Comments">
+    ${messages.map((message) => `<article class="comment" id="comment-${esc(message.id)}">
+      ${message.personName ? `<p class="comment-who">${esc(message.personName)}</p>` : ""}
+      <div class="comment-text">${mentionHtml(message.body)}</div>
+      <p class="needs-answer">Needs an answer</p>
+      ${answerTools(message.id)}
+    </article>`).join("")}
+  </section>`;
+}
+
 function renderMessageInbox() {
   const button = document.querySelector("#message-inbox");
   if (!button) return;
+  button.setAttribute("aria-pressed", commentsOpen ? "true" : "false");
   const count = state?.openMessages?.length || 0;
   const bubble = button.querySelector(".message-bubble");
   if (bubble) {
