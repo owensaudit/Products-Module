@@ -941,9 +941,19 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
 .ministering-table {
   width: 100%;
   min-width: 36rem;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0 8px;
   font-size: 14px;
 }
+
+.ministering-table.quorum-priests tbody tr { outline: 3px solid #ffe56a; }
+.ministering-table.quorum-teachers tbody tr { outline: 3px solid #3caf62; }
+
+.person.quorum-priests { box-shadow: 0 0 0 3px #ffe56a; }
+.person.quorum-teachers { box-shadow: 0 0 0 3px #3caf62; }
+
+.presidency-board.quorum-priests .pres-name-line { box-shadow: 0 0 0 2px #ffe56a; border-radius: 8px; }
+.presidency-board.quorum-teachers .pres-name-line { box-shadow: 0 0 0 2px #3caf62; border-radius: 8px; }
 
 .ministering-table th {
   text-align: left;

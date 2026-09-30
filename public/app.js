@@ -1058,7 +1058,7 @@ function youthSectionBoard(quorum, label, rows, members) {
       <input name="phone-member-${esc(person.id)}" type="tel" inputmode="tel" autocomplete="off" value="${esc(person.phone || "")}" aria-label="${esc(nameKey(person))} phone" placeholder="Phone">
       <input name="email-member-${esc(person.id)}" type="email" inputmode="email" autocomplete="off" value="${esc(person.email || "")}" aria-label="${esc(nameKey(person))} email" placeholder="Email">
       <p class="position">${esc(person.priesthood || (quorum === "teachers" ? "Teacher" : "Priest"))}</p>`).join("");
-  return `<form class="presidency-board" data-quorum="${quorum}">
+  return `<form class="presidency-board quorum-${quorum}" data-quorum="${quorum}">
     <span class="pres-head">Name</span>
     <span class="pres-head">Phone</span>
     <span class="pres-head">Email</span>
@@ -1395,7 +1395,7 @@ function ministeringTable(quorum) {
   const rows = ministeringRows(quorum);
   if (!rows.length) return "";
   const assignmentButton = (person) => `<button type="button" class="ministering-name" data-action="select-person" data-id="${esc(person.id)}">${esc(nameKey(person))}</button>`;
-  return `<table class="ministering-table">
+  return `<table class="ministering-table quorum-${quorum}">
     <thead><tr><th>Name</th><th>Companion</th><th>Assignment(s)</th></tr></thead>
     <tbody>
       ${rows.map((row) => `<tr>
@@ -1430,7 +1430,7 @@ function youthListMarkup() {
   return lists.map(([, label, quorum, section]) => {
     const body = section === "presidency"
       ? ministeringTable(quorum)
-      : youthRosterEntries(quorum, section).filter(youthEntryVisible).map(youthEntryButton).join("");
+      : youthRosterEntries(quorum, section).filter(youthEntryVisible).map((entry) => youthEntryButton(entry, quorum)).join("");
     if (!body) return "";
     return `<section class="youth-list-block">
       ${single ? "" : `<h3>${esc(label)}</h3>`}
@@ -1439,10 +1439,11 @@ function youthListMarkup() {
   }).join("");
 }
 
-function youthEntryButton(entry) {
+function youthEntryButton(entry, quorum = "") {
+  const tone = quorum === "priests" || quorum === "teachers" ? ` quorum-${quorum}` : "";
   if (entry.kind === "person") {
     const person = entry.person;
-    return `<div class="person ${state.rosterMode ? person.rosterStatusKey : person.outreachStatus}" data-action="select-person" data-id="${esc(person.id)}" aria-current="${person.id === selectedPersonId}">
+    return `<div class="person ${state.rosterMode ? person.rosterStatusKey : person.outreachStatus}${tone}" data-action="select-person" data-id="${esc(person.id)}" aria-current="${person.id === selectedPersonId}">
       ${outreachMarks(person) ? `<span class="card-marks">${outreachMarks(person)}</span>` : ""}
       <strong>${esc(personLabel(person))}</strong>
       ${visitedMark(person)}
@@ -1451,7 +1452,7 @@ function youthEntryButton(entry) {
       ${ministeringLines(nameKey(person))}
     </div>`;
   }
-  return `<div class="person leader-row"><strong>${esc(entry.name)}</strong><small>${esc(entry.role)}</small>${ministeringLines(entry.name)}</div>`;
+  return `<div class="person leader-row${tone}"><strong>${esc(entry.name)}</strong><small>${esc(entry.role)}</small>${ministeringLines(entry.name)}</div>`;
 }
 
 function ministeringLines(name) {
