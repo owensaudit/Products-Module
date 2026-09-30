@@ -352,10 +352,11 @@ h1 { margin: 0; font-size: 40px; line-height: 1.05; }
 }
 
 .presidency-board {
-  grid-template-columns: minmax(7.5rem, max-content) 3.25rem 3.25rem max-content;
+  grid-template-columns: max-content 3.25rem 3.25rem max-content;
   column-gap: 10px;
   row-gap: 4px;
   align-items: center;
+  justify-content: end;
 }
 
 .presidency-board .eyebrow { margin: 0; font-size: 11px; grid-column: 1 / -1; }
@@ -540,6 +541,18 @@ input[type="text"], input[type="month"], input[type="date"], input[type="email"]
   border-radius: 0;
   box-shadow: none;
   padding: 0;
+}
+
+.presidency-board .pres-head:nth-child(2),
+.presidency-board input.pres-name {
+  text-align: right;
+}
+
+.presidency-board input.pres-name {
+  width: auto;
+  min-width: 4.5rem;
+  max-width: 14rem;
+  field-sizing: content;
 }
 
 .facts-row select,
