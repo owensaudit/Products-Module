@@ -11,9 +11,15 @@ const STATUS_LABELS = {
   reschedule_visited: "Visited",
   visited: "Visited",
   none: "No status",
+  moved: "Moved",
+  mission: "Mission",
+  do_not_contact: "Do Not Contact",
+  not_interested: "Not Interested",
+  no_contact_info: "No Contact Info",
 };
 
-const ROSTER_STATUS_ORDER = ["reach_out", "no_response", "reschedule", "scheduled", "visited", "declined", "none"];
+const ROSTER_STATUS_ORDER = ["reach_out", "no_response", "reschedule", "scheduled", "declined", "none"];
+const ARCHIVE_STATUS_ORDER = ["moved", "mission", "do_not_contact", "not_interested", "no_contact_info", "visited"];
 
 const WHO = { JO: "Josh Owens" };
 
@@ -31,6 +37,8 @@ const revealInput = document.querySelector("#reveal-private");
 let state = null;
 let view = "people";
 let statusFilter = "all";
+let archiveOpen = false;
+let archiveChoicesFor = "";
 let officeFilter = "all";
 let appointmentFilter = "all";
 let search = "";
@@ -71,11 +79,7 @@ if (monthInput) {
 app.addEventListener("change", (event) => {
   const target = event.target;
   if (target instanceof HTMLSelectElement && target.classList.contains("status-pill")) {
-    if (target.value === "Reach Out") focusReachOutDate = true;
-    post(`/api/people/${target.dataset.personId}/status`, { status: target.value }).then((next) => {
-      state = next;
-      render();
-    }).catch(showError);
+    applyStatus(target.dataset.personId, target.value);
     return;
   }
   const addRow = target.closest?.("[data-outreach-add]");
@@ -153,6 +157,34 @@ app.addEventListener("click", (event) => {
     view = button.dataset.view;
     detailForm = null;
     render();
+  } else if (action === "show-people") {
+    archiveOpen = false;
+    archiveChoicesFor = "";
+    statusFilter = "all";
+    search = "";
+    dayFilter = "";
+    view = "people";
+    const current = selectedPerson();
+    if (current && personIsArchived(current)) selectedPersonId = null;
+    render();
+    document.querySelector("#people-card")?.scrollIntoView({ block: "start" });
+  } else if (action === "archive") {
+    if (!archiveOpen) archiveOpen = true;
+    else if (statusFilter !== "all") statusFilter = "all";
+    else archiveOpen = false;
+    archiveChoicesFor = "";
+    search = "";
+    dayFilter = "";
+    view = "people";
+    const current = selectedPerson();
+    if (current && personIsArchived(current) !== archiveOpen) selectedPersonId = null;
+    render();
+    document.querySelector("#people-card")?.scrollIntoView({ block: "start" });
+  } else if (action === "toggle-archive") {
+    archiveChoicesFor = archiveChoicesFor === selectedPersonId ? "" : selectedPersonId;
+    render();
+  } else if (action === "set-status") {
+    applyStatus(button.dataset.personId, button.dataset.status);
   } else if (action === "filter") {
     statusFilter = button.dataset.status;
     search = "";
@@ -562,6 +594,8 @@ function openCalendarDay(iso) {
   const people = peopleForDay(iso);
   if (!people.length) return;
   dayFilter = iso;
+  archiveOpen = people.every((person) => personIsArchived(person));
+  archiveChoicesFor = "";
   statusFilter = "all";
   officeFilter = "all";
   appointmentFilter = "all";
@@ -683,21 +717,55 @@ function summary() {
   </div>`;
 }
 
+function personIsArchived(person) {
+  return ARCHIVE_STATUS_ORDER.includes(person?.rosterStatusKey || "");
+}
+
+function applyStatus(personId, status) {
+  if (status === "Reach Out") focusReachOutDate = true;
+  const archiveKey = {
+    Moved: "moved",
+    Mission: "mission",
+    "Do Not Contact": "do_not_contact",
+    "Not Interested": "not_interested",
+    "No Contact Info": "no_contact_info",
+    Visited: "visited",
+  }[status];
+  if (archiveKey) {
+    archiveOpen = true;
+    statusFilter = archiveKey;
+    dayFilter = "";
+    search = "";
+    officeFilter = "all";
+    appointmentFilter = "all";
+  } else if (archiveOpen) {
+    archiveOpen = false;
+    statusFilter = "all";
+  }
+  archiveChoicesFor = "";
+  post(`/api/people/${personId}/status`, { status }).then((next) => {
+    state = next;
+    selectedPersonId = personId;
+    render();
+  }).catch(showError);
+}
+
 function rosterSummary() {
+  const cohort = state.people.filter((person) => personIsArchived(person) === archiveOpen);
   const counts = {};
-  for (const person of state.people) {
+  for (const person of cohort) {
     const key = person.rosterStatusKey || "none";
     counts[key] = (counts[key] || 0) + 1;
   }
-  const keys = ROSTER_STATUS_ORDER.filter((key) => counts[key]);
-  for (const key of Object.keys(counts)) {
-    if (!keys.includes(key)) keys.push(key);
-  }
-  const offices = [...new Set(state.people.map((person) => person.priesthood).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-  const withAppointment = state.people.filter((person) => person.appointment).length;
+  const archivedCount = state.people.filter((person) => personIsArchived(person)).length;
+  const activeCount = state.people.length - archivedCount;
+  const keys = archiveOpen ? ARCHIVE_STATUS_ORDER : ROSTER_STATUS_ORDER.filter((key) => counts[key]);
+  const offices = [...new Set(cohort.map((person) => person.priesthood).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const withAppointment = cohort.filter((person) => person.appointment).length;
+  const archiveButton = `<button type="button" class="archive-toggle" data-action="archive" aria-pressed="${archiveOpen && statusFilter === "all"}">Archive ${archivedCount}</button>`;
   return `<div class="summary" aria-label="Brother filters">
-    ${filterButton("all", state.people.length, "Everyone")}
-    ${keys.map((key) => filterButton(key, counts[key] || 0, STATUS_LABELS[key] || key)).join("")}
+    ${archiveOpen ? `<button type="button" data-action="show-people">People ${activeCount}</button>` : filterButton("all", activeCount, "Everyone")}
+    ${archiveOpen ? `${archiveButton}${keys.map((key) => filterButton(key, counts[key] || 0, STATUS_LABELS[key] || key)).join("")}` : `${keys.map((key) => filterButton(key, counts[key] || 0, STATUS_LABELS[key] || key)).join("")}${archiveButton}`}
     <label class="inline-filter">Priesthood
       <select data-action="office" aria-label="Filter by priesthood">
         <option value="all" ${officeFilter === "all" ? "selected" : ""}>All offices</option>
@@ -726,7 +794,7 @@ function countStatuses() {
 
 function peopleView() {
   const people = filteredPeople();
-  const title = dayFilter ? formatDate(dayFilter) : statusFilter === "all" ? "People" : STATUS_LABELS[statusFilter];
+  const title = dayFilter ? formatDate(dayFilter) : archiveOpen && statusFilter === "all" ? "Archive" : statusFilter === "all" ? "People" : STATUS_LABELS[statusFilter];
   const showDetail = !state.rosterMode || Boolean(selectedPersonId) || detailForm === "add-person";
   return `<section class="layout${showDetail ? "" : " layout-single"}">
     <div class="card" id="people-card">
@@ -747,8 +815,9 @@ function personButtons(people = filteredPeople()) {
     return `<p class="empty">No one is loaded yet. The outreach spreadsheet is not readable from here, so this list starts empty. Import a CSV or add a person. No sample members are included.</p>`;
   }
   if (!people.length) {
+    if (archiveOpen && statusFilter === "all" && !search.trim()) return `<p class="empty">No one is in the archive.</p>`;
     const label = statusFilter === "all" ? "this search" : STATUS_LABELS[statusFilter];
-    return `<p class="empty">No one is in ${esc(label)}. Choose Everyone to see the full roster.</p>`;
+    return `<p class="empty">No one is in ${esc(label)}.${archiveOpen ? "" : " Choose Everyone to see the full roster."}</p>`;
   }
   return people.map((person) => `<div class="person ${state.rosterMode ? person.rosterStatusKey : person.outreachStatus}" data-action="select-person" data-id="${esc(person.id)}" aria-current="${person.id === selectedPersonId}">
       <strong>${esc(personLabel(person))}</strong>
@@ -758,21 +827,48 @@ function personButtons(people = filteredPeople()) {
     </div>`).join("");
 }
 
-const STATUS_CHOICES = [
+const ACTIVE_CHOICES = [
   ["", "No status"],
   ["Reach Out", "Reach Out"],
   ["No Response", "No Response"],
   ["Re-Schedule", "Re-Schedule"],
   ["Scheduled", "Scheduled"],
-  ["Visited", "Visited"],
   ["Declined", "Declined"],
+];
+
+const ARCHIVE_CHOICES = [
+  ["Moved", "Moved"],
+  ["Mission", "Mission"],
+  ["Do Not Contact", "Do Not Contact"],
+  ["Not Interested", "Not Interested"],
+  ["No Contact Info", "No Contact Info"],
+  ["Visited", "Visited"],
 ];
 
 function statusSelect(person) {
   const current = person.rosterStatus || "";
+  const option = ([value, label]) => `<option value="${esc(value)}" ${value === current ? "selected" : ""}>${esc(label)}</option>`;
   return `<select class="status-pill ${person.rosterStatusKey}" data-person-id="${esc(person.id)}" aria-label="Status for ${esc(personLabel(person))}">
-    ${STATUS_CHOICES.map(([value, label]) => `<option value="${esc(value)}" ${value === current ? "selected" : ""}>${esc(label)}</option>`).join("")}
+    ${ACTIVE_CHOICES.map(option).join("")}
+    <optgroup label="Archive">${ARCHIVE_CHOICES.map(option).join("")}</optgroup>
   </select>`;
+}
+
+function archiveControl(person) {
+  const open = archiveChoicesFor === person.id;
+  const archived = personIsArchived(person);
+  return `<span class="archive-control">
+    <button type="button" class="tiny archive-card${archived ? " is-archived" : ""}" data-action="toggle-archive" aria-expanded="${open}" aria-pressed="${archived}">Archive</button>
+    ${open ? `<span class="archive-choices">${ARCHIVE_CHOICES.map(([value, label]) => `<button type="button" class="tiny status-choice ${rosterKey(value)}" data-action="set-status" data-person-id="${esc(person.id)}" data-status="${esc(value)}" aria-pressed="${currentStatus(person) === value}">${esc(label)}</button>`).join("")}</span>` : ""}
+  </span>`;
+}
+
+function currentStatus(person) {
+  return person.rosterStatus || "";
+}
+
+function rosterKey(label) {
+  return ARCHIVE_STATUS_ORDER.find((key) => STATUS_LABELS[key] === label) || "none";
 }
 
 function hasBeenVisited(person) {
@@ -793,6 +889,7 @@ function rosterLine(person) {
 }
 
 function personMatchesFilters(person) {
+  if (state.rosterMode && !dayFilter && personIsArchived(person) !== archiveOpen) return false;
   if (statusFilter !== "all") {
     const key = state.rosterMode ? person.rosterStatusKey || "none" : person.outreachStatus;
     if (key !== statusFilter) return false;
@@ -868,7 +965,7 @@ function personDetail() {
 function rosterDetail(person) {
   const facts = [person.priesthood, person.age ? `Age ${person.age}` : "", person.birthday ? `Birthday ${person.birthday}` : ""].filter(Boolean);
   return `<h2>${esc(personLabel(person))}</h2>
-    <p>${statusSelect(person)}</p>
+    <p class="status-row">${statusSelect(person)}${archiveControl(person)}</p>
     ${facts.length ? `<p>${esc(facts.join(" · "))}</p>` : ""}
     ${person.reachOutDate ? `<p><strong>Reach out</strong> ${esc(person.reachOutDate)}</p>` : `<p class="muted">Pick a date to schedule the reach out.</p>`}
     ${reachOutForm(person)}

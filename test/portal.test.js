@@ -29,7 +29,7 @@ import {
   setVisitStatus,
   slotsForMonth,
 } from "../lib/model.js";
-import { brotherSheetToState, calendarMarks, canonicalRosterStatus, rosterStatusKey } from "../lib/roster.js";
+import { brotherSheetToState, calendarMarks, canonicalRosterStatus, isArchiveStatus, rosterStatusKey } from "../lib/roster.js";
 import { createStore } from "../lib/store.js";
 import { createPortalServer } from "../server.js";
 
@@ -137,6 +137,26 @@ test("a reach out needs a date and marks that calendar day", () => {
   state = setPersonStatus(state, "per_1", "Visited");
   assert.equal(presentState(state, "2027-10").calendarMarks["2027-10-05"], undefined);
   assert.throws(() => setReachOutDate(state, "per_1", { date: "soon" }), /Reach out date/);
+});
+
+test("moved, mission, do not contact, not interested, no contact info, and visited are archive statuses", () => {
+  for (const label of ["Moved", "Mission", "Do Not Contact", "Not Interested", "No Contact Info", "Visited"]) {
+    assert.equal(isArchiveStatus(label), true);
+    assert.equal(canonicalRosterStatus(label), label);
+  }
+  assert.equal(isArchiveStatus("Reach Out"), false);
+  assert.equal(isArchiveStatus("Re-Schedule"), false);
+  assert.equal(isArchiveStatus("Declined"), false);
+  assert.equal(rosterStatusKey("Re-Schedule, Visited"), "visited");
+  assert.equal(isArchiveStatus("Re-Schedule, Visited"), true);
+  let state = emptyState();
+  state = {
+    ...state,
+    people: [{ id: "per_1", displayName: "Ada Example", phone: "", email: "", household: "", notes: "", sheetColumns: {}, createdAt: "2026-09-29T12:00:00.000Z", updatedAt: "2026-09-29T12:00:00.000Z" }],
+  };
+  state = setPersonStatus(state, "per_1", "Mission");
+  assert.equal(state.people[0].sheetColumns.Status, "Mission");
+  assert.equal(presentState(state, "2026-09").people[0].rosterStatusKey, "mission");
 });
 
 test("comments attach to a person or a visit", () => {
