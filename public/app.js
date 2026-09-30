@@ -730,7 +730,7 @@ function applyStatus(personId, status) {
   }[status];
   if (archiveKey) {
     archiveOpen = true;
-    statusFilter = archiveKey;
+    statusFilter = archiveKey === "visited" ? "all" : archiveKey;
     dayFilter = "";
     search = "";
     officeFilter = "all";
@@ -762,7 +762,7 @@ function rosterSummary() {
   }
   const archivedCount = state.people.filter((person) => personIsArchived(person)).length;
   const activeCount = state.people.length - archivedCount;
-  const keys = archiveOpen ? ARCHIVE_STATUS_ORDER : ROSTER_STATUS_ORDER.filter((key) => counts[key]);
+  const keys = archiveOpen ? ARCHIVE_STATUS_ORDER.filter((key) => key !== "visited") : ROSTER_STATUS_ORDER.filter((key) => counts[key]);
   const offices = [...new Set(cohort.map((person) => person.priesthood).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const archiveButton = `<button type="button" class="archive-toggle" data-action="archive" aria-pressed="${archiveOpen && statusFilter === "all"}">Archive ${archivedCount}</button>`;
   return `<div class="summary" aria-label="Brother filters">
