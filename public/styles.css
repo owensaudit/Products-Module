@@ -365,6 +365,7 @@ button.cal-day:hover { background: #f3fafc; }
 .cal-day.is-today,
 button.cal-day.is-today:hover { background: #e8f4f8; }
 
+.cal-day.is-open,
 button.cal-day.is-open {
   background: #e8f4f8;
   box-shadow: inset 0 0 0 2px var(--church);

@@ -321,15 +321,6 @@ app.addEventListener("submit", (event) => {
     const path = plan === "reach_out" ? `/api/people/${selectedPersonId}/reach-out` : `/api/people/${selectedPersonId}/appointment`;
     const body = plan === "reach_out" ? { date } : { date, time, kind: plan };
     post(path, body).then(() => {
-      if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-        const [year, month] = date.split("-").map(Number);
-        calendarMonth = new Date(year, month - 1, 1);
-        dayFilter = date;
-        statusFilter = "all";
-        officeFilter = "all";
-        search = "";
-        archiveOpen = false;
-      }
       render();
     }).catch(showError);
   } else if (kind === "comment") {
@@ -423,9 +414,36 @@ function clearError() {
   notice.textContent = "";
 }
 
+let openedOnToday = false;
+
+function showToday() {
+  const now = new Date();
+  calendarMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const iso = todayIso();
+  const people = peopleForDay(iso);
+  dayFilter = iso;
+  archiveChoicesFor = "";
+  statusFilter = "all";
+  officeFilter = "all";
+  search = "";
+  view = "people";
+  detailForm = null;
+  if (people.length) {
+    archiveOpen = people.every((person) => personIsArchived(person));
+    selectedPersonId = people[0].id;
+  } else {
+    archiveOpen = false;
+    selectedPersonId = null;
+  }
+}
+
 async function refresh() {
   const next = await api(`/api/state?month=${encodeURIComponent(monthValue())}&private=${privateOn() ? "1" : "0"}`);
   state = next;
+  if (!openedOnToday) {
+    openedOnToday = true;
+    showToday();
+  }
   if (selectedPersonId && !state.people.some((person) => person.id === selectedPersonId)) selectedPersonId = null;
   render();
 }
@@ -655,7 +673,7 @@ function renderCalendar() {
       described.push("show the brothers for this day");
       cells.push(`<button type="button" class="cal-day${today}${open}" data-action="open-day" data-date="${iso}" data-marks="${esc(kinds.join(" "))}" aria-pressed="${dayFilter === iso}" aria-label="${esc(described.join(", "))}">${inner}</button>`);
     } else {
-      cells.push(`<span class="cal-day${today}" data-date="${iso}" data-marks="${esc(kinds.join(" "))}" aria-label="${esc(described.join(", "))}">${inner}</span>`);
+      cells.push(`<span class="cal-day${today}${open}" data-date="${iso}" data-marks="${esc(kinds.join(" "))}" aria-label="${esc(described.join(", "))}">${inner}</span>`);
     }
   }
   host.innerHTML = `<div class="cal-nav">
@@ -897,6 +915,7 @@ function personButtons(people = filteredPeople()) {
     return `<p class="empty">No one is loaded yet. The outreach spreadsheet is not readable from here, so this list starts empty. Import a CSV or add a person. No sample members are included.</p>`;
   }
   if (!people.length) {
+    if (dayFilter && statusFilter === "all" && !search.trim()) return "";
     if (archiveOpen && statusFilter === "all" && !search.trim()) return `<p class="empty">No one is in the archive.</p>`;
     const label = statusFilter === "all" ? "this search" : STATUS_LABELS[statusFilter];
     return `<p class="empty">No one is in ${esc(label)}.${archiveOpen ? "" : " Choose Everyone to see the full roster."}</p>`;
