@@ -718,8 +718,17 @@ function render() {
     app.innerHTML = `${tabs()}${rosterNeeded()}`;
     return;
   }
+  const listScroll = document.querySelector("#person-list")?.scrollTop ?? 0;
   app.innerHTML = `${tabs()}${summary()}${view === "people" ? peopleView() : view === "month" ? monthView() : importView()}`;
   restoreContactDraft(contactDraft);
+  const list = document.querySelector("#person-list");
+  if (list) {
+    list.scrollTop = listScroll;
+    requestAnimationFrame(() => {
+      const current = document.querySelector("#person-list");
+      if (current) current.scrollTop = listScroll;
+    });
+  }
   if (focusReachOutDate) {
     focusReachOutDate = false;
     document.querySelector('form[data-form="plan"] input[name="date"]')?.focus();
