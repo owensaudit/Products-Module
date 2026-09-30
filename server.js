@@ -15,6 +15,7 @@ import {
   importRows,
   logOutreach,
   presentState,
+  setAppointment,
   setPresidency,
   previewImport,
   scheduleVisit,
@@ -127,6 +128,13 @@ export function createPortalServer(store) {
         const body = await readBody(request);
         const month = body.month || currentMonth();
         const viewOptions = { includePrivate: body.includePrivate === true };
+
+        const personAppointment = pathname.match(/^\/api\/people\/([^/]+)\/appointment$/);
+        if (personAppointment) {
+          const next = await store.update((state) => setAppointment(state, decodeURIComponent(personAppointment[1]), body));
+          sendJson(response, 200, presentState(next, month, viewOptions));
+          return;
+        }
 
         const personStatus = pathname.match(/^\/api\/people\/([^/]+)\/status$/);
         if (personStatus) {

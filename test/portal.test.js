@@ -18,6 +18,7 @@ import {
   emptyState,
   importRows,
   logOutreach,
+  setAppointment,
   setPersonStatus,
   setPresidency,
   personOutreachStatus,
@@ -90,6 +91,30 @@ test("scheduling records the reply channel and the Elders Quorum calendar audien
   state = setVisitStatus(state, visit.id, "cancelled");
   assert.equal(slotsForMonth("2026-09", state.visits).find((slot) => slot.id === "2026-09-30:wed-1915").status, "open");
   assert.equal(personOutreachStatus("per_1", state.outreachAttempts, state.visits), "replied");
+});
+
+test("an appointment is a date and time that marks the brother scheduled", () => {
+  let state = emptyState();
+  state = {
+    ...state,
+    people: [{ id: "per_1", displayName: "Ada Example", phone: "", email: "", household: "", notes: "", sheetColumns: {}, createdAt: "2026-09-29T12:00:00.000Z", updatedAt: "2026-09-29T12:00:00.000Z" }],
+  };
+  state = setAppointment(state, "per_1", { date: "2026-10-21", time: "19:00" });
+  assert.equal(state.people[0].sheetColumns["Apt Date"], "10/21 7:00 PM");
+  assert.equal(state.people[0].sheetColumns.Status, "Scheduled");
+  const view = presentState(state, "2026-10");
+  assert.equal(view.people[0].appointment, "10/21 7:00 PM");
+  assert.equal(view.people[0].rosterStatusKey, "scheduled");
+  assert.deepEqual(view.calendarMarks["2026-10-21"], { kinds: ["scheduled"], people: ["per_1"] });
+  state = setAppointment(state, "per_1", { date: "2026-10-21", time: "12:30" });
+  assert.equal(state.people[0].sheetColumns["Apt Date"], "10/21 12:30 PM");
+  state = setAppointment(state, "per_1", { date: "2026-10-21", time: "00:00" });
+  assert.equal(state.people[0].sheetColumns["Apt Date"], "10/21 12:00 AM");
+  state = setAppointment(state, "per_1", { date: "10/21/2027", time: "19:00" });
+  assert.equal(state.people[0].sheetColumns["Apt Date"], "10/21/2027 7:00 PM");
+  assert.deepEqual(presentState(state, "2027-10").calendarMarks["2027-10-21"], { kinds: ["scheduled"], people: ["per_1"] });
+  assert.equal(presentState(state, "2026-10").calendarMarks["2026-10-21"], undefined);
+  assert.throws(() => setAppointment(state, "per_1", { date: "2026-10-21", time: "7pm" }), /HH:MM/);
 });
 
 test("comments attach to a person or a visit", () => {

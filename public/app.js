@@ -269,6 +269,20 @@ app.addEventListener("submit", (event) => {
       detailForm = "visit";
       render();
     }).catch(showError);
+  } else if (kind === "appointment") {
+    const date = String(data.get("date") || "");
+    post(`/api/people/${selectedPersonId}/appointment`, { date, time: data.get("time") }).then(() => {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        const [year, month] = date.split("-").map(Number);
+        calendarMonth = new Date(year, month - 1, 1);
+        dayFilter = date;
+        statusFilter = "all";
+        officeFilter = "all";
+        appointmentFilter = "all";
+        search = "";
+      }
+      render();
+    }).catch(showError);
   } else if (kind === "comment") {
     post("/api/comments", {
       targetType: data.get("targetType"),
@@ -837,6 +851,7 @@ function rosterDetail(person) {
     <p>${statusSelect(person)}</p>
     ${facts.length ? `<p>${esc(facts.join(" · "))}</p>` : ""}
     ${person.appointment ? `<p><strong>Appointment</strong> ${esc(person.appointment)}</p>` : `<p class="muted">No appointment date yet.</p>`}
+    ${appointmentForm(person)}
     ${person.notes ? `<p>${esc(person.notes)}</p>` : ""}
     ${contactLine(person)}
     <h3>Outreach</h3>
@@ -844,6 +859,29 @@ function rosterDetail(person) {
     <h3>Comments <span class="muted">${person.commentCount}</span></h3>
     ${commentList("person", person.id)}
     ${commentForm("person", person.id)}`;
+}
+
+function appointmentParts(appointment) {
+  const match = String(appointment || "").match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\s+(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!match) return { date: "", time: "" };
+  let year = match[3] ? Number(match[3]) : 2026;
+  if (year < 100) year += 2000;
+  let hour = Number(match[4]);
+  if (match[6].toUpperCase() === "PM" && hour < 12) hour += 12;
+  if (match[6].toUpperCase() === "AM" && hour === 12) hour = 0;
+  return {
+    date: `${year}-${match[1].padStart(2, "0")}-${match[2].padStart(2, "0")}`,
+    time: `${String(hour).padStart(2, "0")}:${match[5]}`,
+  };
+}
+
+function appointmentForm(person) {
+  const current = appointmentParts(person.appointment);
+  return `<form class="appointment-row" data-form="appointment">
+    <input name="date" type="date" aria-label="Appointment date" required value="${esc(current.date)}">
+    <input name="time" type="time" aria-label="Appointment time" required value="${esc(current.time)}">
+    <button class="tiny primary" type="submit">Schedule</button>
+  </form>`;
 }
 
 function contactLine(person) {

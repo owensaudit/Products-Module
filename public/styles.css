@@ -148,6 +148,23 @@ h1 { margin: 0; font-size: 40px; line-height: 1.05; }
 
 .reply, .reply-form { margin-left: 16px; }
 
+.appointment-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 6px 0 10px;
+}
+
+.appointment-row input[type="date"],
+.appointment-row input[type="time"] {
+  width: auto;
+  background: var(--card);
+  border: 1px solid var(--line);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
 .comment-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 
 .tiny {
@@ -564,7 +581,8 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
 
 .ghost { background: transparent; }
 
-.comment-actions .tiny {
+.comment-actions .tiny,
+.appointment-row .tiny {
   padding: 1px 8px;
   font-size: 12px;
   line-height: 1.4;
