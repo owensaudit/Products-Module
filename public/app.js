@@ -394,6 +394,7 @@ presidencyHost?.addEventListener("submit", (event) => {
 
 function render() {
   renderPresidency();
+  renderCalendar();
   if (!state) {
     app.innerHTML = `<p class="empty">Loading the portal…</p>`;
     return;
@@ -422,6 +423,44 @@ function renderPresidency() {
       <p class="position">${esc(member.role)}</p>
     </div>`).join("")}
   </form>`;
+}
+
+function renderCalendar() {
+  const host = document.querySelector("#month-calendar");
+  if (!host) return;
+  const now = new Date();
+  const year = now.getFullYear();
+  const monthIndex = now.getMonth();
+  const monthKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+  const title = now.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const firstWeekday = new Date(year, monthIndex, 1).getDay();
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  const marks = state?.calendarMarks || {};
+  const weekdays = ["S", "M", "T", "W", "T", "F", "S"];
+  const cells = weekdays.map((label) => `<span class="cal-dow">${label}</span>`);
+  for (let index = 0; index < firstWeekday; index += 1) cells.push(`<span class="cal-day is-empty"></span>`);
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const iso = `${monthKey}-${String(day).padStart(2, "0")}`;
+    const kinds = marks[iso] || [];
+    const dots = kinds.map((kind) => {
+      const label = kind === "scheduled" ? "Visit scheduled" : "Reach out";
+      return `<span class="cal-dot ${kind}" title="${label}"></span>`;
+    }).join("");
+    const described = [`${title.split(" ")[0]} ${day}`];
+    if (kinds.includes("scheduled")) described.push("visit scheduled");
+    if (kinds.includes("reach_out")) described.push("reach out");
+    const today = day === now.getDate() ? " is-today" : "";
+    cells.push(`<span class="cal-day${today}" data-date="${iso}" data-marks="${esc(kinds.join(" "))}" aria-label="${esc(described.join(", "))}">
+      <span class="cal-marks">${dots}</span>
+      <span class="cal-num">${day}</span>
+    </span>`);
+  }
+  host.innerHTML = `<p class="cal-title">${esc(title)}</p>
+    <div class="cal-grid">${cells.join("")}</div>
+    <p class="cal-legend">
+      <span><i class="cal-dot scheduled"></i> Visit scheduled</span>
+      <span><i class="cal-dot reach_out"></i> Reach out</span>
+    </p>`;
 }
 
 function rosterNeeded() {

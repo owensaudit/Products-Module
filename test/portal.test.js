@@ -22,7 +22,7 @@ import {
   setVisitStatus,
   slotsForMonth,
 } from "../lib/model.js";
-import { brotherSheetToState, canonicalRosterStatus, rosterStatusKey } from "../lib/roster.js";
+import { brotherSheetToState, calendarMarks, canonicalRosterStatus, rosterStatusKey } from "../lib/roster.js";
 import { createStore } from "../lib/store.js";
 import { createPortalServer } from "../server.js";
 
@@ -230,6 +230,34 @@ test("a brother sheet keeps names filterable and hides contact details", () => {
   assert.equal(revealed.people[0].phone, "555-0100");
   assert.equal(JSON.stringify(view).includes("555-0100"), false);
   assert.equal(JSON.stringify(view).includes("ada@example.com"), false);
+});
+
+test("calendar marks visit days in green and reach-out days in gold", () => {
+  const marks = calendarMarks({
+    people: [
+      { rosterStatusKey: "scheduled", appointment: "10/21 7:00 PM" },
+      { rosterStatusKey: "visited", appointment: "07/03 5:30 PM" },
+    ],
+    outreachAttempts: [{ date: "2026-09-29" }, { date: "2026-09-10" }, { date: "2026-10-21" }],
+    visits: [
+      { date: "2026-09-16", status: "scheduled" },
+      { date: "2026-09-02", status: "completed" },
+    ],
+  });
+  assert.deepEqual(marks["2026-10-21"], ["scheduled", "reach_out"]);
+  assert.equal(marks["2026-07-03"], undefined);
+  assert.deepEqual(marks["2026-09-29"], ["reach_out"]);
+  assert.deepEqual(marks["2026-09-10"], ["reach_out"]);
+  assert.deepEqual(marks["2026-09-16"], ["scheduled"]);
+  assert.equal(marks["2026-09-02"], undefined);
+
+  const sheet = [
+    "Brother\tApt Date\tNOTES\tStatus\tPriesthood\tAge\tBirthday\tPhone Number\tEmail\tName\tDay\tType",
+    "Example, Ada\t10/21 7:00 PM\t\tScheduled\tElder\t40\t1 Jan 1986\t\t\tJO\t09/29\tText",
+  ].join("\n");
+  const view = presentState(brotherSheetToState(sheet, deps()), "2026-09");
+  assert.deepEqual(view.calendarMarks["2026-10-21"], ["scheduled"]);
+  assert.deepEqual(view.calendarMarks["2026-09-29"], ["reach_out"]);
 });
 
 test("an outreach row records a presidency member, how they reached out, and the date", () => {
