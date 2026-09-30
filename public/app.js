@@ -1657,7 +1657,7 @@ function personButtons(people = filteredPeople()) {
     const label = statusFilter === "all" ? "this search" : STATUS_LABELS[statusFilter];
     return `<p class="empty">No one is in ${esc(label)}.${archiveOpen ? "" : " Choose Everyone to see the full roster."}</p>`;
   }
-  return people.map((person) => `<div class="person ${state.rosterMode ? person.rosterStatusKey : person.outreachStatus}" data-action="select-person" data-id="${esc(person.id)}" aria-current="${person.id === selectedPersonId}">
+  return people.map((person) => `<div class="person ${state.rosterMode ? person.rosterStatusKey : person.outreachStatus}${person.list === "youth" ? " to-visit" : ""}" data-action="select-person" data-id="${esc(person.id)}" aria-current="${person.id === selectedPersonId}">
       ${outreachMarks(person) ? `<span class="card-marks">${outreachMarks(person)}</span>` : ""}
       <strong>${esc(personLabel(person))}</strong>
       ${visitedMark(person)}
