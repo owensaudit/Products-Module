@@ -344,6 +344,12 @@ h1 { margin: 0; font-size: 40px; line-height: 1.05; }
 
 .lede { margin: 8px 0 0; max-width: 46ch; color: var(--muted); }
 
+.quorum-titles {
+  display: grid;
+  gap: 28px;
+  align-content: start;
+}
+
 .header-tools, .presidency-board {
   display: grid;
   gap: 4px;
@@ -498,17 +504,6 @@ button.cal-day.is-open {
   line-height: 1;
   font-weight: 500;
 }
-
-.cal-legend {
-  display: flex;
-  justify-content: center;
-  gap: 14px;
-  margin: 8px 0 0;
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.cal-legend span { display: inline-flex; align-items: center; gap: 5px; }
 
 .visually-hidden {
   position: absolute;

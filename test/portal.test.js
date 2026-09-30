@@ -296,6 +296,11 @@ test("a mention needs a response or a resolve, and a comment can be corrected", 
   assert.equal(openMessages(state).length, 0);
   view = presentState(state, "2026-09");
   assert.equal(view.openMessages.length, 0);
+  assert.equal(view.youthOpenMessages.length, 0);
+  state = addComment(state, { targetType: "person", targetId: "per_1", body: "@Tyler youth", quorum: "youth" }, { id: (prefix) => `${prefix}_youth`, now: () => "2026-09-30T12:00:00.000Z" });
+  view = presentState(state, "2026-09");
+  assert.equal(view.openMessages.length, 0);
+  assert.equal(view.youthOpenMessages.length, 1);
 
   const clock = deps();
   let threaded = { ...emptyState(), people: state.people };

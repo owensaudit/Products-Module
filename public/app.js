@@ -49,7 +49,7 @@ let assigneeFilter = "";
 let preserveListScroll = true;
 let blankPlanFor = "";
 let focusReachOutDate = false;
-let commentsOpen = false;
+let inbox = "";
 let commentFor = "";
 let editingCommentId = "";
 let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -190,7 +190,7 @@ app.addEventListener("click", (event) => {
   } else if (action === "open-comment-person") {
     const person = state.people.find((item) => item.id === button.dataset.id);
     if (!person) return;
-    commentsOpen = false;
+    inbox = "";
     selectedPersonId = person.id;
     archiveOpen = personIsArchived(person);
     archiveChoicesFor = "";
@@ -620,7 +620,7 @@ presidencyHost?.addEventListener("click", (event) => {
   assigneeFilter = assigneeFilter === name ? "" : name;
   viewAll = false;
   archiveOpen = false;
-  commentsOpen = false;
+  inbox = "";
   dayFilter = "";
   search = "";
   officeFilter = "all";
@@ -636,10 +636,25 @@ presidencyHost?.addEventListener("submit", (event) => {
 });
 
 document.querySelector("#message-inbox")?.addEventListener("click", () => {
-  const messages = state?.openMessages || [];
-  commentsOpen = messages.length > 0 && !commentsOpen;
-  render();
+  toggleInbox("elders");
 });
+
+document.querySelector("#youth-message-inbox")?.addEventListener("click", () => {
+  toggleInbox("youth");
+});
+
+function inboxMessages(which = inbox) {
+  if (which === "youth") return state?.youthOpenMessages || [];
+  return state?.openMessages || [];
+}
+
+function toggleInbox(which) {
+  const messages = inboxMessages(which);
+  if (!messages.length) return;
+  inbox = inbox === which ? "" : which;
+  commentFor = "";
+  render();
+}
 
 document.querySelector("#month-calendar")?.addEventListener("click", (event) => {
   const control = event.target.closest("[data-action]");
@@ -731,7 +746,7 @@ function saveContactFields() {
 
 function render() {
   if (blankPlanFor && blankPlanFor !== selectedPersonId) blankPlanFor = "";
-  if (commentsOpen && !(state?.openMessages || []).length) commentsOpen = false;
+  if (inbox && !inboxMessages().length) inbox = "";
   const contactDraft = readContactDraft();
   renderPresidency();
   renderCalendar();
@@ -740,7 +755,7 @@ function render() {
     app.innerHTML = `<p class="empty">Loading the portal…</p>`;
     return;
   }
-  if (commentsOpen) {
+  if (inbox) {
     app.innerHTML = commentsView();
     return;
   }
@@ -831,19 +846,13 @@ function renderCalendar() {
       <p class="cal-title">${esc(title)}</p>
       <button type="button" class="cal-shift" data-action="shift-month" data-delta="1" aria-label="Next month">›</button>
     </div>
-    <div class="cal-grid">${cells.join("")}</div>
-    <p class="cal-legend">
-      <span><i class="cal-dot scheduled"></i> Scheduled</span>
-      <span><i class="cal-dot reschedule"></i> Re-Schedule</span>
-      <span><i class="cal-dot reach_out"></i> Reach out</span>
-      <span><i class="cal-dot driveby"></i> Drive by</span>
-    </p>`;
+    <div class="cal-grid">${cells.join("")}</div>`;
 }
 
 function openCalendarDay(iso) {
   const people = peopleForDay(iso);
   if (!people.length) return;
-  commentsOpen = false;
+  inbox = "";
   viewAll = false;
   assigneeFilter = "";
   dayFilter = iso;
@@ -874,14 +883,15 @@ function peopleForDay(iso) {
 }
 
 function commentsView() {
-  const messages = state.openMessages || [];
-  const members = (state.presidency || []).filter((member) => member.name);
+  const youth = inbox === "youth";
+  const messages = inboxMessages();
+  const members = youth ? [] : (state.presidency || []).filter((member) => member.name);
   const visible = commentFor ? messages.filter((message) => (message.mentions || []).includes(commentFor)) : messages;
   const nameButton = (name, count) => {
     const pressed = commentFor === name;
     return `<button type="button" data-action="comment-for" data-name="${esc(name)}" aria-pressed="${pressed}">${esc(name || "All")} ${count}</button>`;
   };
-  return `<section class="comment-list" aria-label="Comments">
+  return `<section class="comment-list" aria-label="${youth ? "Youth comments" : "Comments"}">
     <div class="comment-filters" role="group" aria-label="Whose comments">
       ${nameButton("", messages.length)}
       ${members.map((member) => nameButton(member.name, messages.filter((message) => (message.mentions || []).includes(member.name)).length)).join("")}
@@ -897,10 +907,14 @@ function commentsView() {
 }
 
 function renderMessageInbox() {
-  const button = document.querySelector("#message-inbox");
+  paintInboxButton(document.querySelector("#message-inbox"), "elders");
+  paintInboxButton(document.querySelector("#youth-message-inbox"), "youth");
+}
+
+function paintInboxButton(button, which) {
   if (!button) return;
-  button.setAttribute("aria-pressed", commentsOpen ? "true" : "false");
-  const count = state?.openMessages?.length || 0;
+  button.setAttribute("aria-pressed", inbox === which ? "true" : "false");
+  const count = inboxMessages(which).length;
   const bubble = button.querySelector(".message-bubble");
   if (bubble) {
     bubble.hidden = count === 0;
