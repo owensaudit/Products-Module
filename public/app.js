@@ -50,6 +50,8 @@ let preserveListScroll = true;
 let blankPlanFor = "";
 let focusReachOutDate = false;
 let inbox = "";
+let page = "elders";
+let youthGroup = "all";
 let commentFor = "";
 let editingCommentId = "";
 let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -190,6 +192,8 @@ app.addEventListener("click", (event) => {
   } else if (action === "open-comment-person") {
     const person = state.people.find((item) => item.id === button.dataset.id);
     if (!person) return;
+    page = isYouthMember(person) ? "youth" : "elders";
+    if (page === "youth") youthGroup = person.group;
     inbox = "";
     selectedPersonId = person.id;
     archiveOpen = personIsArchived(person);
@@ -207,6 +211,17 @@ app.addEventListener("click", (event) => {
   } else if (action === "view") {
     view = button.dataset.view;
     detailForm = null;
+    render();
+  } else if (action === "youth-group") {
+    youthGroup = button.dataset.group || "all";
+    viewAll = false;
+    archiveOpen = false;
+    statusFilter = "all";
+    search = "";
+    dayFilter = "";
+    assigneeFilter = "";
+    view = "people";
+    selectedPersonId = null;
     render();
   } else if (action === "view-all") {
     viewAll = true;
@@ -325,13 +340,23 @@ app.addEventListener("submit", (event) => {
   const kind = form.dataset.form;
   if (kind === "add-person") {
     const known = new Set((state?.people || []).map((person) => person.id));
-    post("/api/people", {
+    const payload = {
       displayName: data.get("displayName"),
       household: data.get("household"),
       phone: data.get("phone"),
       email: data.get("email"),
       notes: data.get("notes"),
-    }).then((next) => {
+    };
+    if (page === "youth") {
+      const group = String(data.get("group") || (youthGroup === "teachers" ? "teachers" : "priests"));
+      payload.group = group === "teachers" ? "teachers" : "priests";
+      payload.sheetColumns = {
+        Brother: String(data.get("displayName") || "").trim(),
+        Birthday: String(data.get("birthday") || "").trim(),
+        Priesthood: payload.group === "teachers" ? "Teacher" : "Priest",
+      };
+    }
+    post("/api/people", payload).then((next) => {
       state = next;
       selectedPersonId = next.people.find((person) => !known.has(person.id))?.id || selectedPersonId;
       detailForm = null;
@@ -569,6 +594,36 @@ function mappingFromForm(data) {
 
 let presidencySaveTimer = null;
 
+function youthFieldName(name) {
+  return /^(name|phone|email)-(priests|teachers)-\d+$/.test(name);
+}
+
+function youthLeadershipFromForm() {
+  const readQuorum = (quorum) => {
+    const rows = state?.youthLeadership?.[quorum] || [];
+    return rows.map((row, index) => ({
+      name: String(presidencyHost?.querySelector(`[name="name-${quorum}-${index}"]`)?.value ?? row.name ?? "").trim(),
+      phone: String(presidencyHost?.querySelector(`[name="phone-${quorum}-${index}"]`)?.value ?? row.phone ?? "").trim(),
+      email: String(presidencyHost?.querySelector(`[name="email-${quorum}-${index}"]`)?.value ?? row.email ?? "").trim(),
+    }));
+  };
+  return { priests: readQuorum("priests"), teachers: readQuorum("teachers") };
+}
+
+function saveYouthLeadership() {
+  const payload = youthLeadershipFromForm();
+  const current = state?.youthLeadership || {};
+  const same = (quorum) => (payload[quorum] || []).every((row, index) => {
+    const saved = current[quorum]?.[index] || {};
+    return row.name === (saved.name || "") && row.phone === (saved.phone || "") && row.email === (saved.email || "");
+  });
+  if (same("priests") && same("teachers")) return;
+  post("/api/youth/leadership", payload).then((next) => {
+    state = next;
+    syncPresidencyDropdowns();
+  }).catch(showError);
+}
+
 function presidencyMembersFromForm() {
   return (state?.presidency || []).map((member, index) => ({
     name: String(presidencyHost?.querySelector(`[name="name-${index}"]`)?.value ?? member.name).trim(),
@@ -578,9 +633,10 @@ function presidencyMembersFromForm() {
 }
 
 function syncPresidencyDropdowns() {
+  const names = leaderNamesFor(selectedPerson());
   document.querySelectorAll("select[name='by']").forEach((select) => {
     const current = select.value;
-    select.innerHTML = (state.presidency || []).map((member) => `<option value="${esc(member.name)}">${esc(member.name)} — ${esc(member.role)}</option>`).join("");
+    select.innerHTML = names.map((name) => `<option value="${esc(name)}">${esc(name)}</option>`).join("");
     if ([...select.options].some((option) => option.value === current)) select.value = current;
   });
 }
@@ -603,20 +659,25 @@ presidencyHost?.addEventListener("input", (event) => {
   const name = event.target?.name || "";
   if (!(event.target instanceof HTMLInputElement) || !/^(name|phone|email)-/.test(name)) return;
   clearTimeout(presidencySaveTimer);
-  presidencySaveTimer = setTimeout(savePresidencyNames, 400);
+  presidencySaveTimer = setTimeout(youthFieldName(name) ? saveYouthLeadership : savePresidencyNames, 400);
 });
 
 presidencyHost?.addEventListener("focusout", (event) => {
   const name = event.target?.name || "";
   if (!(event.target instanceof HTMLInputElement) || !/^(name|phone|email)-/.test(name)) return;
   clearTimeout(presidencySaveTimer);
-  savePresidencyNames();
+  if (youthFieldName(name)) saveYouthLeadership();
+  else savePresidencyNames();
 });
 
 presidencyHost?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-action='show-assigned']");
   if (!button) return;
   const name = button.dataset.name || "";
+  if (button.dataset.quorum === "priests" || button.dataset.quorum === "teachers") {
+    page = "youth";
+    youthGroup = button.dataset.quorum;
+  }
   assigneeFilter = assigneeFilter === name ? "" : name;
   viewAll = false;
   archiveOpen = false;
@@ -635,6 +696,9 @@ presidencyHost?.addEventListener("submit", (event) => {
   event.preventDefault();
 });
 
+document.querySelector("#open-elders")?.addEventListener("click", () => openPage("elders"));
+document.querySelector("#open-youth")?.addEventListener("click", () => openPage("youth"));
+
 document.querySelector("#message-inbox")?.addEventListener("click", () => {
   toggleInbox("elders");
 });
@@ -646,6 +710,22 @@ document.querySelector("#youth-message-inbox")?.addEventListener("click", () => 
 function inboxMessages(which = inbox) {
   if (which === "youth") return state?.youthOpenMessages || [];
   return state?.openMessages || [];
+}
+
+function openPage(next) {
+  if (page === next) return;
+  page = next;
+  selectedPersonId = null;
+  detailForm = null;
+  inbox = "";
+  commentFor = "";
+  search = "";
+  statusFilter = "all";
+  archiveOpen = false;
+  viewAll = false;
+  assigneeFilter = "";
+  view = "people";
+  render();
 }
 
 function toggleInbox(which) {
@@ -748,6 +828,7 @@ function render() {
   if (blankPlanFor && blankPlanFor !== selectedPersonId) blankPlanFor = "";
   if (inbox && !inboxMessages().length) inbox = "";
   const contactDraft = readContactDraft();
+  renderPageChrome();
   renderPresidency();
   renderCalendar();
   renderMessageInbox();
@@ -759,7 +840,7 @@ function render() {
     app.innerHTML = commentsView();
     return;
   }
-  if (!state.people.length && view === "people") {
+  if (page !== "youth" && !eldersPeople().length && view === "people") {
     app.innerHTML = `${tabs()}${rosterNeeded()}`;
     return;
   }
@@ -780,10 +861,37 @@ function render() {
   }
 }
 
+function renderPageChrome() {
+  document.querySelector("#open-elders")?.setAttribute("aria-current", page === "elders" ? "true" : "false");
+  document.querySelector("#open-youth")?.setAttribute("aria-current", page === "youth" ? "true" : "false");
+  presidencyHost?.setAttribute("aria-label", page === "youth" ? "Youth quorum presidencies" : "EQ Presidency");
+}
+
+function isYouthMember(person) {
+  return person?.group === "priests" || person?.group === "teachers";
+}
+
+function eldersPeople() {
+  return (state?.people || []).filter((person) => !isYouthMember(person));
+}
+
+function youthMembers(group = youthGroup) {
+  return (state?.people || []).filter((person) => isYouthMember(person) && (group === "all" || person.group === group));
+}
+
+function pagePeople() {
+  return page === "youth" ? youthMembers() : eldersPeople();
+}
+
 function renderPresidency() {
   if (!presidencyHost) return;
   const active = document.activeElement;
   if (active && presidencyHost.contains(active) && active.matches("input, textarea, select")) return;
+  if (page === "youth") {
+    const leadership = state?.youthLeadership || { priests: [], teachers: [] };
+    presidencyHost.innerHTML = `<div class="youth-boards">${youthBoard("priests", "Priests Quorum", leadership.priests || [])}${youthBoard("teachers", "Teachers Quorum", leadership.teachers || [])}</div>`;
+    return;
+  }
   const members = state?.presidency || [];
   if (!members.length) {
     presidencyHost.innerHTML = "";
@@ -795,7 +903,7 @@ function renderPresidency() {
     <span class="pres-head">Phone</span>
     <span class="pres-head">Email</span>
     <span class="pres-head">Position</span>
-    ${members.map((member, index) => `<span class="pres-name-line"><input id="pres-name-${index}" class="pres-name${index === 0 ? " is-president" : ""}" name="name-${index}" value="${esc(member.name)}" required autocomplete="off" aria-label="${esc(member.role)} name">${assignedCountButton(member.name)}</span>
+    ${members.map((member, index) => `<span class="pres-name-line"><input id="pres-name-${index}" class="pres-name${index === 0 ? " is-president" : ""}" name="name-${index}" value="${esc(member.name)}" required autocomplete="off" aria-label="${esc(member.role)} name">${assignedCountButton(member.name, eldersPeople())}</span>
       <input name="phone-${index}" type="tel" inputmode="tel" autocomplete="off" value="${esc(member.phone || "")}" aria-label="${esc(member.role)} phone" placeholder="Phone">
       <input name="email-${index}" type="email" inputmode="email" autocomplete="off" value="${esc(member.email || "")}" aria-label="${esc(member.role)} email" placeholder="Email">
       <p class="position${index === 0 ? " is-president" : ""}">${esc(member.role)}</p>`).join("")}
@@ -849,6 +957,28 @@ function renderCalendar() {
     <div class="cal-grid">${cells.join("")}</div>`;
 }
 
+function youthBoard(quorum, label, rows) {
+  let adultsLabeled = false;
+  const body = rows.map((row, index) => {
+    const adultLabel = row.section === "adults" && !adultsLabeled ? `<span class="pres-section">Adult Leaders</span>` : "";
+    if (row.section === "adults") adultsLabeled = true;
+    const named = youthMembers(quorum);
+    const president = index === 0 ? " is-president" : "";
+    return `${adultLabel}<span class="pres-name-line"><input class="pres-name${president}" name="name-${quorum}-${index}" value="${esc(row.name || "")}" autocomplete="off" aria-label="${esc(label)} ${esc(row.role)} name">${assignedCountButton(row.name, named, quorum)}</span>
+      <input name="phone-${quorum}-${index}" type="tel" inputmode="tel" autocomplete="off" value="${esc(row.phone || "")}" aria-label="${esc(row.role)} phone" placeholder="Phone">
+      <input name="email-${quorum}-${index}" type="email" inputmode="email" autocomplete="off" value="${esc(row.email || "")}" aria-label="${esc(row.role)} email" placeholder="Email">
+      <p class="position${president}">${esc(row.role)}</p>`;
+  }).join("");
+  return `<form class="presidency-board" data-quorum="${quorum}">
+    <p class="eyebrow">${esc(label)}</p>
+    <span class="pres-head">Name</span>
+    <span class="pres-head">Phone</span>
+    <span class="pres-head">Email</span>
+    <span class="pres-head">Position</span>
+    ${body}
+  </form>`;
+}
+
 function openCalendarDay(iso) {
   const people = peopleForDay(iso);
   if (!people.length) return;
@@ -873,7 +1003,7 @@ function peopleForDay(iso) {
   const mark = state?.calendarMarks?.[iso] || {};
   const ids = new Set(mark.people || []);
   const prefer = new Set(mark.kinds || []);
-  return state.people
+  return pagePeople()
     .filter((person) => ids.has(person.id))
     .slice()
     .sort((a, b) => {
@@ -1026,15 +1156,21 @@ function applyStatus(personId, status) {
   }).catch(showError);
 }
 
+function youthGroupButton(group, label) {
+  const count = youthMembers(group).length;
+  return `<button type="button" data-action="youth-group" data-group="${group}" aria-pressed="${youthGroup === group}">${label} ${count}</button>`;
+}
+
 function rosterSummary() {
-  const cohort = state.people.filter((person) => personIsArchived(person) === archiveOpen);
+  const source = page === "youth" ? youthMembers() : eldersPeople();
+  const cohort = source.filter((person) => personIsArchived(person) === archiveOpen);
   const counts = {};
   for (const person of cohort) {
     const key = person.rosterStatusKey || "none";
     counts[key] = (counts[key] || 0) + 1;
   }
-  const archivedCount = state.people.filter((person) => personIsArchived(person)).length;
-  const activeCount = state.people.length - archivedCount;
+  const archivedCount = source.filter((person) => personIsArchived(person)).length;
+  const activeCount = source.length - archivedCount;
   const keys = archiveOpen ? ARCHIVE_STATUS_ORDER : ROSTER_STATUS_ORDER.filter((key) => counts[key]);
   const offices = [...new Set(cohort.map((person) => person.priesthood).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const archiveButton = `<button type="button" class="archive-toggle" data-action="archive" aria-pressed="${!viewAll && archiveOpen}">Archive ${archivedCount}</button>`;
@@ -1042,8 +1178,10 @@ function rosterSummary() {
     ? `<button type="button" data-action="show-people">To Visit ${activeCount}</button>`
     : filterButton("all", activeCount, "To Visit");
   const statusButtons = keys.map((key) => filterButton(key, counts[key] || 0, STATUS_LABELS[key] || key)).join("");
-  const allButton = `<button type="button" data-action="view-all" aria-pressed="${viewAll}">All ${state.people.length}</button>`;
-  return `<div class="summary" aria-label="Brother filters">
+  const allButton = page === "youth"
+    ? `${youthGroupButton("all", "Everyone")}${youthGroupButton("priests", "Priests")}${youthGroupButton("teachers", "Teachers")}`
+    : `<button type="button" data-action="view-all" aria-pressed="${viewAll}">All ${eldersPeople().length}</button>`;
+  return `<div class="summary" aria-label="${page === "youth" ? "Youth filters" : "Brother filters"}">
     ${allButton}
     ${visitButton}
     ${archiveOpen ? `${archiveButton}${statusButtons}` : `${statusButtons}${archiveButton}`}
@@ -1067,17 +1205,32 @@ function countStatuses() {
   return counts;
 }
 
+function listTitle() {
+  if (assigneeFilter) return assigneeFilter;
+  if (viewAll) return page === "youth" ? "Everyone" : "All";
+  if (dayFilter) return formatDate(dayFilter);
+  if (archiveOpen && statusFilter === "all") return "Archive";
+  if (statusFilter !== "all") return STATUS_LABELS[statusFilter];
+  if (page === "youth") {
+    if (youthGroup === "priests") return "Priests";
+    if (youthGroup === "teachers") return "Teachers";
+    return "Youth";
+  }
+  return "To Visit";
+}
+
 function peopleView() {
   const people = filteredPeople();
-  const title = assigneeFilter ? assigneeFilter : viewAll ? "All" : dayFilter ? formatDate(dayFilter) : archiveOpen && statusFilter === "all" ? "Archive" : statusFilter === "all" ? "To Visit" : STATUS_LABELS[statusFilter];
+  const title = listTitle();
   const showDetail = !state.rosterMode || Boolean(selectedPersonId) || detailForm === "add-person";
+  const noun = page === "youth" ? (people.length === 1 ? "member" : "members") : (people.length === 1 ? "brother" : "brothers");
   return `<section class="layout${showDetail ? "" : " layout-single"}">
     <div class="card" id="people-card">
       <div class="row">
         <h2>${esc(title)}</h2>
-        <button type="button" class="ghost" data-action="form" data-form="add-person">Add a person</button>
+        <button type="button" class="ghost" data-action="form" data-form="add-person">${page === "youth" ? "Add member" : "Add a person"}</button>
       </div>
-      <p class="muted">${people.length} ${state.rosterMode ? (people.length === 1 ? "brother" : "brothers") : "in this list"}</p>
+      <p class="muted">${people.length} ${state.rosterMode ? noun : "in this list"}</p>
       <input id="search" class="search" type="search" placeholder="Search by name" value="${esc(search)}" aria-label="Search by name">
       <div id="person-list" class="person-list">${personButtons(people)}</div>
     </div>
@@ -1086,7 +1239,9 @@ function peopleView() {
 }
 
 function personButtons(people = filteredPeople()) {
-  if (!state.people.length) {
+  const loaded = page === "youth" ? youthMembers("all") : eldersPeople();
+  if (!loaded.length) {
+    if (page === "youth") return "";
     return `<p class="empty">No one is loaded yet. The outreach spreadsheet is not readable from here, so this list starts empty. Import a CSV or add a person. No sample members are included.</p>`;
   }
   if (!people.length) {
@@ -1217,7 +1372,8 @@ function personMatchesFilters(person) {
 function filteredPeople() {
   const needle = search.trim().toLowerCase();
   const dayIds = viewAll || !dayFilter ? null : new Set(state.calendarMarks?.[dayFilter]?.people || []);
-  return state.people
+  const source = page === "youth" ? youthMembers() : eldersPeople();
+  return source
     .filter((person) => !dayIds || dayIds.has(person.id))
     .filter((person) => personMatchesFilters(person))
     .filter((person) => {
@@ -1356,16 +1512,25 @@ function planParts(person) {
   return { date: "", time: "", kind: "", place: "" };
 }
 
-function assignedCountButton(name) {
-  const count = state.people.filter((person) => person.rosterStatusKey === "scheduled" && (person.assigned || []).includes(name)).length;
+function leaderNamesFor(person) {
+  if (person?.group === "priests" || person?.group === "teachers") {
+    return (state.youthLeadership?.[person.group] || []).map((row) => row.name).filter(Boolean);
+  }
+  return (state.presidency || []).map((member) => member.name).filter(Boolean);
+}
+
+function assignedCountButton(name, people = eldersPeople(), quorum = "") {
+  if (!name) return "";
+  const count = people.filter((person) => person.rosterStatusKey === "scheduled" && (person.assigned || []).includes(name)).length;
   if (!count) return "";
-  return `<button type="button" class="assign-count" data-action="show-assigned" data-name="${esc(name)}" aria-pressed="${assigneeFilter === name}" aria-label="${count} scheduled ${count === 1 ? "person" : "people"} assigned to ${esc(name)}">${count}</button>`;
+  const quorumAttr = quorum ? ` data-quorum="${esc(quorum)}"` : "";
+  return `<button type="button" class="assign-count" data-action="show-assigned" data-name="${esc(name)}"${quorumAttr} aria-pressed="${assigneeFilter === name}" aria-label="${count} scheduled ${count === 1 ? "person" : "people"} assigned to ${esc(name)}">${count}</button>`;
 }
 
 function assignmentFields(person) {
   if (person.rosterStatusKey !== "scheduled") return "";
   const assigned = person.assigned || [];
-  const members = (state.presidency || []).map((member) => member.name).filter(Boolean);
+  const members = leaderNamesFor(person);
   const options = (selected) => {
     const extra = selected && !members.includes(selected) ? [selected] : [];
     return ["", ...members, ...extra].map((name) => `<option value="${esc(name)}" ${name === selected ? "selected" : ""}>${esc(name || "—")}</option>`).join("");
@@ -1562,6 +1727,21 @@ function personActions(person) {
 }
 
 function addPersonForm() {
+  if (page === "youth") {
+    const groupField = youthGroup === "priests" || youthGroup === "teachers"
+      ? `<input type="hidden" name="group" value="${esc(youthGroup)}">`
+      : `<label>Quorum <select name="group" aria-label="Quorum"><option value="priests">Priests</option><option value="teachers">Teachers</option></select></label>`;
+    return `<h2>Add member</h2>
+      <form class="stack" data-form="add-person">
+        <label>Name <input name="displayName" required></label>
+        ${groupField}
+        <label>Birthday <input name="birthday" autocomplete="off" aria-label="Birthday"></label>
+        <label>Phone <span class="private-flag">Private</span><input name="phone" type="tel" autocomplete="off"></label>
+        <label>Email <span class="private-flag">Private</span><input name="email" type="email" autocomplete="off"></label>
+        <label>Notes <textarea name="notes"></textarea></label>
+        <button class="primary" type="submit">Save member</button>
+      </form>`;
+  }
   return `<h2>Add a person</h2>
     <form class="stack" data-form="add-person">
       <label>Name <input name="displayName" required></label>
@@ -1662,7 +1842,7 @@ function attemptList(person) {
 
 function outreachTable(attempts) {
   const person = selectedPerson();
-  const members = state.presidency || [];
+  const members = leaderNamesFor(person).map((name) => ({ name }));
   const rows = attempts.map((attempt) => outreachEditRow(attempt)).join("");
   return `<div class="cell-table">
     <div class="cell-row outreach-add" data-outreach-add data-person-id="${esc(person?.id || "")}">
@@ -1684,7 +1864,7 @@ function outreachTable(attempts) {
 }
 
 function outreachEditRow(attempt) {
-  const members = state.presidency || [];
+  const members = leaderNamesFor(selectedPerson()).map((name) => ({ name }));
   const who = whoLabel(attempt);
   const names = [...new Set([who, ...members.map((member) => member.name)].filter(Boolean))];
   const channels = ["text", "phone", "email", "in_person"];

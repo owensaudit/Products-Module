@@ -24,6 +24,8 @@ import {
   setPersonContact,
   setPersonStatus,
   setPresidency,
+  setYouthLeadership,
+  addPerson,
   personOutreachStatus,
   previewImport,
   presentState,
@@ -549,6 +551,52 @@ test("an outreach row records a presidency member, how they reached out, and the
     "Secretary: Harrison Bardo",
     "Asst. Secretary: Josh Owens",
   ]);
+});
+
+test("a youth member keeps a quorum and a blank leadership name", async () => {
+  let state = emptyState();
+  state = addPerson(state, {
+    displayName: "Example, Ada",
+    phone: "555-0101",
+    email: "ada@example.com",
+    group: "priests",
+    sheetColumns: { Brother: "Example, Ada", Birthday: "14 Mar 2010", Priesthood: "Priest" },
+  }, deps());
+  state = addPerson(state, {
+    displayName: "Sample, Bea",
+    group: "teachers",
+    sheetColumns: { Brother: "Sample, Bea", Birthday: "4 Oct 2011", Priesthood: "Teacher" },
+  }, deps());
+  state = setYouthLeadership(state, {
+    priests: [
+      { name: "Sample, Bea", phone: "555-0102", email: "bea@example.com" },
+      { name: "Example, Ada" },
+    ],
+    teachers: [{ name: "Sample, Bea" }],
+  });
+  assert.equal(state.people[0].group, "priests");
+  assert.equal(state.people[1].group, "teachers");
+  assert.equal(state.youthLeadership.priests.length, 7);
+  assert.equal(state.youthLeadership.teachers.length, 6);
+  assert.equal(state.youthLeadership.priests[4].name, "");
+  assert.equal(state.youthLeadership.teachers[5].name, "");
+  const view = presentState(state, "2026-10", { includePrivate: true });
+  const priests = view.people.filter((person) => person.group === "priests");
+  assert.equal(priests.length, 1);
+  assert.equal(priests[0].sheetName, "Example, Ada");
+  assert.equal(priests[0].birthday, "03/14/2010");
+  assert.equal(priests[0].rosterStatus, "");
+  assert.equal(priests[0].phone, "555-0101");
+  assert.equal(view.youthLeadership.priests[0].name, "Sample, Bea");
+  assert.equal(view.youthLeadership.priests[4].role, "Adviser");
+  assert.equal(view.youthLeadership.teachers[5].role, "Specialist");
+  const directory = await mkdtemp(path.join(tmpdir(), "portal-youth-"));
+  const store = createStore(path.join(directory, "portal.json"));
+  await store.update(() => state);
+  const saved = await store.read();
+  assert.equal(saved.youthLeadership.priests[4].name, "");
+  assert.equal(saved.people.filter((person) => person.group === "teachers").length, 1);
+  assert.equal(JSON.stringify(saved).includes("555-0101"), true);
 });
 
 test("the fresh portal and the csv template contain no member rows", async () => {

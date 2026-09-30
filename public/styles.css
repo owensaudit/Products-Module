@@ -106,6 +106,21 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 600; letter-spacing: -0.02e
 
 h1 { margin: 0; font-size: 40px; line-height: 1.05; }
 
+button.title-link {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--serif);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-size: 40px;
+  line-height: 1.05;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
 .title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 
 .message-inbox {
@@ -348,6 +363,24 @@ h1 { margin: 0; font-size: 40px; line-height: 1.05; }
   display: grid;
   gap: 28px;
   align-content: start;
+}
+
+.youth-boards { display: grid; gap: 22px; }
+
+.youth-boards .presidency-board {
+  justify-content: start;
+  padding-right: 0;
+  width: 100%;
+}
+
+.pres-section {
+  grid-column: 1 / -1;
+  margin: 8px 0 0;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
 }
 
 .header-tools, .presidency-board {
@@ -1072,7 +1105,7 @@ button.mark-visited {
 @media (max-width: 800px) {
   .church-brand, .site-header, #app { padding-left: 16px; padding-right: 16px; }
   .site-header, .layout { display: block; }
-  h1 { font-size: 32px; }
+  h1, button.title-link { font-size: 32px; }
   .header-tools { justify-content: flex-start; margin-top: 16px; }
   .header-tools label { width: 100%; }
   input[type="month"], #author-name { width: 100%; }

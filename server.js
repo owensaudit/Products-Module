@@ -20,6 +20,7 @@ import {
   setReachOutDate,
   setPersonContact,
   setPresidency,
+  setYouthLeadership,
   previewImport,
   scheduleVisit,
   setPersonStatus,
@@ -168,6 +169,12 @@ export function createPortalServer(store) {
 
         if (pathname === "/api/presidency") {
           const next = await store.update((state) => setPresidency(state, body.members));
+          sendJson(response, 200, presentState(next, month, viewOptions));
+          return;
+        }
+
+        if (pathname === "/api/youth/leadership") {
+          const next = await store.update((state) => setYouthLeadership(state, body));
           sendJson(response, 200, presentState(next, month, viewOptions));
           return;
         }
