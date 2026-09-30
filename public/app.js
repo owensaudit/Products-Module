@@ -299,16 +299,41 @@ function mappingFromForm(data) {
   return mapping;
 }
 
+let presidencySaveTimer = null;
+
+function presidencyNamesFromForm() {
+  return (state?.presidency || []).map((_, index) => {
+    const input = presidencyHost?.querySelector(`[name="name-${index}"]`);
+    return String(input?.value ?? "").trim();
+  });
+}
+
+function syncPresidencyDropdowns() {
+  document.querySelectorAll("select[name='by']").forEach((select) => {
+    const current = select.value;
+    select.innerHTML = (state.presidency || []).map((member) => `<option value="${esc(member.name)}">${esc(member.name)} — ${esc(member.role)}</option>`).join("");
+    if ([...select.options].some((option) => option.value === current)) select.value = current;
+  });
+}
+
+function savePresidencyNames() {
+  const names = presidencyNamesFromForm();
+  if (!names.length || names.some((name) => !name)) return;
+  if (names.every((name, index) => name === state.presidency[index]?.name)) return;
+  post("/api/presidency", { members: names.map((name) => ({ name })) }).then((next) => {
+    state = next;
+    syncPresidencyDropdowns();
+  }).catch(showError);
+}
+
+presidencyHost?.addEventListener("input", (event) => {
+  if (!(event.target instanceof HTMLInputElement) || !event.target.name.startsWith("name-")) return;
+  clearTimeout(presidencySaveTimer);
+  presidencySaveTimer = setTimeout(savePresidencyNames, 400);
+});
+
 presidencyHost?.addEventListener("submit", (event) => {
   event.preventDefault();
-  const data = new FormData(event.target);
-  const members = (state?.presidency || []).map((_, index) => ({
-    name: data.get(`name-${index}`),
-  }));
-  post("/api/presidency", { members }).then((next) => {
-    state = next;
-    render();
-  }).catch(showError);
 });
 
 function render() {
@@ -326,6 +351,7 @@ function render() {
 
 function renderPresidency() {
   if (!presidencyHost) return;
+  if (presidencyHost.contains(document.activeElement)) return;
   const members = state?.presidency || [];
   if (!members.length) {
     presidencyHost.innerHTML = "";
@@ -339,7 +365,6 @@ function renderPresidency() {
       <input id="pres-name-${index}" name="name-${index}" value="${esc(member.name)}" required autocomplete="off" aria-label="${esc(member.role)} name">
       <p class="position">${esc(member.role)}</p>
     </div>`).join("")}
-    <button class="primary" type="submit">Save names</button>
   </form>`;
 }
 
