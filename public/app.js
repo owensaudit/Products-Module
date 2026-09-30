@@ -167,9 +167,8 @@ app.addEventListener("click", (event) => {
     render();
     document.querySelector("#people-card")?.scrollIntoView({ block: "start" });
   } else if (action === "archive") {
-    if (!archiveOpen) archiveOpen = true;
-    else if (statusFilter !== "all") statusFilter = "all";
-    else archiveOpen = false;
+    archiveOpen = !archiveOpen;
+    statusFilter = "all";
     archiveChoicesFor = "";
     search = "";
     dayFilter = "";
@@ -730,7 +729,7 @@ function applyStatus(personId, status) {
   }[status];
   if (archiveKey) {
     archiveOpen = true;
-    statusFilter = archiveKey === "visited" ? "all" : archiveKey;
+    statusFilter = archiveKey;
     dayFilter = "";
     search = "";
     officeFilter = "all";
@@ -762,12 +761,16 @@ function rosterSummary() {
   }
   const archivedCount = state.people.filter((person) => personIsArchived(person)).length;
   const activeCount = state.people.length - archivedCount;
-  const keys = archiveOpen ? ARCHIVE_STATUS_ORDER.filter((key) => key !== "visited") : ROSTER_STATUS_ORDER.filter((key) => counts[key]);
+  const keys = archiveOpen ? ARCHIVE_STATUS_ORDER : ROSTER_STATUS_ORDER.filter((key) => counts[key]);
   const offices = [...new Set(cohort.map((person) => person.priesthood).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-  const archiveButton = `<button type="button" class="archive-toggle" data-action="archive" aria-pressed="${archiveOpen && statusFilter === "all"}">Archive ${archivedCount}</button>`;
+  const archiveButton = `<button type="button" class="archive-toggle" data-action="archive" aria-pressed="${archiveOpen}">Archive ${archivedCount}</button>`;
+  const visitButton = archiveOpen
+    ? `<button type="button" data-action="show-people">People to Visit ${activeCount}</button>`
+    : filterButton("all", activeCount, "People to Visit");
+  const statusButtons = keys.map((key) => filterButton(key, counts[key] || 0, STATUS_LABELS[key] || key)).join("");
   return `<div class="summary" aria-label="Brother filters">
-    ${archiveOpen ? `<button type="button" data-action="show-people">People ${activeCount}</button>` : filterButton("all", activeCount, "Everyone")}
-    ${archiveOpen ? `${archiveButton}${keys.map((key) => filterButton(key, counts[key] || 0, STATUS_LABELS[key] || key)).join("")}` : `${keys.map((key) => filterButton(key, counts[key] || 0, STATUS_LABELS[key] || key)).join("")}${archiveButton}`}
+    ${visitButton}
+    ${archiveOpen ? `${archiveButton}${statusButtons}` : `${statusButtons}${archiveButton}`}
     <label class="inline-filter">Priesthood
       <select data-action="office" aria-label="Filter by priesthood">
         <option value="all" ${officeFilter === "all" ? "selected" : ""}>All offices</option>
@@ -789,7 +792,7 @@ function countStatuses() {
 
 function peopleView() {
   const people = filteredPeople();
-  const title = dayFilter ? formatDate(dayFilter) : archiveOpen && statusFilter === "all" ? "Archive" : statusFilter === "all" ? "People" : STATUS_LABELS[statusFilter];
+  const title = dayFilter ? formatDate(dayFilter) : archiveOpen && statusFilter === "all" ? "Archive" : statusFilter === "all" ? "People to Visit" : STATUS_LABELS[statusFilter];
   const showDetail = !state.rosterMode || Boolean(selectedPersonId) || detailForm === "add-person";
   return `<section class="layout${showDetail ? "" : " layout-single"}">
     <div class="card" id="people-card">
