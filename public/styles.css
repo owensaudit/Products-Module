@@ -557,6 +557,7 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
 .status-choice.moved, .status-choice.no_contact_info { background: #ece7dc; color: var(--slate); }
 .status-choice.mission { background: var(--blue-soft); color: var(--blue); }
 .status-choice.do_not_contact, .status-choice.not_interested { background: var(--rose-soft); color: var(--rose); }
+.status-choice.declined { background: var(--status-declined); color: white; }
 .status-choice.visited { background: var(--status-visited); color: white; }
 .status-row .tiny, .archive-choices .tiny {
   padding: 1px 8px;

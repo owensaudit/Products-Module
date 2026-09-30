@@ -156,14 +156,14 @@ test("a reach out needs a date and marks that calendar day", () => {
   assert.throws(() => setReachOutDate(state, "per_1", { date: "soon" }), /Reach out date/);
 });
 
-test("moved, mission, do not contact, not interested, no contact info, and visited are archive statuses", () => {
-  for (const label of ["Moved", "Mission", "Do Not Contact", "Not Interested", "No Contact Info", "Visited"]) {
+test("moved, mission, do not contact, not interested, no contact info, declined, and visited are archive statuses", () => {
+  for (const label of ["Moved", "Mission", "Do Not Contact", "Not Interested", "No Contact Info", "Declined", "Visited"]) {
     assert.equal(isArchiveStatus(label), true);
     assert.equal(canonicalRosterStatus(label), label);
   }
   assert.equal(isArchiveStatus("Reach Out"), false);
   assert.equal(isArchiveStatus("Re-Schedule"), false);
-  assert.equal(isArchiveStatus("Declined"), false);
+  assert.equal(isArchiveStatus("Scheduled"), false);
   assert.equal(rosterStatusKey("Re-Schedule, Visited"), "visited");
   assert.equal(isArchiveStatus("Re-Schedule, Visited"), true);
   let state = emptyState();

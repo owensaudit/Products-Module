@@ -18,8 +18,8 @@ const STATUS_LABELS = {
   no_contact_info: "No Contact Info",
 };
 
-const ROSTER_STATUS_ORDER = ["reach_out", "no_response", "reschedule", "scheduled", "declined", "none"];
-const ARCHIVE_STATUS_ORDER = ["moved", "mission", "do_not_contact", "not_interested", "no_contact_info", "visited"];
+const ROSTER_STATUS_ORDER = ["reach_out", "no_response", "reschedule", "scheduled", "none"];
+const ARCHIVE_STATUS_ORDER = ["moved", "mission", "do_not_contact", "not_interested", "no_contact_info", "declined", "visited"];
 
 const WHO = { JO: "Josh Owens" };
 
@@ -722,6 +722,7 @@ function applyStatus(personId, status) {
     "Do Not Contact": "do_not_contact",
     "Not Interested": "not_interested",
     "No Contact Info": "no_contact_info",
+    Declined: "declined",
     Visited: "visited",
   }[status];
   if (archiveKey) {
@@ -736,7 +737,6 @@ function applyStatus(personId, status) {
       "No Response": "no_response",
       "Re-Schedule": "reschedule",
       Scheduled: "scheduled",
-      Declined: "declined",
     }[status] || "none";
     if (archiveOpen) archiveOpen = false;
     if (statusFilter !== "all" && statusFilter !== activeKey) statusFilter = "all";
@@ -828,7 +828,6 @@ const ACTIVE_CHOICES = [
   ["No Response", "No Response"],
   ["Re-Schedule", "Re-Schedule"],
   ["Scheduled", "Scheduled"],
-  ["Declined", "Declined"],
 ];
 
 const ARCHIVE_CHOICES = [
@@ -837,6 +836,7 @@ const ARCHIVE_CHOICES = [
   ["Do Not Contact", "Do Not Contact"],
   ["Not Interested", "Not Interested"],
   ["No Contact Info", "No Contact Info"],
+  ["Declined", "Declined"],
   ["Visited", "Visited"],
 ];
 
