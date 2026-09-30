@@ -14,6 +14,7 @@
   --status-scheduled: #3caf62;
   --status-reschedule: #d7f3e2;
   --status-reach: #d4efff;
+  --status-driveby: #ead9fb;
   --status-none: #ffe56a;
   --status-peach: #f6c29a;
   --status-declined: #d23b3b;
@@ -301,6 +302,12 @@ h1 { margin: 0; font-size: 40px; line-height: 1.05; }
   color: white;
 }
 
+.place-option:has(input[value="driveby"]:checked) {
+  background: var(--status-driveby);
+  border-color: #d4b8ee;
+  color: #4a2770;
+}
+
 .place-option:has(input:focus-visible) { outline: 2px solid var(--church); }
 
 .place-icon { width: 16px; height: 16px; flex: none; }
@@ -479,6 +486,7 @@ button.cal-day.is-open {
 }
 
 .cal-dot.reach_out { background: #7ec8f0; }
+.cal-dot.driveby { background: #c9a6e8; }
 .cal-dot.scheduled { background: var(--status-scheduled); }
 .cal-dot.reschedule { background: #7dcea0; }
 
@@ -632,6 +640,7 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
 }
 
 .summary button[data-status="reach_out"] { background: var(--status-reach); color: #0e3f66; border-color: #9ecfec; }
+.summary button[data-status="driveby"] { background: var(--status-driveby); color: #4a2770; border-color: #d4b8ee; }
 .summary button[data-status="none"] { background: var(--status-none); color: #3d3200; border-color: #e6c200; }
 .summary button[data-status="no_response"] { background: var(--status-peach); color: #6a3412; border-color: #e0a57a; }
 .summary button[data-status="reschedule"] { background: var(--status-reschedule); color: #145c34; border-color: #b7e4c8; }
@@ -670,6 +679,7 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
 .pill.declined { background: var(--status-declined); color: white; }
 .pill.visited, .pill.reschedule_visited { background: var(--status-visited); color: white; }
 .pill.reach_out { background: var(--status-reach); color: #0e3f66; }
+.pill.driveby { background: var(--status-driveby); color: #4a2770; }
 .pill.no_response { background: var(--status-peach); color: #6a3412; }
 .pill.reschedule { background: var(--status-reschedule); color: #145c34; }
 .pill.none { background: var(--status-none); color: #3d3200; }
@@ -727,6 +737,7 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
 .status-pill.none { background: var(--status-none); color: #3d3200; }
 .status-pill.no_response { background: var(--status-peach); color: #6a3412; }
 .status-pill.reach_out { background: var(--status-reach); color: #0e3f66; }
+.status-pill.driveby { background: var(--status-driveby); color: #4a2770; }
 .status-pill.reschedule { background: var(--status-reschedule); color: #145c34; }
 .status-pill.reschedule_visited,
 .status-pill.visited { background: var(--status-visited); color: white; }
@@ -747,6 +758,8 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
 .person.replied, .person.reschedule, .person.reschedule_visited { background: var(--blue-soft); }
 .person.awaiting_reply, .person.reach_out { background: var(--status-reach); color: #0e3f66; }
 .person.awaiting_reply small, .person.reach_out small { color: #3d6480; }
+.person.driveby { background: var(--status-driveby); color: #4a2770; }
+.person.driveby small { color: #5c3d78; }
 .person.visited, .person.reschedule_visited { background: var(--status-visited); color: white; }
 .person.visited small, .person.reschedule_visited small { color: white; }
 .person.completed, .person.scheduled { background: var(--status-scheduled); }

@@ -141,9 +141,12 @@ test("an appointment is a date and time that marks the brother scheduled", () =>
   assert.equal(state.people[0].sheetColumns.Status, "Re-Schedule");
   assert.equal(state.people[0].sheetColumns["Apt Date"], "11/4 6:00 PM");
   state = setAppointment(state, "per_1", { date: "2026-11-05", time: "18:30", kind: "scheduled", place: "drive-by" });
-  assert.equal(state.people[0].sheetColumns["Apt Place"], "Driveby");
-  assert.equal(state.people[0].sheetColumns.Status, "Scheduled");
-  assert.equal(presentState(state, "2026-11").people[0].appointmentPlace, "Driveby");
+  assert.equal(state.people[0].sheetColumns["Apt Place"], "Drive by");
+  assert.equal(state.people[0].sheetColumns.Status, "Drive by");
+  const driveBy = presentState(state, "2026-11");
+  assert.equal(driveBy.people[0].appointmentPlace, "Drive by");
+  assert.equal(driveBy.people[0].rosterStatusKey, "driveby");
+  assert.deepEqual(driveBy.calendarMarks["2026-11-05"], { kinds: ["driveby"], people: ["per_1"] });
 });
 
 test("a reach out needs a date and marks that calendar day", () => {

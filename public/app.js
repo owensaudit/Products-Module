@@ -6,6 +6,7 @@ const STATUS_LABELS = {
   completed: "Visit complete",
   declined: "Declined",
   reach_out: "Reach Out",
+  driveby: "Drive by",
   no_response: "No Response",
   reschedule: "Re-Schedule",
   reschedule_visited: "Visited",
@@ -19,7 +20,7 @@ const STATUS_LABELS = {
 };
 
 const PRIESTHOOD_OFFICES = ["Unordained", "Deacon", "Teacher", "Priest", "Elder", "High Priest"];
-const ROSTER_STATUS_ORDER = ["reach_out", "no_response", "reschedule", "scheduled", "none"];
+const ROSTER_STATUS_ORDER = ["reach_out", "no_response", "reschedule", "scheduled", "driveby", "none"];
 const ARCHIVE_STATUS_ORDER = ["moved", "mission", "do_not_contact", "not_interested", "no_contact_info", "declined", "visited"];
 
 const WHO = { JO: "Josh Owens" };
@@ -81,6 +82,10 @@ if (monthInput) {
 
 app.addEventListener("change", (event) => {
   const target = event.target;
+  if (target instanceof HTMLInputElement && target.name === "place" && target.value === "driveby" && target.form?.dataset.form === "plan") {
+    applyStatus(selectedPersonId, "Drive by");
+    return;
+  }
   if (target instanceof HTMLSelectElement && target.classList.contains("status-pill")) {
     applyStatus(target.dataset.personId, target.value);
     return;
@@ -358,6 +363,20 @@ app.addEventListener("submit", (event) => {
     const date = String(data.get("date") || "");
     const plan = String(data.get("kind") || "");
     const time = String(data.get("time") || "");
+    const place = String(data.get("place") || "");
+    if (place === "driveby") {
+      if (date && !time) {
+        showError(new Error("Add a time for a scheduled appointment"));
+        return;
+      }
+      const path = date ? `/api/people/${selectedPersonId}/appointment` : `/api/people/${selectedPersonId}/status`;
+      const body = date ? { date, time, kind: plan, place } : { status: "Drive by" };
+      post(path, body).then(() => {
+        if (date) blankPlanFor = selectedPersonId;
+        render();
+      }).catch(showError);
+      return;
+    }
     if (!plan) {
       showError(new Error("Choose Reach out, Scheduled Appt, or Re-Schedule"));
       return;
@@ -366,8 +385,7 @@ app.addEventListener("submit", (event) => {
       showError(new Error("Add a time for a scheduled appointment"));
       return;
     }
-    const place = String(data.get("place") || "");
-    if ((plan === "scheduled" || plan === "reschedule") && place !== "church" && place !== "home" && place !== "driveby") {
+    if ((plan === "scheduled" || plan === "reschedule") && place !== "church" && place !== "home") {
       showError(new Error("Choose Church, Home, or Driveby"));
       return;
     }
@@ -739,13 +757,14 @@ function renderCalendar() {
     const kinds = mark.kinds || [];
     const people = mark.people || [];
     const dots = kinds.map((kind) => {
-      const label = kind === "scheduled" ? "Scheduled" : kind === "reschedule" ? "Re-Schedule" : "Reach out";
+      const label = kind === "scheduled" ? "Scheduled" : kind === "reschedule" ? "Re-Schedule" : kind === "driveby" ? "Drive by" : "Reach out";
       return `<span class="cal-dot ${kind}" title="${label}"></span>`;
     }).join("");
     const described = [`${title} ${day}`];
     if (kinds.includes("scheduled")) described.push("scheduled");
     if (kinds.includes("reschedule")) described.push("re-schedule");
     if (kinds.includes("reach_out")) described.push("reach out");
+    if (kinds.includes("driveby")) described.push("drive by");
     const today = viewingNow && day === now.getDate() ? " is-today" : "";
     const open = dayFilter === iso ? " is-open" : "";
     const inner = `<span class="cal-marks">${dots}</span><span class="cal-num">${day}</span>`;
@@ -766,6 +785,7 @@ function renderCalendar() {
       <span><i class="cal-dot scheduled"></i> Scheduled</span>
       <span><i class="cal-dot reschedule"></i> Re-Schedule</span>
       <span><i class="cal-dot reach_out"></i> Reach out</span>
+      <span><i class="cal-dot driveby"></i> Drive by</span>
     </p>`;
 }
 
@@ -924,6 +944,7 @@ function applyStatus(personId, status) {
       "No Response": "no_response",
       "Re-Schedule": "reschedule",
       Scheduled: "scheduled",
+      "Drive by": "driveby",
     }[status] || "none";
     viewAll = false;
     if (archiveOpen) archiveOpen = false;
@@ -1020,6 +1041,7 @@ const ACTIVE_CHOICES = [
   ["No Response", "No Response"],
   ["Re-Schedule", "Re-Schedule"],
   ["Scheduled", "Scheduled"],
+  ["Drive by", "Drive by"],
 ];
 
 const ARCHIVE_CHOICES = [
@@ -1199,7 +1221,7 @@ function placeChoice(place) {
     <input type="radio" name="place" value="${value}" ${place === label ? "checked" : ""}>
     ${icon}${label}
   </label>`;
-  return `<span class="place-choices">${option("church", "Church", churchIcon())}${option("home", "Home", homeIcon())}${option("driveby", "Driveby", drivebyIcon())}</span>`;
+  return `<span class="place-choices">${option("church", "Church", churchIcon())}${option("home", "Home", homeIcon())}${option("driveby", "Drive by", drivebyIcon())}</span>`;
 }
 
 function planLine(person) {
@@ -1208,6 +1230,7 @@ function planLine(person) {
   if (key === "reach_out" && person.reachOutDate) return `<p><strong>Reach out</strong> ${esc(person.reachOutDate)}</p>`;
   if (key === "scheduled" && person.appointment) return `<p class="plan-line"><strong>Scheduled Appt</strong> ${esc(person.appointment)}${where}</p>`;
   if (key === "reschedule" && person.appointment) return `<p class="plan-line"><strong>Re-Schedule</strong> ${esc(person.appointment)}${where}</p>`;
+  if (key === "driveby" && person.appointment) return `<p class="plan-line"><strong>Drive by</strong> ${esc(person.appointment)}${where}</p>`;
   if (person.appointment) return `<p class="plan-line"><strong>Scheduled Appt</strong> ${esc(person.appointment)}${where}</p>`;
   if (person.reachOutDate) return `<p><strong>Reach out</strong> ${esc(person.reachOutDate)}</p>`;
   return "";
@@ -1216,6 +1239,10 @@ function planLine(person) {
 function planParts(person) {
   const key = person.rosterStatusKey;
   if (key === "reach_out" && person.reachOutDate) return { date: reachOutParts(person.reachOutDate), time: "", kind: "reach_out", place: "" };
+  if (key === "driveby") {
+    const parts = person.appointment ? appointmentParts(person.appointment) : { date: "", time: "" };
+    return { ...parts, kind: "", place: "Drive by" };
+  }
   if (person.appointment && (key === "scheduled" || key === "reschedule")) {
     return { ...appointmentParts(person.appointment), kind: key === "reschedule" ? "reschedule" : "scheduled", place: person.appointmentPlace || "" };
   }
