@@ -783,6 +783,8 @@ presidencyHost?.addEventListener("submit", (event) => {
 
 document.querySelector("#open-elders")?.addEventListener("click", () => openPage("elders"));
 document.querySelector("#open-youth")?.addEventListener("click", () => openPage("youth"));
+document.querySelector("#open-youth-title")?.addEventListener("click", () => openPage("youth"));
+document.querySelector("[data-page-header='youth'] .eyebrow")?.addEventListener("click", () => openPage("youth"));
 
 document.querySelector("#message-inbox")?.addEventListener("click", () => {
   toggleInbox("elders");

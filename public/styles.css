@@ -134,6 +134,9 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 600; letter-spacing: -0.02e
 
 h1 { margin: 0; font-size: 40px; line-height: 1.05; }
 
+body[data-page="elders"] [data-page-header="youth"] .eyebrow { cursor: pointer; }
+body[data-page="elders"] #open-youth-title:hover { color: var(--church-deep); }
+
 button.title-link {
   margin: 0;
   padding: 0;
