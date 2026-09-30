@@ -452,10 +452,24 @@ body[data-page="youth"] .presidency-board {
   padding-right: 0;
   width: max-content;
   max-width: none;
+  grid-template-columns: max-content max-content max-content max-content;
 }
 
-body[data-page="youth"] .presidency-board input.pres-name {
+body[data-page="youth"] .presidency-board input.pres-name,
+body[data-page="youth"] .presidency-board input[name^="phone-"],
+body[data-page="youth"] .presidency-board input[name^="email-"] {
+  width: auto;
   max-width: none;
+  min-width: 0;
+  overflow: visible;
+  color: var(--ink);
+  caret-color: var(--ink);
+  field-sizing: content;
+}
+
+body[data-page="youth"] .presidency-board input[name^="phone-"],
+body[data-page="youth"] .presidency-board input[name^="email-"] {
+  min-width: 4.5rem;
 }
 
 .pres-section {
