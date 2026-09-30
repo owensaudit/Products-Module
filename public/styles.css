@@ -142,12 +142,39 @@ h1 { margin: 0; font-size: 40px; line-height: 1.05; }
   padding: 12px 14px;
 }
 
+.comment-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.comment-filters button {
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: white;
+  padding: 6px 12px;
+  color: var(--ink);
+}
+
+.comment-filters button[aria-pressed="true"] {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
 .comment-who {
   margin: 0 0 6px;
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--church-deep);
+  font: inherit;
   font-size: 13px;
   font-weight: 700;
+  text-align: left;
+  cursor: pointer;
 }
+
+.comment-who:hover { text-decoration: underline; }
 
 .message-bubble {
   position: absolute;

@@ -47,6 +47,7 @@ let viewAll = false;
 let blankPlanFor = "";
 let focusReachOutDate = false;
 let commentsOpen = false;
+let commentFor = "";
 let editingCommentId = "";
 let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let selectedPersonId = null;
@@ -172,6 +173,25 @@ app.addEventListener("click", (event) => {
       menu.innerHTML = "";
     }
     return;
+  } else if (action === "comment-for") {
+    commentFor = button.dataset.name || "";
+    render();
+  } else if (action === "open-comment-person") {
+    const person = state.people.find((item) => item.id === button.dataset.id);
+    if (!person) return;
+    commentsOpen = false;
+    selectedPersonId = person.id;
+    archiveOpen = personIsArchived(person);
+    archiveChoicesFor = "";
+    statusFilter = "all";
+    search = "";
+    dayFilter = "";
+    officeFilter = "all";
+    viewAll = false;
+    view = "people";
+    detailForm = null;
+    render();
+    document.getElementById(`comment-${button.dataset.comment}`)?.scrollIntoView({ block: "nearest" });
   } else if (action === "view") {
     view = button.dataset.view;
     detailForm = null;
@@ -781,13 +801,24 @@ function peopleForDay(iso) {
 
 function commentsView() {
   const messages = state.openMessages || [];
+  const members = (state.presidency || []).filter((member) => member.name);
+  const visible = commentFor ? messages.filter((message) => (message.mentions || []).includes(commentFor)) : messages;
+  const nameButton = (name, count) => {
+    const pressed = commentFor === name;
+    return `<button type="button" data-action="comment-for" data-name="${esc(name)}" aria-pressed="${pressed}">${esc(name || "All")} ${count}</button>`;
+  };
   return `<section class="comment-list" aria-label="Comments">
-    ${messages.map((message) => `<article class="comment" id="comment-${esc(message.id)}">
-      ${message.personName ? `<p class="comment-who">${esc(message.personName)}</p>` : ""}
+    <div class="comment-filters" role="group" aria-label="Whose comments">
+      ${nameButton("", messages.length)}
+      ${members.map((member) => nameButton(member.name, messages.filter((message) => (message.mentions || []).includes(member.name)).length)).join("")}
+    </div>
+    ${visible.map((message) => `<article class="comment" id="comment-${esc(message.id)}">
+      ${message.personName ? `<button type="button" class="comment-who" data-action="open-comment-person" data-id="${esc(message.personId)}" data-comment="${esc(message.id)}">${esc(message.personName)}</button>` : ""}
       <div class="comment-text">${mentionHtml(message.body)}</div>
       <p class="needs-answer">Needs an answer</p>
       ${answerTools(message.id)}
     </article>`).join("")}
+    ${commentFor && !visible.length ? `<p class="empty">No comments for ${esc(commentFor)}.</p>` : ""}
   </section>`;
 }
 
