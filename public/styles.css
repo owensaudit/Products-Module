@@ -357,6 +357,7 @@ h1 { margin: 0; font-size: 40px; line-height: 1.05; }
   row-gap: 4px;
   align-items: center;
   justify-content: end;
+  padding-right: 2rem;
 }
 
 .presidency-board .eyebrow { margin: 0; font-size: 11px; grid-column: 1 / -1; }
@@ -857,6 +858,17 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
 .step.done { background: var(--green-soft); color: var(--green); }
 
 .actions, .row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.row { justify-content: space-between; align-items: center; }
+
+.row h2 { margin: 0; }
+
+.row .ghost {
+  margin-left: auto;
+  padding: 2px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+}
 
 .primary {
   background: var(--church-deep);
