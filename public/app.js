@@ -1255,11 +1255,14 @@ function rosterNeeded() {
 function renderPeopleList() {
   const list = document.querySelector("#person-list");
   if (!list) return;
-  list.innerHTML = showingYouthLists() ? youthListMarkup() : personButtons();
+  const assignments = showingAssignments();
+  const youthLists = showingYouthLists();
+  list.innerHTML = youthLists ? youthListMarkup() : assignments ? assignmentListMarkup() : personButtons();
   const count = document.querySelector("#people-card .muted");
-  if (count && showingYouthLists()) {
-    const total = youthVisibleEntries().length;
-    count.textContent = `${total} ${total === 1 ? "person" : "people"}`;
+  if (count && (youthLists || assignments)) {
+    const total = assignments ? visibleAssignments().length : youthVisibleEntries().length;
+    const noun = assignments ? (total === 1 ? "assignment" : "assignments") : (total === 1 ? "person" : "people");
+    count.textContent = `${total} ${noun}`;
   }
 }
 
@@ -1404,11 +1407,15 @@ function listTitle() {
 
 function peopleView() {
   const youthLists = showingYouthLists();
-  const people = youthLists ? [] : filteredPeople();
-  const title = youthLists ? youthListTitle() : listTitle();
-  const total = youthLists ? youthVisibleEntries().length : people.length;
+  const assignments = showingAssignments();
+  const people = youthLists || assignments ? [] : filteredPeople();
+  const title = assignments ? "Assignments" : youthLists ? youthListTitle() : listTitle();
+  const total = assignments ? visibleAssignments().length : youthLists ? youthVisibleEntries().length : people.length;
   const showDetail = !state.rosterMode || Boolean(selectedPersonId) || detailForm === "add-person";
-  const noun = page === "youth" ? (total === 1 ? "person" : "people") : (total === 1 ? "brother" : "brothers");
+  const noun = assignments
+    ? (total === 1 ? "assignment" : "assignments")
+    : page === "youth" ? (total === 1 ? "person" : "people") : (total === 1 ? "brother" : "brothers");
+  const markup = youthLists ? youthListMarkup() : assignments ? assignmentListMarkup() : personButtons(people);
   return `<section class="layout${showDetail ? "" : " layout-single"}">
     <div class="card" id="people-card">
       <div class="row">
@@ -1417,14 +1424,38 @@ function peopleView() {
       </div>
       <p class="muted">${total} ${state.rosterMode ? noun : "in this list"}</p>
       <input id="search" class="search" type="search" placeholder="Search by name" value="${esc(search)}" aria-label="Search by name">
-      <div id="person-list" class="person-list">${youthLists ? youthListMarkup() : personButtons(people)}</div>
+      <div id="person-list" class="person-list">${markup}</div>
     </div>
     ${showDetail ? `<div class="card">${detailForm === "add-person" ? addPersonForm() : personDetail()}</div>` : ""}
   </section>`;
 }
 
+function showingAssignments() {
+  return page === "youth" && youthList === "assignments" && !archiveOpen && !assigneeFilter && !dayFilter;
+}
+
 function showingYouthLists() {
-  return page === "youth" && youthList !== "visits" && !archiveOpen && !assigneeFilter && !dayFilter;
+  return page === "youth" && youthList !== "visits" && youthList !== "assignments" && !archiveOpen && !assigneeFilter && !dayFilter;
+}
+
+function visibleAssignments() {
+  const needle = search.trim().toLowerCase();
+  return youthVisits()
+    .filter((person) => !personIsArchived(person))
+    .filter((person) => {
+      if (!needle) return true;
+      const name = nameKey(person).toLowerCase();
+      const household = String(person.household || "").toLowerCase();
+      const address = String(person.sheetColumns?.Address || "").toLowerCase();
+      return name.includes(needle) || household.includes(needle) || address.includes(needle);
+    })
+    .sort((a, b) => nameKey(a).localeCompare(nameKey(b), "en", { sensitivity: "base" }));
+}
+
+function assignmentListMarkup() {
+  const people = visibleAssignments();
+  if (!people.length) return `<p class="empty">No assignments${search.trim() ? " match this search" : ""}.</p>`;
+  return `<div class="ministering-cards assignment-cards">${people.map((person) => roleCard(person, "Assignment")).join("")}</div>`;
 }
 
 function youthListTitle() {
@@ -1505,9 +1536,10 @@ function roleCard(person, kind, fallback = "") {
   const title = person ? nameKey(person) : fallback;
   if (!title) return "";
   const street = String(person?.sheetColumns?.Address || "").split("\n").find((line) => line.trim()) || "";
+  const tone = kind === "Assignment" ? " role-assignment" : "";
   const body = `<span class="role-kicker">${esc(kind)}</span><strong>${esc(title)}</strong>${street ? `<small>${esc(street)}</small>` : ""}`;
-  if (!person) return `<article class="role-card">${body}</article>`;
-  return `<button type="button" class="role-card" data-action="select-person" data-id="${esc(person.id)}">${body}</button>`;
+  if (!person) return `<article class="role-card${tone}">${body}</article>`;
+  return `<button type="button" class="role-card${tone}" data-action="select-person" data-id="${esc(person.id)}">${body}</button>`;
 }
 
 function ministeringCards(quorum) {
@@ -1647,11 +1679,13 @@ function youthRosterSummary() {
     return `<button type="button" data-action="youth-list" data-list="${id}" aria-pressed="${pressed}">${esc(label)} ${youthListSize(id, quorum)}</button>`;
   }).join("");
   const allPressed = listsOpen && youthList === "all";
-  const visitPressed = !listsOpen && !archiveOpen && !viewAll && !assigneeFilter && !dayFilter && statusFilter === "all";
+  const assignmentPressed = showingAssignments();
+  const visitPressed = youthList === "visits" && !archiveOpen && !viewAll && !assigneeFilter && !dayFilter && statusFilter === "all";
   return `<div class="summary" aria-label="Youth lists">
     <button type="button" data-action="view-all" aria-pressed="${allPressed}">All ${allCount}</button>
     ${listButtons}
-    <button type="button" data-action="show-people" aria-pressed="${visitPressed}">To Visit ${activeCount}</button>
+    <button type="button" data-action="youth-list" data-list="assignments" aria-pressed="${assignmentPressed}">Assignments ${activeCount}</button>
+    <button type="button" data-action="show-people" data-list="to-visit" aria-pressed="${visitPressed}">To Visit ${activeCount}</button>
     <button type="button" class="archive-toggle" data-action="archive" aria-pressed="${archiveOpen}">Archive ${archivedCount}</button>
   </div>`;
 }

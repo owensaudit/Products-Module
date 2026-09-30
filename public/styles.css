@@ -891,7 +891,8 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
   outline-offset: 1px;
 }
 
-.summary button[data-action="show-people"] { box-shadow: 0 0 0 3px var(--status-peach); }
+.summary button[data-list="to-visit"] { box-shadow: 0 0 0 3px #e23b3b; }
+.summary button[data-list="assignments"] { box-shadow: 0 0 0 3px #f7a1c4; }
 .summary button[data-list="priests-quorum"] { box-shadow: 0 0 0 3px #ffe56a; }
 .summary button[data-list="teachers-quorum"] { box-shadow: 0 0 0 3px #3caf62; }
 .summary button[data-list="leaders"] {
@@ -979,6 +980,9 @@ article.role-card { cursor: default; }
 .role-card small { color: var(--muted); }
 .ministering-cards.quorum-priests .role-card { box-shadow: 0 0 0 3px #ffe56a; }
 .ministering-cards.quorum-teachers .role-card { box-shadow: 0 0 0 3px #3caf62; }
+.role-card.role-assignment,
+.ministering-cards.quorum-priests .role-card.role-assignment,
+.ministering-cards.quorum-teachers .role-card.role-assignment { box-shadow: 0 0 0 3px var(--status-peach); }
 .ministering-head,
 .ministering-card {
   display: grid;
