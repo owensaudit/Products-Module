@@ -2,7 +2,7 @@ const STATUS_LABELS = {
   not_contacted: "Not contacted",
   awaiting_reply: "Awaiting reply",
   replied: "Replied",
-  scheduled: "Visit scheduled",
+  scheduled: "Scheduled",
   completed: "Visit complete",
   declined: "Declined",
   reach_out: "Reach Out",
@@ -562,11 +562,11 @@ function renderCalendar() {
     const kinds = mark.kinds || [];
     const people = mark.people || [];
     const dots = kinds.map((kind) => {
-      const label = kind === "scheduled" ? "Visit scheduled" : "Reach out";
+      const label = kind === "scheduled" ? "Scheduled" : "Reach out";
       return `<span class="cal-dot ${kind}" title="${label}"></span>`;
     }).join("");
     const described = [`${title} ${day}`];
-    if (kinds.includes("scheduled")) described.push("visit scheduled");
+    if (kinds.includes("scheduled")) described.push("scheduled");
     if (kinds.includes("reach_out")) described.push("reach out");
     const today = viewingNow && day === now.getDate() ? " is-today" : "";
     const open = dayFilter === iso ? " is-open" : "";
@@ -585,7 +585,7 @@ function renderCalendar() {
     </div>
     <div class="cal-grid">${cells.join("")}</div>
     <p class="cal-legend">
-      <span><i class="cal-dot scheduled"></i> Visit scheduled</span>
+      <span><i class="cal-dot scheduled"></i> Scheduled</span>
       <span><i class="cal-dot reach_out"></i> Reach out</span>
     </p>`;
 }
@@ -1066,7 +1066,7 @@ function statusSentence(person) {
     return `Replied by ${CHANNEL_LABELS[attempt.channel].toLowerCase()} on ${formatDate(attempt.date)}. Choose an open slot to record the visit.`;
   }
   if (visit) {
-    return `Visit scheduled ${formatDate(visit.date)} · ${visit.slotLabel}, after a ${CHANNEL_LABELS[visit.replyChannel].toLowerCase()} reply. Recorded for the ${state.calendarName}.`;
+    return `Scheduled ${formatDate(visit.date)} · ${visit.slotLabel}, after a ${CHANNEL_LABELS[visit.replyChannel].toLowerCase()} reply. Recorded for the ${state.calendarName}.`;
   }
   if (person.outreachStatus === "completed") return "The last scheduled visit is marked complete.";
   if (person.outreachStatus === "declined" && attempt) return `Declined on ${formatDate(attempt.date)}.`;

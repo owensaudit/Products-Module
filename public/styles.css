@@ -10,6 +10,13 @@
   --green-soft: #e7f2ec;
   --gold: #8a5a12;
   --gold-soft: #f8efd8;
+  --status-visited: #14643a;
+  --status-scheduled: #3caf62;
+  --status-reschedule: #d7f3e2;
+  --status-reach: #e0b000;
+  --status-none: #ffe56a;
+  --status-peach: #f6c29a;
+  --status-declined: #d23b3b;
   --blue: #156e8e;
   --blue-soft: #e6f3f8;
   --rose: #8d3d4a;
@@ -328,8 +335,8 @@ button.cal-day.is-open {
   flex: none;
 }
 
-.cal-dot.reach_out { background: var(--gold); }
-.cal-dot.scheduled { background: #1c8c45; }
+.cal-dot.reach_out { background: var(--status-reach); }
+.cal-dot.scheduled { background: var(--status-scheduled); }
 
 .cal-num {
   font-size: 13px;
@@ -415,15 +422,15 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
   padding: 8px 16px;
 }
 
-.summary button[data-status="reach_out"] { background: var(--gold-soft); color: var(--gold); border-color: #ead7a8; }
-.summary button[data-status="no_response"],
-.summary button[data-status="none"] { background: #ece7dc; color: var(--slate); border-color: #ddd4c4; }
-.summary button[data-status="reschedule"],
-.summary button[data-status="reschedule_visited"] { background: var(--blue-soft); color: var(--blue); border-color: #c5dcea; }
+.summary button[data-status="reach_out"] { background: var(--status-reach); color: #3d2c00; border-color: #b88e00; }
+.summary button[data-status="none"] { background: var(--status-none); color: #3d3200; border-color: #e6c200; }
+.summary button[data-status="no_response"] { background: var(--status-peach); color: #6a3412; border-color: #e0a57a; }
+.summary button[data-status="reschedule"] { background: var(--status-reschedule); color: #145c34; border-color: #b7e4c8; }
+.summary button[data-status="reschedule_visited"],
+.summary button[data-status="visited"] { background: var(--status-visited); color: white; border-color: #0e4a2b; }
 .summary button[data-status="scheduled"],
-.summary button[data-status="visited"],
-.summary button[data-status="completed"] { background: var(--green-soft); color: var(--green); border-color: #c5ddd0; }
-.summary button[data-status="declined"],
+.summary button[data-status="completed"] { background: var(--status-scheduled); color: #083018; border-color: #2c8a4c; }
+.summary button[data-status="declined"] { background: var(--status-declined); color: white; border-color: #a82828; }
 .summary button[data-status="do_not_contact"],
 .summary button[data-status="not_interested"] { background: var(--rose-soft); color: var(--rose); border-color: #efd0d6; }
 .summary button[data-status="moved"],
@@ -450,13 +457,13 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
 .pill.not_contacted { background: #ece7dc; }
 .pill.awaiting_reply { background: var(--gold-soft); color: var(--gold); }
 .pill.replied { background: var(--blue-soft); color: var(--blue); }
-.pill.scheduled, .pill.completed { background: var(--green-soft); color: var(--green); }
-.pill.declined { background: var(--rose-soft); color: var(--rose); }
-.pill.visited { background: var(--green-soft); color: var(--green); }
-.pill.reach_out { background: var(--gold-soft); color: var(--gold); }
-.pill.no_response { background: #ece7dc; color: var(--slate); }
-.pill.reschedule, .pill.reschedule_visited { background: var(--blue-soft); color: var(--blue); }
-.pill.none { background: #ece7dc; color: var(--slate); }
+.pill.scheduled, .pill.completed { background: var(--status-scheduled); color: #083018; }
+.pill.declined { background: var(--status-declined); color: white; }
+.pill.visited, .pill.reschedule_visited { background: var(--status-visited); color: white; }
+.pill.reach_out { background: var(--status-reach); color: #3d2c00; }
+.pill.no_response { background: var(--status-peach); color: #6a3412; }
+.pill.reschedule { background: var(--status-reschedule); color: #145c34; }
+.pill.none { background: var(--status-none); color: #3d3200; }
 .pill.open { background: white; border: 1px dashed var(--green); color: var(--green); }
 .pill.taken { background: var(--green); color: white; }
 
@@ -488,7 +495,7 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
   position: absolute;
   top: 10px;
   right: 14px;
-  color: #1c8c45;
+  color: white;
   font-size: 22px;
   font-weight: 700;
   line-height: 1;
@@ -508,13 +515,19 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
   font-weight: 600;
 }
 
-.status-pill.none, .status-pill.no_response { background: #ece7dc; color: var(--slate); }
-.status-pill.reach_out { background: var(--gold-soft); color: var(--gold); }
-.status-pill.reschedule, .status-pill.reschedule_visited { background: var(--blue-soft); color: var(--blue); }
-.status-pill.visited, .status-pill.scheduled, .status-pill.completed { background: var(--green-soft); color: var(--green); }
-.status-pill.declined, .status-pill.do_not_contact, .status-pill.not_interested { background: var(--rose-soft); color: var(--rose); }
+.status-pill.none { background: var(--status-none); color: #3d3200; }
+.status-pill.no_response { background: var(--status-peach); color: #6a3412; }
+.status-pill.reach_out { background: var(--status-reach); color: #3d2c00; }
+.status-pill.reschedule { background: var(--status-reschedule); color: #145c34; }
+.status-pill.reschedule_visited,
+.status-pill.visited { background: var(--status-visited); color: white; }
+.status-pill option { background: white; color: #1b242b; }
+.status-pill.scheduled, .status-pill.completed { background: var(--status-scheduled); color: #083018; }
+.status-pill.declined { background: var(--status-declined); color: white; }
+.status-pill.do_not_contact, .status-pill.not_interested { background: var(--rose-soft); color: var(--rose); }
 .status-pill.moved, .status-pill.no_contact_info { background: #ece7dc; color: var(--slate); }
 .status-pill.mission { background: var(--blue-soft); color: var(--blue); }
+.status-pill option { background: white; color: #1b242b; }
 
 .person small, .muted { color: var(--muted); }
 
@@ -523,10 +536,17 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
 .person[aria-current="true"] { outline: 2px solid var(--ink); border-color: var(--ink); }
 
 .person.replied, .person.reschedule, .person.reschedule_visited { background: var(--blue-soft); }
-.person.awaiting_reply, .person.reach_out { background: var(--gold-soft); }
-.person.visited, .person.completed, .person.scheduled { background: var(--green-soft); }
-.person.declined, .person.do_not_contact, .person.not_interested { background: var(--rose-soft); }
-.person.no_response, .person.none, .person.not_contacted, .person.moved, .person.no_contact_info { background: #ece7dc; }
+.person.awaiting_reply, .person.reach_out { background: var(--status-reach); }
+.person.visited, .person.reschedule_visited { background: var(--status-visited); color: white; }
+.person.visited small, .person.reschedule_visited small { color: white; }
+.person.completed, .person.scheduled { background: var(--status-scheduled); }
+.person.reschedule { background: var(--status-reschedule); }
+.person.declined { background: var(--status-declined); color: white; }
+.person.declined small { color: white; }
+.person.do_not_contact, .person.not_interested { background: var(--rose-soft); }
+.person.no_response { background: var(--status-peach); }
+.person.none, .person.not_contacted { background: var(--status-none); }
+.person.moved, .person.no_contact_info { background: #ece7dc; }
 .person.mission { background: var(--blue-soft); }
 
 .status-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -535,7 +555,7 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
 .status-choice.moved, .status-choice.no_contact_info { background: #ece7dc; color: var(--slate); }
 .status-choice.mission { background: var(--blue-soft); color: var(--blue); }
 .status-choice.do_not_contact, .status-choice.not_interested { background: var(--rose-soft); color: var(--rose); }
-.status-choice.visited { background: var(--green-soft); color: var(--green); }
+.status-choice.visited { background: var(--status-visited); color: white; }
 .status-row .tiny, .archive-choices .tiny {
   padding: 1px 8px;
   font-size: 12px;
