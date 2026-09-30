@@ -145,9 +145,6 @@ h1 { margin: 0; font-size: 40px; line-height: 1.05; }
   font-weight: 400;
 }
 
-.facts-row input[name="age"] { width: 4.5rem; }
-.facts-row input[name="birthday"] { width: 11rem; }
-
 .contact-fields {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -390,6 +387,19 @@ input[type="text"], input[type="month"], input[type="date"], input[type="email"]
   box-shadow: none;
   padding: 0;
 }
+
+.facts-row select,
+.facts-row input {
+  height: 32px;
+  border-radius: 999px;
+  padding: 0 14px;
+  background: #fff;
+  border: 1px solid var(--line);
+  box-shadow: none;
+}
+
+.facts-row input[name="age"] { width: 4.5rem; }
+.facts-row input[name="birthday"] { width: 8.5rem; }
 
 .presidency-board input::placeholder {
   color: #8aa0a8;

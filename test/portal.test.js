@@ -186,12 +186,16 @@ test("a phone number and email can be saved on a person", () => {
   state = setPersonContact(state, "per_1", { priesthood: "High Priest", age: " 46 ", birthday: "26 Jun 1979" });
   assert.equal(state.people[0].sheetColumns.Priesthood, "High Priest");
   assert.equal(state.people[0].sheetColumns.Age, "46");
-  assert.equal(state.people[0].sheetColumns.Birthday, "26 Jun 1979");
+  assert.equal(state.people[0].sheetColumns.Birthday, "06/26/1979");
   assert.equal(state.people[0].notes, "Knock first");
   const profile = presentState(state, "2026-09");
   assert.equal(profile.people[0].priesthood, "High Priest");
   assert.equal(profile.people[0].age, "46");
-  assert.equal(profile.people[0].birthday, "26 Jun 1979");
+  assert.equal(profile.people[0].birthday, "06/26/1979");
+  state = setPersonContact(state, "per_1", { birthday: "3 Jun 1996" });
+  assert.equal(state.people[0].sheetColumns.Birthday, "06/03/1996");
+  state = setPersonContact(state, "per_1", { birthday: "6/3/1996" });
+  assert.equal(presentState(state, "2026-09").people[0].birthday, "06/03/1996");
   state = setPersonContact(state, "per_1", { priesthood: "" });
   assert.equal(state.people[0].sheetColumns.Priesthood, undefined);
   assert.equal(state.people[0].sheetColumns.Age, "46");
@@ -389,6 +393,7 @@ test("a brother sheet keeps names filterable and hides contact details", () => {
   assert.equal(view.rosterMode, true);
   assert.equal(view.people[0].rosterStatusKey, "visited");
   assert.equal(view.people[0].priesthood, "Elder");
+  assert.equal(view.people[0].birthday, "01/01/1986");
   assert.equal(view.people[0].appointment, "07/03 5:30 PM");
   assert.equal(view.people[0].phone, "");
   assert.equal(view.people[0].email, "");
