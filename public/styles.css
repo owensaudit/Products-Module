@@ -148,7 +148,24 @@ h1 { margin: 0; font-size: 40px; line-height: 1.05; }
 
 .reply, .reply-form { margin-left: 16px; }
 
-.comment-edit { margin-top: 6px; padding: 4px 10px; }
+.comment-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+
+.tiny {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: white;
+  padding: 1px 8px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.tiny.primary {
+  background: var(--church-deep);
+  color: white;
+  border-color: var(--church-deep);
+}
+
+.reply-form textarea { min-height: 44px; }
 
 .comment-text { white-space: pre-wrap; }
 
@@ -546,6 +563,13 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
 }
 
 .ghost { background: transparent; }
+
+.comment-actions .tiny {
+  padding: 1px 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  border-radius: 999px;
+}
 
 .stack { display: grid; gap: 10px; }
 

@@ -12,6 +12,7 @@ import {
   addComment,
   mentionedMembers,
   openMessages,
+  deleteComment,
   resolveComment,
   updateComment,
   emptyState,
@@ -140,6 +141,14 @@ test("a mention needs a response or a resolve, and a comment can be corrected", 
   assert.equal(openMessages(state).length, 0);
   view = presentState(state, "2026-09");
   assert.equal(view.openMessages.length, 0);
+
+  const clock = deps();
+  let threaded = { ...emptyState(), people: state.people };
+  threaded = addComment(threaded, { targetType: "person", targetId: "per_1", body: "@Tyler question" }, clock);
+  threaded = addComment(threaded, { parentId: threaded.comments[0].id, body: "Answer" }, clock);
+  threaded = addComment(threaded, { targetType: "person", targetId: "per_1", body: "Keep me" }, clock);
+  threaded = deleteComment(threaded, threaded.comments[0].id);
+  assert.deepEqual(threaded.comments.map((comment) => comment.body), ["Keep me"]);
 });
 
 test("csv import keeps extra columns and does not invent blank rows", () => {

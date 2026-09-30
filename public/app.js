@@ -199,6 +199,12 @@ app.addEventListener("click", (event) => {
       editingCommentId = "";
       render();
     }).catch(showError);
+  } else if (action === "delete-comment") {
+    if (!confirm("Delete this comment?")) return;
+    post(`/api/comments/${button.dataset.id}/delete`, {}).then(() => {
+      if (editingCommentId === button.dataset.id) editingCommentId = "";
+      render();
+    }).catch(showError);
   } else if (action === "reset") {
     if (confirm("Clear everyone, outreach, visits, and comments stored in this portal?")) {
       post("/api/reset", {}).then(() => {
@@ -1070,14 +1076,17 @@ function commentBody(comment) {
       <input type="hidden" name="id" value="${esc(comment.id)}">
       <label>Correct this note <textarea name="body" required>${esc(comment.body)}</textarea></label>
       <div class="mention-menu" hidden></div>
-      <div class="actions">
-        <button class="primary" type="submit">Save</button>
-        <button type="button" class="ghost" data-action="cancel-edit">Cancel</button>
+      <div class="comment-actions">
+        <button class="tiny primary" type="submit">Save</button>
+        <button type="button" class="tiny" data-action="cancel-edit">Cancel</button>
       </div>
     </form>`;
   }
   return `<div class="comment-text">${mentionHtml(comment.body)}</div>
-    <button type="button" class="ghost comment-edit" data-action="edit-comment" data-id="${esc(comment.id)}">Edit</button>`;
+    <div class="comment-actions">
+      <button type="button" class="tiny" data-action="edit-comment" data-id="${esc(comment.id)}">Edit</button>
+      <button type="button" class="tiny" data-action="delete-comment" data-id="${esc(comment.id)}">Delete</button>
+    </div>`;
 }
 
 function answerTools(commentId) {
@@ -1085,9 +1094,9 @@ function answerTools(commentId) {
     <input type="hidden" name="parentId" value="${esc(commentId)}">
     <label>Response <textarea name="body" required placeholder="Write a response"></textarea></label>
     <div class="mention-menu" hidden></div>
-    <div class="actions">
-      <button class="primary" type="submit">Respond</button>
-      <button type="button" class="ghost" data-action="resolve-comment" data-id="${esc(commentId)}">Resolve</button>
+    <div class="comment-actions">
+      <button class="tiny primary" type="submit">Respond</button>
+      <button type="button" class="tiny" data-action="resolve-comment" data-id="${esc(commentId)}">Resolve</button>
     </div>
   </form>`;
 }
