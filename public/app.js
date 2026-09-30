@@ -812,6 +812,7 @@ function openPage(next) {
   assigneeFilter = "";
   dayFilter = "";
   view = "people";
+  if (next === "youth") officeFilter = "all";
   render();
 }
 
@@ -1627,8 +1628,6 @@ function youthRosterSummary() {
     const pressed = listsOpen && youthList === id;
     return `<button type="button" data-action="youth-list" data-list="${id}" aria-pressed="${pressed}">${esc(label)} ${youthListSize(id, quorum)}</button>`;
   }).join("");
-  const people = [...youthMembers("priests"), ...youthMembers("teachers")];
-  const offices = [...new Set(people.map((person) => person.priesthood).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const allPressed = listsOpen && youthList === "all";
   const visitPressed = !listsOpen && !archiveOpen && !viewAll && !assigneeFilter && !dayFilter && statusFilter === "all";
   return `<div class="summary" aria-label="Youth lists">
@@ -1636,12 +1635,6 @@ function youthRosterSummary() {
     ${listButtons}
     <button type="button" data-action="show-people" aria-pressed="${visitPressed}">To Visit ${activeCount}</button>
     <button type="button" class="archive-toggle" data-action="archive" aria-pressed="${archiveOpen}">Archive ${archivedCount}</button>
-    <label class="inline-filter">Priesthood
-      <select data-action="office" aria-label="Filter by priesthood">
-        <option value="all" ${officeFilter === "all" ? "selected" : ""}>All offices</option>
-        ${offices.map((office) => `<option value="${esc(office)}" ${officeFilter === office ? "selected" : ""}>${esc(office)}</option>`).join("")}
-      </select>
-    </label>
   </div>`;
 }
 
