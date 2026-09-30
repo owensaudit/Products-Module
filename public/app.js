@@ -362,10 +362,6 @@ app.addEventListener("submit", (event) => {
     }).then(render).catch(showError);
     return;
   }
-  if (kind === "add-assignment") {
-    addYouthAssignment(form.dataset.youthId, data.get("assignment")).catch(showError);
-    return;
-  }
   if (kind === "add-person") {
     const known = new Set((state?.people || []).map((person) => person.id));
     const payload = {
@@ -913,24 +909,6 @@ function saveAssignmentName(personId, name) {
   const next = String(name || "").trim();
   if (!person || !next || next === nameKey(person)) return Promise.resolve();
   return post(`/api/people/${personId}/contact`, { name: next }).then(render);
-}
-
-function addYouthAssignment(youthId, familyName) {
-  const youth = (state?.people || []).find((person) => person.id === youthId);
-  const name = String(familyName || "").trim();
-  if (!youth || !name) return Promise.resolve();
-  const companion = ministeringCompanionValue(youth, ministeringForYouth(nameKey(youth)).families);
-  const assigned = [nameKey(youth)];
-  if (companion) assigned.push(companion);
-  const existing = youthVisits().find((person) => nameKey(person).toLowerCase() === name.toLowerCase());
-  const request = existing
-    ? post(`/api/people/${existing.id}/contact`, { assigned })
-    : post("/api/people", {
-      displayName: name,
-      list: "youth",
-      sheetColumns: { Brother: name, Assigned: assigned.join(" | ") },
-    });
-  return request.then(render);
 }
 
 function saveContactFields() {
@@ -1553,10 +1531,6 @@ function ministeringCards(quorum) {
         ${roleCard(row.person, "Name")}
         ${roleCard(companion, "Companion", companionName)}
         ${row.families.map((family) => roleCard(family, "Assignment")).join("")}
-        <form data-form="add-assignment" data-youth-id="${esc(row.person.id)}" class="add-assignment">
-          <input name="assignment" placeholder="Add assignment" aria-label="Add assignment">
-          <button type="submit">Add</button>
-        </form>
       </section>`;
     }).join("")}
   </div>`;
@@ -1925,10 +1899,6 @@ function youthMemberDetail(person) {
     <h3>Assignments</h3>
     <p class="muted">${responded} of ${families.length} responded</p>
     ${families.map((family) => youthAssignmentVisit(family)).join("")}
-    <form data-form="add-assignment" data-youth-id="${esc(person.id)}" class="add-assignment">
-      <input name="assignment" placeholder="Add assignment" aria-label="Add assignment">
-      <button type="submit">Add</button>
-    </form>
     <h3>Outreach</h3>
     ${attemptList(person)}
     <h3>Comments${person.commentCount ? ` <span class="muted">${person.commentCount}</span>` : ""}</h3>
