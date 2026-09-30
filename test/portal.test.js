@@ -376,6 +376,15 @@ test("an outreach row records a presidency member, how they reached out, and the
   assert.equal(state.outreachAttempts[0].channel, "in_person");
   assert.equal(state.outreachAttempts[0].date, "2026-09-29");
   assert.equal(state.outreachAttempts[0].sheetColumns.By, "Josh Owens");
+  state = logOutreach(state, {
+    personId: "per_1",
+    channel: "text",
+    date: "2026-08-28",
+    status: "contacted",
+  }, deps());
+  assert.equal(state.outreachAttempts[1].channel, "text");
+  assert.equal(state.outreachAttempts[1].date, "2026-08-28");
+  assert.equal(state.outreachAttempts[1].sheetColumns.By, undefined);
 
   state = setPresidency(state, [
     { name: "Mark Lillenberg", role: "changed" },

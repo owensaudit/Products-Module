@@ -83,7 +83,7 @@ app.addEventListener("change", (event) => {
     const by = addRow.querySelector("[name=by]").value;
     const channel = addRow.querySelector("[name=channel]").value;
     const date = addRow.querySelector("[name=date]").value;
-    if (by && channel && date) {
+    if (channel && date) {
       post("/api/outreach", {
         personId: addRow.dataset.personId,
         by,
