@@ -1040,7 +1040,7 @@ function personButtons(people = filteredPeople()) {
   }
   return people.map((person) => `<div class="person ${state.rosterMode ? person.rosterStatusKey : person.outreachStatus}" data-action="select-person" data-id="${esc(person.id)}" aria-current="${person.id === selectedPersonId}">
       <strong>${esc(personLabel(person))}</strong>
-      ${visitedMark(person)}
+      <span class="card-marks">${outreachMarks(person)}${visitedMark(person)}</span>
       ${state.rosterMode ? statusSelect(person) : `<span class="pill ${person.outreachStatus}">${esc(STATUS_LABELS[person.outreachStatus])}</span>`}
       <small>${state.rosterMode ? rosterLine(person) : esc(latestLine(person))}</small>
     </div>`).join("");
@@ -1100,6 +1100,31 @@ function visitedMark(person) {
   if (hasBeenVisited(person)) return `<span class="visited-check" aria-label="Visited">✓</span>`;
   if (state.rosterMode && person.rosterStatusKey === "scheduled") return visitCheck(person);
   return "";
+}
+
+function outreachMarks(person) {
+  const attempts = (state.outreachAttempts || []).filter((attempt) => attempt.personId === person.id);
+  const texts = attempts.filter((attempt) => attempt.channel === "text").length;
+  const calls = attempts.filter((attempt) => attempt.channel === "phone").length;
+  const drives = attempts.filter((attempt) => attempt.channel === "driveby").length;
+  return [
+    texts ? touchMark("text", texts, `${texts} ${texts === 1 ? "text" : "texts"}`, textIcon()) : "",
+    calls ? touchMark("phone", calls, `${calls} ${calls === 1 ? "call" : "calls"}`, phoneIcon()) : "",
+    drives ? touchMark("drive", drives, drives === 1 ? "Drove by" : `${drives} drive-bys`, drivebyIcon()) : "",
+  ].join("");
+}
+
+function touchMark(kind, count, label, icon) {
+  const number = kind === "drive" ? "" : `<span>${count}</span>`;
+  return `<span class="touch-mark ${kind}" title="${esc(label)}" aria-label="${esc(label)}">${icon}${number}</span>`;
+}
+
+function textIcon() {
+  return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.5h14v9H8.5L5 18.5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
+}
+
+function phoneIcon() {
+  return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.2 5.2h2l1 2.8-1.5 1a11 11 0 0 0 5.3 5.3l1-1.5 2.8 1v2a1.8 1.8 0 0 1-2 1.8A13.2 13.2 0 0 1 6.4 7.2a1.8 1.8 0 0 1 1.8-2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
 }
 
 function visitCheck(person) {

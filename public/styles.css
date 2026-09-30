@@ -744,10 +744,43 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
   text-align: left;
   border-radius: 14px;
   display: grid;
-  gap: 4px;
-  padding: 12px 42px 12px 14px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 8px;
+  padding: 12px 14px;
   position: relative;
 }
+
+.person strong { grid-column: 1; }
+
+.card-marks {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.person > .status-pill,
+.person > .pill,
+.person > small { grid-column: 1 / -1; }
+
+.touch-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 22px;
+  padding: 0 6px 0 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.touch-mark svg { width: 14px; height: 14px; flex: none; }
+
+.touch-mark.drive { padding-right: 5px; }
 
 button.mark-visited {
   width: 28px;
@@ -762,16 +795,7 @@ button.mark-visited {
   line-height: 1;
 }
 
-.person > button.mark-visited {
-  position: absolute;
-  top: 8px;
-  right: 10px;
-}
-
 .visited-check {
-  position: absolute;
-  top: 10px;
-  right: 14px;
   color: white;
   font-size: 22px;
   font-weight: 700;
