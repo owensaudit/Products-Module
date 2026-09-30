@@ -411,7 +411,7 @@ test("a brother sheet keeps names filterable and hides contact details", () => {
   assert.equal(JSON.stringify(view).includes("ada@example.com"), false);
 });
 
-test("calendar marks visit days in green and reach-out days in gold", () => {
+test("calendar marks scheduled days and reach-out days", () => {
   const marks = calendarMarks({
     people: [
       { id: "ada", rosterStatusKey: "scheduled", appointment: "10/21 7:00 PM" },
