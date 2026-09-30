@@ -331,8 +331,13 @@ app.addEventListener("submit", (event) => {
       showError(new Error("Add a time for a scheduled appointment"));
       return;
     }
+    const place = String(data.get("place") || "");
+    if ((plan === "scheduled" || plan === "reschedule") && place !== "church" && place !== "home") {
+      showError(new Error("Choose Church or Home"));
+      return;
+    }
     const path = plan === "reach_out" ? `/api/people/${selectedPersonId}/reach-out` : `/api/people/${selectedPersonId}/appointment`;
-    const body = plan === "reach_out" ? { date } : { date, time, kind: plan };
+    const body = plan === "reach_out" ? { date } : { date, time, kind: plan, place };
     post(path, body).then(() => {
       render();
     }).catch(showError);
@@ -954,7 +959,7 @@ function personButtons(people = filteredPeople()) {
       <strong>${esc(personLabel(person))}</strong>
       ${visitedMark(person)}
       ${state.rosterMode ? statusSelect(person) : `<span class="pill ${person.outreachStatus}">${esc(STATUS_LABELS[person.outreachStatus])}</span>`}
-      <small>${esc(state.rosterMode ? rosterLine(person) : latestLine(person))}</small>
+      <small>${state.rosterMode ? rosterLine(person) : esc(latestLine(person))}</small>
     </div>`).join("");
 }
 
@@ -1013,10 +1018,13 @@ function visitedMark(person) {
 }
 
 function rosterLine(person) {
-  const bits = [person.priesthood, person.reachOutDate ? `Reach out ${person.reachOutDate}` : "", person.appointment ? `Appt ${person.appointment}` : ""].filter(Boolean);
+  const bits = [];
+  if (person.priesthood) bits.push(esc(person.priesthood));
+  if (person.reachOutDate) bits.push(`Reach out ${esc(person.reachOutDate)}`);
+  if (person.appointment) bits.push(`Appt ${esc(person.appointment)}${placeMark(person.appointmentPlace)}`);
   const touch = lastTouch(person);
-  if (touch) bits.push(touch);
-  return bits.join(" · ") || person.sheetName || "";
+  if (touch) bits.push(esc(touch));
+  return bits.join(" · ") || esc(person.sheetName || "");
 }
 
 function personMatchesFilters(person) {
@@ -1106,25 +1114,47 @@ function rosterDetail(person) {
     ${commentForm("person", person.id)}`;
 }
 
+function churchIcon() {
+  return `<svg class="place-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5v3.2M9.8 5.7h4.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4.5 20.5V11L12 6.2 19.5 11v9.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 20.5v-5.2h4v5.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
+}
+
+function homeIcon() {
+  return `<svg class="place-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11.2 12 4.2l8.5 7V20.5h-6.2v-5.4H9.7v5.4H3.5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
+}
+
+function placeMark(place) {
+  if (place !== "Church" && place !== "Home") return "";
+  return `<span class="place-mark">${place === "Church" ? churchIcon() : homeIcon()}${esc(place)}</span>`;
+}
+
+function placeChoice(place) {
+  const option = (value, label, icon) => `<label class="place-option">
+    <input type="radio" name="place" value="${value}" ${place === label ? "checked" : ""}>
+    ${icon}${label}
+  </label>`;
+  return `<span class="place-choices">${option("church", "Church", churchIcon())}${option("home", "Home", homeIcon())}</span>`;
+}
+
 function planLine(person) {
   const key = person.rosterStatusKey;
+  const where = placeMark(person.appointmentPlace);
   if (key === "reach_out" && person.reachOutDate) return `<p><strong>Reach out</strong> ${esc(person.reachOutDate)}</p>`;
-  if (key === "scheduled" && person.appointment) return `<p><strong>Scheduled Appt</strong> ${esc(person.appointment)}</p>`;
-  if (key === "reschedule" && person.appointment) return `<p><strong>Re-Schedule</strong> ${esc(person.appointment)}</p>`;
-  if (person.appointment) return `<p><strong>Scheduled Appt</strong> ${esc(person.appointment)}</p>`;
+  if (key === "scheduled" && person.appointment) return `<p class="plan-line"><strong>Scheduled Appt</strong> ${esc(person.appointment)}${where}</p>`;
+  if (key === "reschedule" && person.appointment) return `<p class="plan-line"><strong>Re-Schedule</strong> ${esc(person.appointment)}${where}</p>`;
+  if (person.appointment) return `<p class="plan-line"><strong>Scheduled Appt</strong> ${esc(person.appointment)}${where}</p>`;
   if (person.reachOutDate) return `<p><strong>Reach out</strong> ${esc(person.reachOutDate)}</p>`;
   return "";
 }
 
 function planParts(person) {
   const key = person.rosterStatusKey;
-  if (key === "reach_out" && person.reachOutDate) return { date: reachOutParts(person.reachOutDate), time: "", kind: "reach_out" };
+  if (key === "reach_out" && person.reachOutDate) return { date: reachOutParts(person.reachOutDate), time: "", kind: "reach_out", place: "" };
   if (person.appointment && (key === "scheduled" || key === "reschedule")) {
-    return { ...appointmentParts(person.appointment), kind: key === "reschedule" ? "reschedule" : "scheduled" };
+    return { ...appointmentParts(person.appointment), kind: key === "reschedule" ? "reschedule" : "scheduled", place: person.appointmentPlace || "" };
   }
-  if (person.reachOutDate) return { date: reachOutParts(person.reachOutDate), time: "", kind: "" };
-  if (person.appointment) return { ...appointmentParts(person.appointment), kind: "" };
-  return { date: "", time: "", kind: "" };
+  if (person.reachOutDate) return { date: reachOutParts(person.reachOutDate), time: "", kind: "", place: "" };
+  if (person.appointment) return { ...appointmentParts(person.appointment), kind: "", place: person.appointmentPlace || "" };
+  return { date: "", time: "", kind: "", place: "" };
 }
 
 function planForm(person) {
@@ -1139,6 +1169,7 @@ function planForm(person) {
       ${choice("scheduled", "Scheduled Appt")}
       ${choice("reschedule", "Re-Schedule")}
     </select>
+    ${placeChoice(current.place)}
     <button class="tiny primary" type="submit">Schedule</button>
   </form>`;
 }

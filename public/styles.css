@@ -220,6 +220,47 @@ h1 { margin: 0; font-size: 40px; line-height: 1.05; }
   border-radius: 999px;
 }
 
+.place-choices { display: inline-flex; gap: 6px; }
+
+.place-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: white;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.place-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.place-option:has(input:checked) {
+  background: var(--church-deep);
+  border-color: var(--church-deep);
+  color: white;
+}
+
+.place-option:has(input:focus-visible) { outline: 2px solid var(--church); }
+
+.place-icon { width: 16px; height: 16px; flex: none; }
+
+.place-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 8px;
+  color: var(--church-deep);
+  font-weight: 700;
+}
+
 .comment-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 
 .tiny {
