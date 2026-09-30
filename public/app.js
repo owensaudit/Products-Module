@@ -40,7 +40,6 @@ let statusFilter = "all";
 let archiveOpen = false;
 let archiveChoicesFor = "";
 let officeFilter = "all";
-let appointmentFilter = "all";
 let search = "";
 let dayFilter = "";
 let focusReachOutDate = false;
@@ -102,9 +101,8 @@ app.addEventListener("change", (event) => {
     return;
   }
   if (!(target instanceof HTMLSelectElement)) return;
-  if (target.dataset.action === "office") officeFilter = target.value;
-  if (target.dataset.action === "appointment") appointmentFilter = target.value;
-  if (target.dataset.action === "office" || target.dataset.action === "appointment") {
+  if (target.dataset.action === "office") {
+    officeFilter = target.value;
     dayFilter = "";
     view = "people";
     const current = selectedPerson();
@@ -312,7 +310,6 @@ app.addEventListener("submit", (event) => {
         dayFilter = date;
         statusFilter = "all";
         officeFilter = "all";
-        appointmentFilter = "all";
         search = "";
       }
       render();
@@ -326,7 +323,6 @@ app.addEventListener("submit", (event) => {
         dayFilter = date;
         statusFilter = "all";
         officeFilter = "all";
-        appointmentFilter = "all";
         search = "";
       }
       render();
@@ -600,7 +596,6 @@ function openCalendarDay(iso) {
   archiveChoicesFor = "";
   statusFilter = "all";
   officeFilter = "all";
-  appointmentFilter = "all";
   search = "";
   view = "people";
   detailForm = null;
@@ -739,7 +734,6 @@ function applyStatus(personId, status) {
     dayFilter = "";
     search = "";
     officeFilter = "all";
-    appointmentFilter = "all";
   } else {
     const activeKey = {
       "Reach Out": "reach_out",
@@ -770,7 +764,6 @@ function rosterSummary() {
   const activeCount = state.people.length - archivedCount;
   const keys = archiveOpen ? ARCHIVE_STATUS_ORDER : ROSTER_STATUS_ORDER.filter((key) => counts[key]);
   const offices = [...new Set(cohort.map((person) => person.priesthood).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-  const withAppointment = cohort.filter((person) => person.appointment).length;
   const archiveButton = `<button type="button" class="archive-toggle" data-action="archive" aria-pressed="${archiveOpen && statusFilter === "all"}">Archive ${archivedCount}</button>`;
   return `<div class="summary" aria-label="Brother filters">
     ${archiveOpen ? `<button type="button" data-action="show-people">People ${activeCount}</button>` : filterButton("all", activeCount, "Everyone")}
@@ -779,13 +772,6 @@ function rosterSummary() {
       <select data-action="office" aria-label="Filter by priesthood">
         <option value="all" ${officeFilter === "all" ? "selected" : ""}>All offices</option>
         ${offices.map((office) => `<option value="${esc(office)}" ${officeFilter === office ? "selected" : ""}>${esc(office)}</option>`).join("")}
-      </select>
-    </label>
-    <label class="inline-filter">Appointment
-      <select data-action="appointment" aria-label="Filter by appointment">
-        <option value="all" ${appointmentFilter === "all" ? "selected" : ""}>All brothers</option>
-        <option value="yes" ${appointmentFilter === "yes" ? "selected" : ""}>Has a date (${withAppointment})</option>
-        <option value="no" ${appointmentFilter === "no" ? "selected" : ""}>No date yet</option>
       </select>
     </label>
   </div>`;
@@ -904,8 +890,6 @@ function personMatchesFilters(person) {
     if (key !== statusFilter) return false;
   }
   if (state.rosterMode && officeFilter !== "all" && person.priesthood !== officeFilter) return false;
-  if (state.rosterMode && appointmentFilter === "yes" && !person.appointment) return false;
-  if (state.rosterMode && appointmentFilter === "no" && person.appointment) return false;
   return true;
 }
 
