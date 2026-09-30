@@ -536,6 +536,27 @@ input[type="text"], input[type="month"], input[type="date"], input[type="email"]
   border: 1px dotted #e7a3a3;
 }
 
+input.person-name {
+  display: block;
+  width: 100%;
+  margin: 0 0 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-family: var(--serif);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+input.person-name:focus {
+  outline: none;
+  border-bottom: 1px solid var(--line);
+}
+
 .presidency-board input {
   background: transparent;
   border: 0;
