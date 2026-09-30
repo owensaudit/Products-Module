@@ -458,6 +458,16 @@ input[type="text"], input[type="month"], input[type="date"], input[type="email"]
   border-bottom: 1px solid var(--line);
 }
 
+.presidency-board input[name^="phone-"]:not(:placeholder-shown),
+.presidency-board input[name^="email-"]:not(:placeholder-shown) {
+  -webkit-text-security: disc;
+}
+
+.presidency-board input[name^="phone-"]:not(:placeholder-shown):is(:hover, :focus),
+.presidency-board input[name^="email-"]:not(:placeholder-shown):is(:hover, :focus) {
+  -webkit-text-security: none;
+}
+
 textarea { min-height: 72px; width: 100%; resize: vertical; }
 
 .check { display: flex; align-items: center; gap: 8px; padding-bottom: 8px; }
