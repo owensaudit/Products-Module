@@ -753,12 +753,17 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
 
 .person strong { grid-column: 1; }
 
+.person:not(:has(.card-marks)):has(.visited-check, button.mark-visited) strong {
+  padding-right: 34px;
+}
+
 .card-marks {
-  grid-column: 2;
-  grid-row: 1;
+  grid-column: 1 / -1;
   display: flex;
+  justify-content: center;
   align-items: center;
   gap: 4px;
+  min-height: 28px;
 }
 
 .person > .status-pill,
@@ -794,6 +799,13 @@ button.mark-visited {
   font-size: 18px;
   font-weight: 700;
   line-height: 1;
+}
+
+.person > .visited-check,
+.person > button.mark-visited {
+  position: absolute;
+  top: 10px;
+  right: 12px;
 }
 
 .visited-check {
