@@ -885,6 +885,15 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
   outline-offset: 1px;
 }
 
+.summary button[data-list="priests-quorum"] { box-shadow: 0 0 0 3px #ffe56a; }
+.summary button[data-list="teachers-quorum"] { box-shadow: 0 0 0 3px #3caf62; }
+.summary button[data-list="leaders"] {
+  border: 3px solid transparent;
+  background:
+    linear-gradient(white, white) padding-box,
+    linear-gradient(90deg, #ffe56a 50%, #3caf62 50%) border-box;
+}
+
 .pill {
   display: inline-flex;
   align-items: center;
