@@ -13,6 +13,7 @@ import {
   emptyState,
   importRows,
   logOutreach,
+  setPersonStatus,
   setPresidency,
   personOutreachStatus,
   previewImport,
@@ -96,6 +97,13 @@ test("comments attach to a person or a visit", () => {
   state = addComment(state, { targetType: "person", targetId: "per_1", authorName: "Tyler Sanders", body: "I can host." }, deps());
   state = addComment(state, { targetType: "visit", targetId: state.visits[0].id, authorName: "Brad Conger", body: "I will be there after church." }, deps());
   assert.equal(state.comments.length, 2);
+  state = addComment(state, { targetType: "person", targetId: "per_1", body: "See @Tyler Sanders" }, deps());
+  assert.equal(state.comments[2].authorName, "");
+  assert.equal(state.comments[2].body, "See @Tyler Sanders");
+  state = setPersonStatus(state, "per_1", "Reach Out");
+  assert.equal(state.people[0].sheetColumns.Status, "Reach Out");
+  state = setPersonStatus(state, "per_1", "");
+  assert.equal(state.people[0].sheetColumns.Status, undefined);
   assert.throws(() => addComment(state, { targetType: "person", targetId: "missing", authorName: "Josh Owens", body: "Hello" }, deps()), /not found/);
 });
 

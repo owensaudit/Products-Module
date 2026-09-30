@@ -65,6 +65,32 @@ if (monthInput) {
 
 app.addEventListener("change", (event) => {
   const target = event.target;
+  if (target instanceof HTMLSelectElement && target.classList.contains("status-pill")) {
+    post(`/api/people/${target.dataset.personId}/status`, { status: target.value }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
+    return;
+  }
+  const addRow = target.closest?.("[data-outreach-add]");
+  if (addRow) {
+    const by = addRow.querySelector("[name=by]").value;
+    const channel = addRow.querySelector("[name=channel]").value;
+    const date = addRow.querySelector("[name=date]").value;
+    if (by && channel && date) {
+      post("/api/outreach", {
+        personId: addRow.dataset.personId,
+        by,
+        channel,
+        date,
+        status: "contacted",
+      }).then((next) => {
+        state = next;
+        render();
+      }).catch(showError);
+    }
+    return;
+  }
   if (!(target instanceof HTMLSelectElement)) return;
   if (target.dataset.action === "office") officeFilter = target.value;
   if (target.dataset.action === "appointment") appointmentFilter = target.value;
@@ -76,11 +102,47 @@ app.addEventListener("change", (event) => {
   }
 });
 
+app.addEventListener("input", (event) => {
+  const area = event.target;
+  if (!(area instanceof HTMLTextAreaElement) || area.name !== "body") return;
+  area.dataset.caret = String(area.selectionStart);
+  const typed = area.value.slice(0, area.selectionStart);
+  const match = typed.match(/@([^@\n]*)$/);
+  const menu = area.closest("form")?.querySelector(".mention-menu");
+  if (!menu) return;
+  if (!match) {
+    menu.hidden = true;
+    menu.innerHTML = "";
+    return;
+  }
+  const query = match[1].toLowerCase();
+  const people = (state?.presidency || []).filter((member) => member.name.toLowerCase().includes(query));
+  menu.hidden = people.length === 0;
+  menu.innerHTML = people.map((member) => `<button type="button" data-action="mention" data-name="${esc(member.name)}">${esc(member.name)} <span class="muted">${esc(member.role)}</span></button>`).join("");
+});
+
 app.addEventListener("click", (event) => {
+  if (event.target.closest("select, input, textarea")) return;
   const button = event.target.closest("[data-action]");
   if (!button) return;
   const action = button.dataset.action;
-  if (action === "view") {
+  if (action === "mention") {
+    const area = button.closest("form")?.querySelector("textarea[name=body]");
+    if (!area) return;
+    const caret = Number(area.dataset.caret ?? area.selectionStart);
+    const name = button.dataset.name;
+    const before = area.value.slice(0, caret).replace(/@([^@\n]*)$/, `@${name} `);
+    const after = area.value.slice(caret);
+    area.value = before + after;
+    area.dataset.caret = String(before.length);
+    area.focus();
+    const menu = button.closest(".mention-menu");
+    if (menu) {
+      menu.hidden = true;
+      menu.innerHTML = "";
+    }
+    return;
+  } else if (action === "view") {
     view = button.dataset.view;
     detailForm = null;
     render();
@@ -187,14 +249,8 @@ app.addEventListener("submit", (event) => {
     post("/api/comments", {
       targetType: data.get("targetType"),
       targetId: data.get("targetId"),
-      authorName: data.get("authorName") || savedAuthor(),
       body: data.get("body"),
     }).then(() => {
-      if (data.get("authorName")) {
-        const enteredName = String(data.get("authorName") || "").trim();
-        if (authorInput) authorInput.value = enteredName;
-        localStorage.setItem("mvp-author", enteredName);
-      }
       detailForm = detailForm === "comment" ? null : detailForm;
       render();
     }).catch(showError);
@@ -495,12 +551,29 @@ function personButtons(people = filteredPeople()) {
     const label = statusFilter === "all" ? "this search" : STATUS_LABELS[statusFilter];
     return `<p class="empty">No one is in ${esc(label)}. Choose Everyone to see the full roster.</p>`;
   }
-  return people.map((person) => `<button type="button" class="person ${state.rosterMode ? person.rosterStatusKey : person.outreachStatus}" data-action="select-person" data-id="${esc(person.id)}" aria-current="${person.id === selectedPersonId}">
+  return people.map((person) => `<div class="person ${state.rosterMode ? person.rosterStatusKey : person.outreachStatus}" data-action="select-person" data-id="${esc(person.id)}" aria-current="${person.id === selectedPersonId}">
       <strong>${esc(personLabel(person))}</strong>
       ${visitedMark(person)}
-      <span class="pill ${state.rosterMode ? person.rosterStatusKey : person.outreachStatus}">${esc(state.rosterMode ? (person.rosterStatus || "No status") : STATUS_LABELS[person.outreachStatus])}</span>
+      ${state.rosterMode ? statusSelect(person) : `<span class="pill ${person.outreachStatus}">${esc(STATUS_LABELS[person.outreachStatus])}</span>`}
       <small>${esc(state.rosterMode ? rosterLine(person) : latestLine(person))}</small>
-    </button>`).join("");
+    </div>`).join("");
+}
+
+const STATUS_CHOICES = [
+  ["", "No status"],
+  ["Reach Out", "Reach Out"],
+  ["No Response", "No Response"],
+  ["Re-Schedule", "Re-Schedule"],
+  ["Scheduled", "Scheduled"],
+  ["Visited", "Visited"],
+  ["Declined", "Declined"],
+];
+
+function statusSelect(person) {
+  const current = person.rosterStatus || "";
+  return `<select class="status-pill ${person.rosterStatusKey}" data-person-id="${esc(person.id)}" aria-label="Status for ${esc(personLabel(person))}">
+    ${STATUS_CHOICES.map(([value, label]) => `<option value="${esc(value)}" ${value === current ? "selected" : ""}>${esc(label)}</option>`).join("")}
+  </select>`;
 }
 
 function hasBeenVisited(person) {
@@ -594,7 +667,7 @@ function personDetail() {
 function rosterDetail(person) {
   const facts = [person.priesthood, person.age ? `Age ${person.age}` : "", person.birthday ? `Birthday ${person.birthday}` : ""].filter(Boolean);
   return `<h2>${esc(personLabel(person))}</h2>
-    <p><span class="pill ${person.rosterStatusKey}">${esc(person.rosterStatus || "No status")}</span></p>
+    <p>${statusSelect(person)}</p>
     ${facts.length ? `<p>${esc(facts.join(" · "))}</p>` : ""}
     ${person.appointment ? `<p><strong>Appointment</strong> ${esc(person.appointment)}</p>` : `<p class="muted">No appointment date yet.</p>`}
     ${person.notes ? `<p>${esc(person.notes)}</p>` : ""}
@@ -774,51 +847,53 @@ function attemptList(person) {
 }
 
 function outreachTable(attempts) {
+  const person = selectedPerson();
+  const members = state.presidency || [];
   const rows = attempts.map((attempt) => `<div class="cell-row">
       <span>${esc(whoLabel(attempt) || "—")}</span>
       <span>${esc(CHANNEL_LABELS[attempt.channel] || attempt.channel)}</span>
       <span>${esc(formatShortDate(attempt.date))}</span>
     </div>`).join("");
   return `<div class="cell-table">
-    <div class="cell-row cell-head"><span>Who</span><span>How</span><span>Date</span></div>
-    ${rows || `<p class="empty">No outreach yet.</p>`}
-    ${outreachCells()}
-  </div>`;
-}
-
-function outreachCells() {
-  const members = state.presidency || [];
-  return `<form class="outreach-cells" data-form="outreach">
-    <label>Who
-      <select name="by" required>
-        ${members.map((member) => `<option value="${esc(member.name)}">${esc(member.name)} — ${esc(member.role)}</option>`).join("")}
+    <div class="cell-row outreach-add" data-outreach-add data-person-id="${esc(person?.id || "")}">
+      <select name="by" aria-label="Who">
+        <option value="">Who</option>
+        ${members.map((member) => `<option value="${esc(member.name)}">${esc(member.name)}</option>`).join("")}
       </select>
-    </label>
-    <label>How
-      <select name="channel" required>
+      <select name="channel" aria-label="How">
+        <option value="">How</option>
         <option value="text">Text</option>
         <option value="phone">Call</option>
         <option value="email">Email</option>
         <option value="in_person">In person</option>
       </select>
-    </label>
-    <label>Date <input name="date" type="date" required value="${todayIso()}"></label>
-    <button class="primary" type="submit">Add</button>
-  </form>`;
+      <input name="date" type="date" aria-label="Date">
+    </div>
+    ${rows}
+  </div>`;
 }
 
 function commentList(targetType, targetId) {
   const comments = state.comments.filter((comment) => comment.targetType === targetType && comment.targetId === targetId);
-  if (!comments.length) return `<p class="empty">No comments yet. Anyone using this portal can add one.</p>`;
-  return comments.map((comment) => `<article class="comment"><strong>${esc(comment.authorName)}</strong><div>${esc(comment.body)}</div></article>`).join("");
+  if (!comments.length) return `<p class="empty">No comments yet. Type @ to mention someone.</p>`;
+  return comments.map((comment) => `<article class="comment">${comment.authorName ? `<strong>${esc(comment.authorName)}</strong>` : ""}<div>${mentionHtml(comment.body)}</div></article>`).join("");
+}
+
+function mentionHtml(body) {
+  const names = (state.presidency || []).map((member) => member.name).sort((a, b) => b.length - a.length);
+  let html = esc(body);
+  for (const name of names) {
+    html = html.replaceAll(`@${esc(name)}`, `<span class="mention">@${esc(name)}</span>`);
+  }
+  return html;
 }
 
 function commentForm(targetType, targetId) {
   return `<form class="stack" data-form="comment">
     <input type="hidden" name="targetType" value="${esc(targetType)}">
     <input type="hidden" name="targetId" value="${esc(targetId)}">
-    ${savedAuthor() ? "" : `<label>Your name <input name="authorName" required></label>`}
-    <label>Comment <textarea name="body" required placeholder="A note others can read"></textarea></label>
+    <label>Comment <textarea name="body" required placeholder="Write a note. Type @ to mention someone."></textarea></label>
+    <div class="mention-menu" hidden></div>
     <button class="primary" type="submit">Add comment</button>
   </form>`;
 }

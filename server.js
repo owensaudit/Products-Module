@@ -15,6 +15,7 @@ import {
   setPresidency,
   previewImport,
   scheduleVisit,
+  setPersonStatus,
   setVisitStatus,
 } from "./lib/model.js";
 import { createStore } from "./lib/store.js";
@@ -123,6 +124,13 @@ export function createPortalServer(store) {
         const body = await readBody(request);
         const month = body.month || currentMonth();
         const viewOptions = { includePrivate: body.includePrivate === true };
+
+        const personStatus = pathname.match(/^\/api\/people\/([^/]+)\/status$/);
+        if (personStatus) {
+          const next = await store.update((state) => setPersonStatus(state, decodeURIComponent(personStatus[1]), body.status));
+          sendJson(response, 200, presentState(next, month, viewOptions));
+          return;
+        }
 
         if (pathname === "/api/people") {
           const next = await store.update((state) => addPerson(state, body));

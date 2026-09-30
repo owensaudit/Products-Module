@@ -269,7 +269,25 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
   line-height: 1;
 }
 
+.person { cursor: pointer; }
+
 .person strong { font-size: 16px; }
+
+.status-pill {
+  justify-self: start;
+  width: auto;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.status-pill.none, .status-pill.no_response { background: #ece7dc; color: var(--slate); }
+.status-pill.reach_out { background: var(--gold-soft); color: var(--gold); }
+.status-pill.reschedule, .status-pill.reschedule_visited { background: var(--blue-soft); color: var(--blue); }
+.status-pill.visited, .status-pill.scheduled, .status-pill.completed { background: var(--green-soft); color: var(--green); }
+.status-pill.declined { background: var(--rose-soft); color: var(--rose); }
 
 .person small, .muted { color: var(--muted); }
 
@@ -292,7 +310,26 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
   align-items: end;
 }
 
-.outreach-cells { grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.8fr) minmax(0, 0.9fr) auto; }
+.outreach-add select,
+.outreach-add input[type="date"] {
+  width: 100%;
+  background: #f6f1e6;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 12px;
+}
+
+.mention-menu { display: grid; gap: 4px; }
+
+.mention-menu button {
+  text-align: left;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: white;
+  padding: 6px 10px;
+}
+
+.mention { color: var(--church-deep); font-weight: 700; }
 
 .cell-head { color: var(--muted); font-size: 12px; font-weight: 600; }
 
