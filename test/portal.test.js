@@ -575,7 +575,10 @@ test("a youth member keeps a quorum and a blank leadership name", async () => {
     teachers: [{ name: "Sample, Bea" }],
   });
   assert.equal(state.people[0].group, "priests");
+  state = addPerson(state, { displayName: "Guest, Cam", list: "youth", sheetColumns: { Brother: "Guest, Cam" } }, deps());
   assert.equal(state.people[1].group, "teachers");
+  assert.equal(state.people.find((person) => person.displayName === "Guest, Cam").list, "youth");
+  assert.equal(state.people.find((person) => person.displayName === "Guest, Cam").group, undefined);
   assert.equal(state.youthLeadership.priests.length, 7);
   assert.equal(state.youthLeadership.teachers.length, 6);
   assert.equal(state.youthLeadership.priests[4].name, "");

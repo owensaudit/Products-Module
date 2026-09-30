@@ -361,16 +361,96 @@ button.title-link {
 
 .quorum-titles {
   display: grid;
-  gap: 28px;
   align-content: start;
+  min-width: 0;
 }
 
-.youth-boards { display: grid; gap: 22px; }
+.title-stack { min-width: 0; }
 
-.youth-boards .presidency-board {
+.page-switch {
+  display: block;
+  margin: 6px 0 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--church);
+  font-weight: 650;
+  font-size: 15px;
+  text-align: left;
+}
+
+.roster-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.roster-switch button {
+  border: 1px solid var(--line);
+  background: white;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-weight: 650;
+}
+
+.roster-switch button[aria-pressed="true"] {
+  background: var(--church-deep);
+  color: white;
+  border-color: var(--church-deep);
+}
+
+.youth-boards { display: grid; gap: 22px; min-width: 0; }
+
+.roster-title {
+  display: block;
+  width: 100%;
+  margin: 0 0 4px;
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: var(--church);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.3;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.roster-title[aria-expanded="true"] { color: var(--church-deep); }
+
+.youth-section { min-width: 0; }
+
+body[data-page="youth"] .site-header {
+  grid-template-columns: minmax(15rem, max-content) minmax(220px, 260px) minmax(22rem, 1fr);
+}
+
+body[data-page="youth"] .month-cal {
+  transform: none;
+  justify-self: start;
+  width: min(100%, 260px);
+}
+
+body[data-page="youth"] #presidency {
+  max-height: calc(100vh - 24px);
+  overflow: auto;
+  align-self: start;
+  justify-self: stretch;
+  min-width: 0;
+  padding-left: 12px;
+}
+
+body[data-page="youth"] .presidency-board {
   justify-content: start;
   padding-right: 0;
-  width: 100%;
+  width: max-content;
+  max-width: none;
+}
+
+body[data-page="youth"] .presidency-board input.pres-name {
+  max-width: none;
 }
 
 .pres-section {

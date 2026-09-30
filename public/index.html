@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ministering Visit Portal</title>
-    <link rel="stylesheet" href="/styles.css?v=59">
+    <link rel="stylesheet" href="/styles.css?v=61">
   </head>
   <body>
     <a class="skip" href="#app">Skip to the portal</a>
@@ -26,10 +26,13 @@
     </div>
     <header class="site-header">
       <div class="quorum-titles">
-        <div class="title-block">
+        <div class="title-block" data-page-header="elders">
           <p class="eyebrow">Elders Quorum</p>
           <div class="title-row">
-            <button type="button" class="title-link" id="open-elders" aria-current="true">Ministering visits</button>
+            <div class="title-stack">
+              <h1>Ministering visits</h1>
+              <button type="button" class="page-switch" id="open-youth">Youth ministry</button>
+            </div>
             <button type="button" id="message-inbox" class="message-inbox" aria-label="Messages that need an answer">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4 3v-3H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
@@ -39,10 +42,13 @@
           </div>
           <p class="lede">To minister as the Savior would, to Love, and Invite.</p>
         </div>
-        <div class="title-block">
+        <div class="title-block" data-page-header="youth" hidden>
           <p class="eyebrow">Youth Quorum</p>
           <div class="title-row">
-            <button type="button" class="title-link" id="open-youth" aria-current="false">Youth ministry</button>
+            <div class="title-stack">
+              <h1>Youth ministry</h1>
+              <button type="button" class="page-switch" id="open-elders">Ministering visits</button>
+            </div>
             <button type="button" id="youth-message-inbox" class="message-inbox" aria-label="Youth messages that need an answer">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4 3v-3H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
@@ -57,6 +63,6 @@
     </header>
     <p id="notice" class="notice" role="status" hidden></p>
     <main id="app" tabindex="-1"></main>
-    <script src="/app.js?v=60" type="module"></script>
+    <script src="/app.js?v=62" type="module"></script>
   </body>
 </html>

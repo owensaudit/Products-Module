@@ -51,7 +51,7 @@ let blankPlanFor = "";
 let focusReachOutDate = false;
 let inbox = "";
 let page = "elders";
-let youthGroup = "all";
+let youthGroup = "priests";
 let commentFor = "";
 let editingCommentId = "";
 let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -192,8 +192,7 @@ app.addEventListener("click", (event) => {
   } else if (action === "open-comment-person") {
     const person = state.people.find((item) => item.id === button.dataset.id);
     if (!person) return;
-    page = isYouthMember(person) ? "youth" : "elders";
-    if (page === "youth") youthGroup = person.group;
+    page = person?.list === "youth" ? "youth" : "elders";
     inbox = "";
     selectedPersonId = person.id;
     archiveOpen = personIsArchived(person);
@@ -211,17 +210,6 @@ app.addEventListener("click", (event) => {
   } else if (action === "view") {
     view = button.dataset.view;
     detailForm = null;
-    render();
-  } else if (action === "youth-group") {
-    youthGroup = button.dataset.group || "all";
-    viewAll = false;
-    archiveOpen = false;
-    statusFilter = "all";
-    search = "";
-    dayFilter = "";
-    assigneeFilter = "";
-    view = "people";
-    selectedPersonId = null;
     render();
   } else if (action === "view-all") {
     viewAll = true;
@@ -348,13 +336,8 @@ app.addEventListener("submit", (event) => {
       notes: data.get("notes"),
     };
     if (page === "youth") {
-      const group = String(data.get("group") || (youthGroup === "teachers" ? "teachers" : "priests"));
-      payload.group = group === "teachers" ? "teachers" : "priests";
-      payload.sheetColumns = {
-        Brother: String(data.get("displayName") || "").trim(),
-        Birthday: String(data.get("birthday") || "").trim(),
-        Priesthood: payload.group === "teachers" ? "Teacher" : "Priest",
-      };
+      payload.list = "youth";
+      payload.sheetColumns = { Brother: String(data.get("displayName") || "").trim() };
     }
     post("/api/people", payload).then((next) => {
       state = next;
@@ -594,6 +577,27 @@ function mappingFromForm(data) {
 
 let presidencySaveTimer = null;
 
+function memberField(name) {
+  const match = String(name).match(/^(?:name|phone|email)-member-(.+)$/);
+  return match ? match[1] : "";
+}
+
+function saveYouthMember(id) {
+  const person = state?.people?.find((item) => item.id === id);
+  if (!person || !presidencyHost) return;
+  const typedName = String(presidencyHost.querySelector(`[name="name-member-${id}"]`)?.value ?? "").trim();
+  const phone = String(presidencyHost.querySelector(`[name="phone-member-${id}"]`)?.value ?? "").trim();
+  const email = String(presidencyHost.querySelector(`[name="email-member-${id}"]`)?.value ?? "").trim();
+  const payload = {};
+  if (typedName && typedName !== nameKey(person)) payload.name = typedName;
+  if (phone !== (person.phone || "")) payload.phone = phone;
+  if (email !== (person.email || "")) payload.email = email;
+  if (!Object.keys(payload).length) return;
+  post(`/api/people/${id}/contact`, payload).then((next) => {
+    state = next;
+  }).catch(showError);
+}
+
 function youthFieldName(name) {
   return /^(name|phone|email)-(priests|teachers)-\d+$/.test(name);
 }
@@ -659,6 +663,11 @@ presidencyHost?.addEventListener("input", (event) => {
   const name = event.target?.name || "";
   if (!(event.target instanceof HTMLInputElement) || !/^(name|phone|email)-/.test(name)) return;
   clearTimeout(presidencySaveTimer);
+  const memberId = memberField(name);
+  if (memberId) {
+    presidencySaveTimer = setTimeout(() => saveYouthMember(memberId), 400);
+    return;
+  }
   presidencySaveTimer = setTimeout(youthFieldName(name) ? saveYouthLeadership : savePresidencyNames, 400);
 });
 
@@ -666,11 +675,21 @@ presidencyHost?.addEventListener("focusout", (event) => {
   const name = event.target?.name || "";
   if (!(event.target instanceof HTMLInputElement) || !/^(name|phone|email)-/.test(name)) return;
   clearTimeout(presidencySaveTimer);
-  if (youthFieldName(name)) saveYouthLeadership();
+  const memberId = memberField(name);
+  if (memberId) saveYouthMember(memberId);
+  else if (youthFieldName(name)) saveYouthLeadership();
   else savePresidencyNames();
 });
 
 presidencyHost?.addEventListener("click", (event) => {
+  const toggle = event.target.closest("[data-action='toggle-youth-section']");
+  if (toggle) {
+    const id = toggle.dataset.section || "";
+    if (openYouthSections.has(id)) openYouthSections.delete(id);
+    else openYouthSections.add(id);
+    render();
+    return;
+  }
   const button = event.target.closest("[data-action='show-assigned']");
   if (!button) return;
   const name = button.dataset.name || "";
@@ -863,25 +882,35 @@ function render() {
 }
 
 function renderPageChrome() {
-  document.querySelector("#open-elders")?.setAttribute("aria-current", page === "elders" ? "true" : "false");
-  document.querySelector("#open-youth")?.setAttribute("aria-current", page === "youth" ? "true" : "false");
-  presidencyHost?.setAttribute("aria-label", page === "youth" ? "Youth quorum presidencies" : "EQ Presidency");
+  document.body.dataset.page = page;
+  document.querySelectorAll("[data-page-header]").forEach((block) => {
+    block.hidden = block.dataset.pageHeader !== page;
+  });
+  presidencyHost?.setAttribute("aria-label", page === "youth" ? "Youth quorums" : "EQ Presidency");
 }
 
 function isYouthMember(person) {
   return person?.group === "priests" || person?.group === "teachers";
 }
 
-function eldersPeople() {
-  return (state?.people || []).filter((person) => !isYouthMember(person));
+function isYouthVisit(person) {
+  return person?.list === "youth";
 }
 
-function youthMembers(group = youthGroup) {
+function eldersPeople() {
+  return (state?.people || []).filter((person) => !isYouthMember(person) && !isYouthVisit(person));
+}
+
+function youthMembers(group = "all") {
   return (state?.people || []).filter((person) => isYouthMember(person) && (group === "all" || person.group === group));
 }
 
+function youthVisits() {
+  return (state?.people || []).filter((person) => isYouthVisit(person));
+}
+
 function pagePeople() {
-  return page === "youth" ? youthMembers() : eldersPeople();
+  return page === "youth" ? youthVisits() : eldersPeople();
 }
 
 function renderPresidency() {
@@ -889,8 +918,7 @@ function renderPresidency() {
   const active = document.activeElement;
   if (active && presidencyHost.contains(active) && active.matches("input, textarea, select")) return;
   if (page === "youth") {
-    const leadership = state?.youthLeadership || { priests: [], teachers: [] };
-    presidencyHost.innerHTML = `<div class="youth-boards">${youthBoard("priests", "Priests Quorum", leadership.priests || [])}${youthBoard("teachers", "Teachers Quorum", leadership.teachers || [])}</div>`;
+    presidencyHost.innerHTML = renderYouthRosters();
     return;
   }
   const members = state?.presidency || [];
@@ -958,25 +986,55 @@ function renderCalendar() {
     <div class="cal-grid">${cells.join("")}</div>`;
 }
 
-function youthBoard(quorum, label, rows) {
-  let adultsLabeled = false;
-  const body = rows.map((row, index) => {
-    const adultLabel = row.section === "adults" && !adultsLabeled ? `<span class="pres-section">Adult Leaders</span>` : "";
-    if (row.section === "adults") adultsLabeled = true;
-    const named = youthMembers(quorum);
+const YOUTH_SECTIONS = [
+  ["priests-presidency", "priests", "presidency", "Priests Quorum"],
+  ["priests-adults", "priests", "adults", "Priests Quorum Adult Leaders"],
+  ["teachers-presidency", "teachers", "presidency", "Teachers Quorum"],
+  ["teachers-adults", "teachers", "adults", "Teachers Quorum Adult Leaders"],
+];
+
+const openYouthSections = new Set();
+
+function renderYouthRosters() {
+  const leadership = state?.youthLeadership || { priests: [], teachers: [] };
+  return `<div class="youth-boards">${YOUTH_SECTIONS.map(([id, quorum, section, label]) => {
+    const open = openYouthSections.has(id);
+    const rows = (leadership[quorum] || []).map((row, index) => ({ row, index })).filter((item) => item.row.section === section);
+    const members = section === "presidency" ? quorumMembers(quorum, leadership[quorum] || []) : [];
+    return `<section class="youth-section">
+      <button type="button" class="roster-title" data-action="toggle-youth-section" data-section="${id}" aria-expanded="${open}">${esc(label)}</button>
+      ${open ? youthSectionBoard(quorum, label, rows, members) : ""}
+    </section>`;
+  }).join("")}</div>`;
+}
+
+function quorumMembers(quorum, leaders) {
+  const used = new Set(leaders.map((row) => String(row.name || "").trim().toLowerCase()).filter(Boolean));
+  return youthMembers(quorum).filter((person) => !used.has(nameKey(person).trim().toLowerCase()));
+}
+
+function youthSectionBoard(quorum, label, rows, members) {
+  const visits = youthVisits();
+  const leaderRows = rows.map(({ row, index }) => {
     const president = index === 0 ? " is-president" : "";
-    return `${adultLabel}<span class="pres-name-line"><input class="pres-name${president}" name="name-${quorum}-${index}" value="${esc(row.name || "")}" autocomplete="off" aria-label="${esc(label)} ${esc(row.role)} name">${assignedCountButton(row.name, named, quorum)}</span>
+    return `<span class="pres-name-line"><input class="pres-name${president}" name="name-${quorum}-${index}" value="${esc(row.name || "")}" autocomplete="off" aria-label="${esc(label)} ${esc(row.role)} name">${assignedCountButton(row.name, visits, quorum)}</span>
       <input name="phone-${quorum}-${index}" type="tel" inputmode="tel" autocomplete="off" value="${esc(row.phone || "")}" aria-label="${esc(row.role)} phone" placeholder="Phone">
       <input name="email-${quorum}-${index}" type="email" inputmode="email" autocomplete="off" value="${esc(row.email || "")}" aria-label="${esc(row.role)} email" placeholder="Email">
       <p class="position${president}">${esc(row.role)}</p>`;
   }).join("");
+  const memberLabel = members.length ? `<span class="pres-section">Members</span>` : "";
+  const memberRows = members.map((person) => `<span class="pres-name-line"><input class="pres-name" name="name-member-${esc(person.id)}" value="${esc(nameKey(person))}" autocomplete="off" aria-label="${esc(nameKey(person))} name">${assignedCountButton(nameKey(person), visits, quorum)}</span>
+      <input name="phone-member-${esc(person.id)}" type="tel" inputmode="tel" autocomplete="off" value="${esc(person.phone || "")}" aria-label="${esc(nameKey(person))} phone" placeholder="Phone">
+      <input name="email-member-${esc(person.id)}" type="email" inputmode="email" autocomplete="off" value="${esc(person.email || "")}" aria-label="${esc(nameKey(person))} email" placeholder="Email">
+      <p class="position">${esc(person.priesthood || (quorum === "teachers" ? "Teacher" : "Priest"))}</p>`).join("");
   return `<form class="presidency-board" data-quorum="${quorum}">
-    <p class="eyebrow">${esc(label)}</p>
     <span class="pres-head">Name</span>
     <span class="pres-head">Phone</span>
     <span class="pres-head">Email</span>
     <span class="pres-head">Position</span>
-    ${body}
+    ${leaderRows}
+    ${memberLabel}
+    ${memberRows}
   </form>`;
 }
 
@@ -1157,13 +1215,8 @@ function applyStatus(personId, status) {
   }).catch(showError);
 }
 
-function youthGroupButton(group, label) {
-  const count = youthMembers(group).length;
-  return `<button type="button" data-action="youth-group" data-group="${group}" aria-pressed="${youthGroup === group}">${label} ${count}</button>`;
-}
-
 function rosterSummary() {
-  const source = page === "youth" ? youthMembers() : eldersPeople();
+  const source = page === "youth" ? youthVisits() : eldersPeople();
   const cohort = source.filter((person) => personIsArchived(person) === archiveOpen);
   const counts = {};
   for (const person of cohort) {
@@ -1179,9 +1232,7 @@ function rosterSummary() {
     ? `<button type="button" data-action="show-people">To Visit ${activeCount}</button>`
     : filterButton("all", activeCount, "To Visit");
   const statusButtons = keys.map((key) => filterButton(key, counts[key] || 0, STATUS_LABELS[key] || key)).join("");
-  const allButton = page === "youth"
-    ? `${youthGroupButton("all", "Everyone")}${youthGroupButton("priests", "Priests")}${youthGroupButton("teachers", "Teachers")}`
-    : `<button type="button" data-action="view-all" aria-pressed="${viewAll}">All ${eldersPeople().length}</button>`;
+  const allButton = `<button type="button" data-action="view-all" aria-pressed="${viewAll}">All ${source.length}</button>`;
   return `<div class="summary" aria-label="${page === "youth" ? "Youth filters" : "Brother filters"}">
     ${allButton}
     ${visitButton}
@@ -1208,15 +1259,10 @@ function countStatuses() {
 
 function listTitle() {
   if (assigneeFilter) return assigneeFilter;
-  if (viewAll) return page === "youth" ? "Everyone" : "All";
+  if (viewAll) return "All";
   if (dayFilter) return formatDate(dayFilter);
   if (archiveOpen && statusFilter === "all") return "Archive";
   if (statusFilter !== "all") return STATUS_LABELS[statusFilter];
-  if (page === "youth") {
-    if (youthGroup === "priests") return "Priests";
-    if (youthGroup === "teachers") return "Teachers";
-    return "Youth";
-  }
   return "To Visit";
 }
 
@@ -1224,7 +1270,7 @@ function peopleView() {
   const people = filteredPeople();
   const title = listTitle();
   const showDetail = !state.rosterMode || Boolean(selectedPersonId) || detailForm === "add-person";
-  const noun = page === "youth" ? (people.length === 1 ? "member" : "members") : (people.length === 1 ? "brother" : "brothers");
+  const noun = page === "youth" ? (people.length === 1 ? "person" : "people") : (people.length === 1 ? "brother" : "brothers");
   return `<section class="layout${showDetail ? "" : " layout-single"}">
     <div class="card" id="people-card">
       <div class="row">
@@ -1240,7 +1286,7 @@ function peopleView() {
 }
 
 function personButtons(people = filteredPeople()) {
-  const loaded = page === "youth" ? youthMembers("all") : eldersPeople();
+  const loaded = page === "youth" ? youthVisits() : eldersPeople();
   if (!loaded.length) {
     if (page === "youth") return "";
     return `<p class="empty">No one is loaded yet. The outreach spreadsheet is not readable from here, so this list starts empty. Import a CSV or add a person. No sample members are included.</p>`;
@@ -1373,7 +1419,7 @@ function personMatchesFilters(person) {
 function filteredPeople() {
   const needle = search.trim().toLowerCase();
   const dayIds = viewAll || !dayFilter ? null : new Set(state.calendarMarks?.[dayFilter]?.people || []);
-  const source = page === "youth" ? youthMembers() : eldersPeople();
+  const source = pagePeople();
   return source
     .filter((person) => !dayIds || dayIds.has(person.id))
     .filter((person) => personMatchesFilters(person))
@@ -1513,10 +1559,22 @@ function planParts(person) {
   return { date: "", time: "", kind: "", place: "" };
 }
 
-function leaderNamesFor(person) {
-  if (person?.group === "priests" || person?.group === "teachers") {
-    return (state.youthLeadership?.[person.group] || []).map((row) => row.name).filter(Boolean);
+function youthVisitorNames() {
+  const names = [];
+  for (const quorum of ["priests", "teachers"]) {
+    for (const row of state?.youthLeadership?.[quorum] || []) {
+      if (row.name) names.push(row.name);
+    }
+    for (const person of youthMembers(quorum)) {
+      const name = nameKey(person);
+      if (name) names.push(name);
+    }
   }
+  return [...new Set(names)];
+}
+
+function leaderNamesFor(person) {
+  if (person?.list === "youth") return youthVisitorNames();
   return (state.presidency || []).map((member) => member.name).filter(Boolean);
 }
 
@@ -1729,14 +1787,10 @@ function personActions(person) {
 
 function addPersonForm() {
   if (page === "youth") {
-    const groupField = youthGroup === "priests" || youthGroup === "teachers"
-      ? `<input type="hidden" name="group" value="${esc(youthGroup)}">`
-      : `<label>Quorum <select name="group" aria-label="Quorum"><option value="priests">Priests</option><option value="teachers">Teachers</option></select></label>`;
     return `<h2>Add member</h2>
       <form class="stack" data-form="add-person">
         <label>Name <input name="displayName" required></label>
-        ${groupField}
-        <label>Birthday <input name="birthday" autocomplete="off" aria-label="Birthday"></label>
+        <label>Household <input name="household"></label>
         <label>Phone <span class="private-flag">Private</span><input name="phone" type="tel" autocomplete="off"></label>
         <label>Email <span class="private-flag">Private</span><input name="email" type="email" autocomplete="off"></label>
         <label>Notes <textarea name="notes"></textarea></label>
