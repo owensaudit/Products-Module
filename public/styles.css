@@ -1059,9 +1059,6 @@ article.role-card { cursor: default; }
 .person.quorum-priests { box-shadow: 0 0 0 3px #ffe56a; }
 .person.quorum-teachers { box-shadow: 0 0 0 3px #3caf62; }
 
-.presidency-board.quorum-priests .pres-name-line { box-shadow: 0 0 0 2px #ffe56a; border-radius: 8px; }
-.presidency-board.quorum-teachers .pres-name-line { box-shadow: 0 0 0 2px #3caf62; border-radius: 8px; }
-
 .ministering-table th {
   text-align: left;
   font-weight: 700;
