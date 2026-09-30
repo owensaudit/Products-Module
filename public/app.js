@@ -334,7 +334,7 @@ function renderPresidency() {
   presidencyHost.innerHTML = `<form class="presidency-board">
     <p class="eyebrow">EQ Presidency</p>
     <div class="pres-row pres-head"><span>Name</span><span>Position</span></div>
-    ${members.map((member, index) => `<div class="pres-row">
+    ${members.map((member, index) => `<div class="pres-row${index === 0 ? " is-president" : ""}">
       <label class="visually-hidden" for="pres-name-${index}">${esc(member.role)}</label>
       <input id="pres-name-${index}" name="name-${index}" value="${esc(member.name)}" required autocomplete="off" aria-label="${esc(member.role)} name">
       <p class="position">${esc(member.role)}</p>
