@@ -52,6 +52,7 @@ let focusReachOutDate = false;
 let inbox = "";
 let page = "elders";
 let youthGroup = "priests";
+let youthList = "all";
 let commentFor = "";
 let editingCommentId = "";
 let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -212,6 +213,7 @@ app.addEventListener("click", (event) => {
     detailForm = null;
     render();
   } else if (action === "view-all") {
+    if (page === "youth") youthList = "all";
     viewAll = true;
     archiveOpen = false;
     archiveChoicesFor = "";
@@ -223,6 +225,7 @@ app.addEventListener("click", (event) => {
     view = "people";
     render();
   } else if (action === "show-people") {
+    if (page === "youth") youthList = "visits";
     viewAll = false;
     archiveOpen = false;
     archiveChoicesFor = "";
@@ -234,7 +237,21 @@ app.addEventListener("click", (event) => {
     const current = selectedPerson();
     if (current && personIsArchived(current)) selectedPersonId = null;
     render();
+  } else if (action === "youth-list") {
+    youthList = button.dataset.list || "all";
+    viewAll = false;
+    archiveOpen = false;
+    archiveChoicesFor = "";
+    statusFilter = "all";
+    search = "";
+    dayFilter = "";
+    assigneeFilter = "";
+    officeFilter = "all";
+    selectedPersonId = null;
+    view = "people";
+    render();
   } else if (action === "archive") {
+    if (page === "youth") youthList = "visits";
     viewAll = false;
     archiveOpen = !archiveOpen;
     statusFilter = "all";
@@ -338,6 +355,9 @@ app.addEventListener("submit", (event) => {
     if (page === "youth") {
       payload.list = "youth";
       payload.sheetColumns = { Brother: String(data.get("displayName") || "").trim() };
+      youthList = "visits";
+      viewAll = false;
+      archiveOpen = false;
     }
     post("/api/people", payload).then((next) => {
       state = next;
@@ -734,6 +754,7 @@ function inboxMessages(which = inbox) {
 function openPage(next) {
   if (page === next) return;
   page = next;
+  youthList = "all";
   selectedPersonId = null;
   detailForm = null;
   inbox = "";
@@ -996,6 +1017,13 @@ const YOUTH_SECTIONS = [
   ["teachers-adults", "teachers", "adults", "Teachers Quorum Adult Leaders"],
 ];
 
+const YOUTH_LISTS = [
+  ["priests-quorum", "Priests Quorum", "priests", "presidency"],
+  ["priests-adults", "Priests Quorum Adult Leaders", "priests", "adults"],
+  ["teachers-quorum", "Teachers Quorum", "teachers", "presidency"],
+  ["teachers-adults", "Teachers Quorum Adult Leaders", "teachers", "adults"],
+];
+
 const openYouthSections = new Set();
 
 function renderYouthRosters() {
@@ -1128,7 +1156,12 @@ function rosterNeeded() {
 function renderPeopleList() {
   const list = document.querySelector("#person-list");
   if (!list) return;
-  list.innerHTML = personButtons();
+  list.innerHTML = showingYouthLists() ? youthListMarkup() : personButtons();
+  const count = document.querySelector("#people-card .muted");
+  if (count && showingYouthLists()) {
+    const total = youthVisibleEntries().length;
+    count.textContent = `${total} ${total === 1 ? "person" : "people"}`;
+  }
 }
 
 function monthValue() {
@@ -1219,7 +1252,8 @@ function applyStatus(personId, status) {
 }
 
 function rosterSummary() {
-  const source = page === "youth" ? youthVisits() : eldersPeople();
+  if (page === "youth") return youthRosterSummary();
+  const source = eldersPeople();
   const cohort = source.filter((person) => personIsArchived(person) === archiveOpen);
   const counts = {};
   for (const person of cohort) {
@@ -1270,22 +1304,137 @@ function listTitle() {
 }
 
 function peopleView() {
-  const people = filteredPeople();
-  const title = listTitle();
+  const youthLists = showingYouthLists();
+  const people = youthLists ? [] : filteredPeople();
+  const title = youthLists ? youthListTitle() : listTitle();
+  const total = youthLists ? youthVisibleEntries().length : people.length;
   const showDetail = !state.rosterMode || Boolean(selectedPersonId) || detailForm === "add-person";
-  const noun = page === "youth" ? (people.length === 1 ? "person" : "people") : (people.length === 1 ? "brother" : "brothers");
+  const noun = page === "youth" ? (total === 1 ? "person" : "people") : (total === 1 ? "brother" : "brothers");
   return `<section class="layout${showDetail ? "" : " layout-single"}">
     <div class="card" id="people-card">
       <div class="row">
         <h2>${esc(title)}</h2>
         <button type="button" class="ghost" data-action="form" data-form="add-person">${page === "youth" ? "Add member" : "Add a person"}</button>
       </div>
-      <p class="muted">${people.length} ${state.rosterMode ? noun : "in this list"}</p>
+      <p class="muted">${total} ${state.rosterMode ? noun : "in this list"}</p>
       <input id="search" class="search" type="search" placeholder="Search by name" value="${esc(search)}" aria-label="Search by name">
-      <div id="person-list" class="person-list">${personButtons(people)}</div>
+      <div id="person-list" class="person-list">${youthLists ? youthListMarkup() : personButtons(people)}</div>
     </div>
     ${showDetail ? `<div class="card">${detailForm === "add-person" ? addPersonForm() : personDetail()}</div>` : ""}
   </section>`;
+}
+
+function showingYouthLists() {
+  return page === "youth" && youthList !== "visits" && !archiveOpen && !assigneeFilter && !dayFilter;
+}
+
+function youthListTitle() {
+  return YOUTH_LISTS.find(([id]) => id === youthList)?.[1] || "All";
+}
+
+function youthRosterEntries(quorum, section) {
+  const leadership = state?.youthLeadership?.[quorum] || [];
+  const entries = [];
+  const used = new Set();
+  leadership.forEach((row, index) => {
+    if (row.section !== section) return;
+    const name = String(row.name || "").trim();
+    if (!name) return;
+    const key = name.toLowerCase();
+    if (used.has(key)) return;
+    used.add(key);
+    const person = youthMembers(quorum).find((item) => nameKey(item).trim().toLowerCase() === key);
+    if (person) entries.push({ kind: "person", person, role: row.role });
+    else entries.push({ kind: "leader", name, role: row.role, quorum, index });
+  });
+  if (section === "presidency") {
+    for (const person of youthMembers(quorum)) {
+      const key = nameKey(person).trim().toLowerCase();
+      if (used.has(key)) continue;
+      used.add(key);
+      entries.push({ kind: "person", person, role: person.priesthood || "" });
+    }
+  }
+  return entries;
+}
+
+function youthEntryName(entry) {
+  return entry.kind === "person" ? nameKey(entry.person) : entry.name;
+}
+
+function youthEntryVisible(entry) {
+  const needle = search.trim().toLowerCase();
+  if (needle && !youthEntryName(entry).toLowerCase().includes(needle)) return false;
+  if (officeFilter !== "all") {
+    if (entry.kind !== "person" || entry.person.priesthood !== officeFilter) return false;
+  }
+  return true;
+}
+
+function youthVisibleLists() {
+  if (youthList === "all") return YOUTH_LISTS;
+  return YOUTH_LISTS.filter(([id]) => id === youthList);
+}
+
+function youthVisibleEntries() {
+  return youthVisibleLists().flatMap(([, , quorum, section]) => youthRosterEntries(quorum, section).filter(youthEntryVisible));
+}
+
+function youthListMarkup() {
+  const lists = youthVisibleLists();
+  const single = lists.length === 1;
+  return lists.map(([, label, quorum, section]) => {
+    const entries = youthRosterEntries(quorum, section).filter(youthEntryVisible);
+    if (!entries.length) return "";
+    return `<section class="youth-list-block">
+      ${single ? "" : `<h3>${esc(label)}</h3>`}
+      ${entries.map(youthEntryButton).join("")}
+    </section>`;
+  }).join("");
+}
+
+function youthEntryButton(entry) {
+  if (entry.kind === "person") {
+    const person = entry.person;
+    return `<div class="person ${state.rosterMode ? person.rosterStatusKey : person.outreachStatus}" data-action="select-person" data-id="${esc(person.id)}" aria-current="${person.id === selectedPersonId}">
+      ${outreachMarks(person) ? `<span class="card-marks">${outreachMarks(person)}</span>` : ""}
+      <strong>${esc(personLabel(person))}</strong>
+      ${visitedMark(person)}
+      ${state.rosterMode ? statusSelect(person) : `<span class="pill ${person.outreachStatus}">${esc(STATUS_LABELS[person.outreachStatus])}</span>`}
+      <small>${state.rosterMode ? rosterLine(person) : esc(latestLine(person))}</small>
+    </div>`;
+  }
+  return `<div class="person leader-row"><strong>${esc(entry.name)}</strong><small>${esc(entry.role)}</small></div>`;
+}
+
+function youthRosterSummary() {
+  const visits = youthVisits();
+  const archivedCount = visits.filter((person) => personIsArchived(person)).length;
+  const activeCount = visits.length - archivedCount;
+  const listsOpen = showingYouthLists();
+  const allCount = YOUTH_LISTS.reduce((sum, [, , quorum, section]) => sum + youthRosterEntries(quorum, section).length, 0);
+  const listButtons = YOUTH_LISTS.map(([id, label, quorum, section]) => {
+    const pressed = listsOpen && youthList === id;
+    return `<button type="button" data-action="youth-list" data-list="${id}" aria-pressed="${pressed}">${esc(label)} ${youthRosterEntries(quorum, section).length}</button>`;
+  }).join("");
+  const people = YOUTH_LISTS.flatMap(([, , quorum, section]) => youthRosterEntries(quorum, section))
+    .filter((entry) => entry.kind === "person")
+    .map((entry) => entry.person);
+  const offices = [...new Set(people.map((person) => person.priesthood).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const allPressed = listsOpen && youthList === "all";
+  const visitPressed = !listsOpen && !archiveOpen && !viewAll && !assigneeFilter && !dayFilter && statusFilter === "all";
+  return `<div class="summary" aria-label="Youth lists">
+    <button type="button" data-action="view-all" aria-pressed="${allPressed}">All ${allCount}</button>
+    ${listButtons}
+    <button type="button" data-action="show-people" aria-pressed="${visitPressed}">To Visit ${activeCount}</button>
+    <button type="button" class="archive-toggle" data-action="archive" aria-pressed="${archiveOpen}">Archive ${archivedCount}</button>
+    <label class="inline-filter">Priesthood
+      <select data-action="office" aria-label="Filter by priesthood">
+        <option value="all" ${officeFilter === "all" ? "selected" : ""}>All offices</option>
+        ${offices.map((office) => `<option value="${esc(office)}" ${officeFilter === office ? "selected" : ""}>${esc(office)}</option>`).join("")}
+      </select>
+    </label>
+  </div>`;
 }
 
 function personButtons(people = filteredPeople()) {

@@ -925,6 +925,18 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
 
 .person-list { display: grid; gap: 8px; }
 
+.youth-list-block { display: grid; gap: 8px; }
+.youth-list-block + .youth-list-block { margin-top: 16px; }
+.youth-list-block h3 {
+  margin: 4px 0 0;
+  color: var(--church);
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .person {
   width: 100%;
   text-align: left;
