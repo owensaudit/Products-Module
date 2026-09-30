@@ -291,11 +291,11 @@ test("an outreach row records a presidency member, how they reached out, and the
   ]);
   const view = presentState(state, "2026-09");
   assert.deepEqual(view.presidency.map((member) => member.role), [
-    "EQ President",
-    "EQ 1st Counselor",
-    "EQ 2nd Counselor",
-    "EQ Secretary",
-    "EQ Asst. Secretary",
+    "President",
+    "1st Counselor",
+    "2nd Counselor",
+    "Secretary",
+    "Asst. Secretary",
   ]);
   assert.equal(view.presidency[3].name, "Ada Example");
   assert.equal(view.presidency.length, 5);
@@ -310,11 +310,11 @@ test("an outreach row records a presidency member, how they reached out, and the
     ],
   });
   assert.deepEqual(migrated.map((member) => `${member.role}: ${member.name}`), [
-    "EQ President: Mark Lillenberg",
-    "EQ 1st Counselor: Tyler Sanders",
-    "EQ 2nd Counselor: Brad Conger",
-    "EQ Secretary: Harrison Bardo",
-    "EQ Asst. Secretary: Josh Owens",
+    "President: Mark Lillenberg",
+    "1st Counselor: Tyler Sanders",
+    "2nd Counselor: Brad Conger",
+    "Secretary: Harrison Bardo",
+    "Asst. Secretary: Josh Owens",
   ]);
 });
 

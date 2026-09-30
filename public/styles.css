@@ -107,9 +107,14 @@ h1 { margin: 0; font-size: 40px; line-height: 1.05; }
   min-width: 0;
 }
 
-.presidency-board .eyebrow { margin: 0; font-size: 11px; }
+.presidency-board {
+  grid-template-columns: minmax(0, 1fr) max-content;
+  column-gap: 10px;
+  row-gap: 4px;
+  align-items: center;
+}
 
-.pres-row { display: grid; grid-template-columns: 1.05fr 1fr; gap: 6px; align-items: center; }
+.presidency-board .eyebrow { margin: 0; font-size: 11px; grid-column: 1 / -1; }
 
 .pres-head { color: var(--muted); font-size: 11px; }
 
@@ -118,11 +123,22 @@ h1 { margin: 0; font-size: 40px; line-height: 1.05; }
   font-family: var(--sans);
   font-size: 13px;
   font-weight: 500;
-  line-height: 1.25;
+  line-height: 1.2;
   color: var(--ink);
 }
 
-.presidency-board input { padding: 3px 6px; }
+.presidency-board input {
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  box-sizing: border-box;
+}
+
+.position { margin: 0; white-space: nowrap; }
+
+.presidency-board input.is-president,
+.position.is-president { font-weight: 700; }
 
 .month-cal {
   justify-self: center;
@@ -221,11 +237,6 @@ button.cal-day.is-open {
 }
 
 .cal-legend span { display: inline-flex; align-items: center; gap: 5px; }
-
-.position { margin: 0; }
-
-.pres-row.is-president input,
-.pres-row.is-president .position { font-weight: 700; }
 
 .visually-hidden {
   position: absolute;
