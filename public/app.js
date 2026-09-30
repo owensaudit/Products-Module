@@ -43,6 +43,7 @@ let archiveChoicesFor = "";
 let officeFilter = "all";
 let search = "";
 let dayFilter = "";
+let viewAll = false;
 let focusReachOutDate = false;
 let messageCursor = 0;
 let editingCommentId = "";
@@ -174,7 +175,18 @@ app.addEventListener("click", (event) => {
     view = button.dataset.view;
     detailForm = null;
     render();
+  } else if (action === "view-all") {
+    viewAll = true;
+    archiveOpen = false;
+    archiveChoicesFor = "";
+    statusFilter = "all";
+    search = "";
+    dayFilter = "";
+    officeFilter = "all";
+    view = "people";
+    render();
   } else if (action === "show-people") {
+    viewAll = false;
     archiveOpen = false;
     archiveChoicesFor = "";
     statusFilter = "all";
@@ -185,6 +197,7 @@ app.addEventListener("click", (event) => {
     if (current && personIsArchived(current)) selectedPersonId = null;
     render();
   } else if (action === "archive") {
+    viewAll = false;
     archiveOpen = !archiveOpen;
     statusFilter = "all";
     archiveChoicesFor = "";
@@ -200,6 +213,7 @@ app.addEventListener("click", (event) => {
   } else if (action === "set-status") {
     applyStatus(button.dataset.personId, button.dataset.status);
   } else if (action === "filter") {
+    viewAll = false;
     statusFilter = button.dataset.status;
     search = "";
     dayFilter = "";
@@ -439,6 +453,7 @@ function showToday() {
   calendarMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const iso = todayIso();
   const people = peopleForDay(iso);
+  viewAll = false;
   dayFilter = iso;
   archiveChoicesFor = "";
   statusFilter = "all";
@@ -741,6 +756,7 @@ function renderCalendar() {
 function openCalendarDay(iso) {
   const people = peopleForDay(iso);
   if (!people.length) return;
+  viewAll = false;
   dayFilter = iso;
   archiveOpen = people.every((person) => personIsArchived(person));
   archiveChoicesFor = "";
@@ -855,6 +871,7 @@ function applyStatus(personId, status) {
     Visited: "visited",
   }[status];
   if (archiveKey) {
+    viewAll = false;
     archiveOpen = true;
     statusFilter = archiveKey;
     dayFilter = "";
@@ -867,6 +884,7 @@ function applyStatus(personId, status) {
       "Re-Schedule": "reschedule",
       Scheduled: "scheduled",
     }[status] || "none";
+    viewAll = false;
     if (archiveOpen) archiveOpen = false;
     if (statusFilter !== "all" && statusFilter !== activeKey) statusFilter = "all";
   }
@@ -889,12 +907,14 @@ function rosterSummary() {
   const activeCount = state.people.length - archivedCount;
   const keys = archiveOpen ? ARCHIVE_STATUS_ORDER : ROSTER_STATUS_ORDER.filter((key) => counts[key]);
   const offices = [...new Set(cohort.map((person) => person.priesthood).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-  const archiveButton = `<button type="button" class="archive-toggle" data-action="archive" aria-pressed="${archiveOpen}">Archive ${archivedCount}</button>`;
-  const visitButton = archiveOpen
+  const archiveButton = `<button type="button" class="archive-toggle" data-action="archive" aria-pressed="${!viewAll && archiveOpen}">Archive ${archivedCount}</button>`;
+  const visitButton = archiveOpen && !viewAll
     ? `<button type="button" data-action="show-people">People to Visit ${activeCount}</button>`
     : filterButton("all", activeCount, "People to Visit");
   const statusButtons = keys.map((key) => filterButton(key, counts[key] || 0, STATUS_LABELS[key] || key)).join("");
+  const allButton = `<button type="button" data-action="view-all" aria-pressed="${viewAll}">All People ${state.people.length}</button>`;
   return `<div class="summary" aria-label="Brother filters">
+    ${allButton}
     ${visitButton}
     ${archiveOpen ? `${archiveButton}${statusButtons}` : `${statusButtons}${archiveButton}`}
     <label class="inline-filter">Priesthood
@@ -907,7 +927,8 @@ function rosterSummary() {
 }
 
 function filterButton(status, count, label = STATUS_LABELS[status]) {
-  return `<button type="button" data-action="filter" data-status="${status}" aria-pressed="${statusFilter === status}">${esc(label)} ${count}</button>`;
+  const pressed = !viewAll && !dayFilter && statusFilter === status && (status === "all" ? !archiveOpen : true);
+  return `<button type="button" data-action="filter" data-status="${status}" aria-pressed="${pressed}">${esc(label)} ${count}</button>`;
 }
 
 function countStatuses() {
@@ -918,7 +939,7 @@ function countStatuses() {
 
 function peopleView() {
   const people = filteredPeople();
-  const title = dayFilter ? formatDate(dayFilter) : archiveOpen && statusFilter === "all" ? "Archive" : statusFilter === "all" ? "People to Visit" : STATUS_LABELS[statusFilter];
+  const title = viewAll ? "All People" : dayFilter ? formatDate(dayFilter) : archiveOpen && statusFilter === "all" ? "Archive" : statusFilter === "all" ? "People to Visit" : STATUS_LABELS[statusFilter];
   const showDetail = !state.rosterMode || Boolean(selectedPersonId) || detailForm === "add-person";
   return `<section class="layout${showDetail ? "" : " layout-single"}">
     <div class="card" id="people-card">
@@ -1017,6 +1038,10 @@ function rosterLine(person) {
 }
 
 function personMatchesFilters(person) {
+  if (viewAll) {
+    if (state.rosterMode && officeFilter !== "all" && person.priesthood !== officeFilter) return false;
+    return true;
+  }
   if (state.rosterMode && !dayFilter && personIsArchived(person) !== archiveOpen) return false;
   if (statusFilter !== "all") {
     const key = state.rosterMode ? person.rosterStatusKey || "none" : person.outreachStatus;
@@ -1028,7 +1053,7 @@ function personMatchesFilters(person) {
 
 function filteredPeople() {
   const needle = search.trim().toLowerCase();
-  const dayIds = dayFilter ? new Set(state.calendarMarks?.[dayFilter]?.people || []) : null;
+  const dayIds = viewAll || !dayFilter ? null : new Set(state.calendarMarks?.[dayFilter]?.people || []);
   return state.people
     .filter((person) => !dayIds || dayIds.has(person.id))
     .filter((person) => personMatchesFilters(person))
