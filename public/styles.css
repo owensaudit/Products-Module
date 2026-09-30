@@ -84,7 +84,7 @@ button { cursor: pointer; }
 
 .site-header {
   display: grid;
-  grid-template-columns: max-content minmax(220px, 1fr) minmax(220px, 270px);
+  grid-template-columns: max-content minmax(200px, 280px) minmax(460px, 1fr);
   align-items: start;
   gap: 24px;
   padding: 28px 32px 8px;
@@ -206,7 +206,7 @@ h1 { margin: 0; font-size: 40px; line-height: 1.05; }
 }
 
 .presidency-board {
-  grid-template-columns: minmax(0, 1fr) max-content;
+  grid-template-columns: minmax(0, 1.1fr) minmax(88px, 0.8fr) minmax(120px, 1.2fr) max-content;
   column-gap: 10px;
   row-gap: 4px;
   align-items: center;
@@ -229,7 +229,7 @@ h1 { margin: 0; font-size: 40px; line-height: 1.05; }
   width: 100%;
   min-width: 0;
   height: 28px;
-  padding: 0 8px;
+  padding: 0;
   box-sizing: border-box;
 }
 
@@ -381,6 +381,23 @@ input[type="text"], input[type="month"], input[type="date"], input[type="email"]
   border-radius: 10px;
   padding: 8px 10px;
   min-width: 0;
+}
+
+.presidency-board input {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+.presidency-board input::placeholder {
+  color: #8aa0a8;
+  opacity: 1;
+}
+
+.presidency-board input:placeholder-shown {
+  border-bottom: 1px solid var(--line);
 }
 
 textarea { min-height: 72px; width: 100%; resize: vertical; }

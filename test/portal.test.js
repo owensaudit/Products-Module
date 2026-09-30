@@ -487,7 +487,15 @@ test("an outreach row records a presidency member, how they reached out, and the
     "Asst. Secretary",
   ]);
   assert.equal(view.presidency[3].name, "Ada Example");
+  assert.equal(view.presidency[0].phone, "");
+  assert.equal(view.presidency[0].email, "");
   assert.equal(view.presidency.length, 5);
+  state = setPresidency(state, view.presidency.map((member, index) => (
+    index === 0 ? { ...member, phone: "555-0101", email: "ada@example.com" } : member
+  )));
+  assert.equal(presentState(state, "2026-09").presidency[0].phone, "555-0101");
+  assert.equal(presentState(state, "2026-09").presidency[0].email, "ada@example.com");
+  assert.equal(presentState(state, "2026-09").presidency[1].phone, "");
 
   const migrated = activePresidency({
     presidency: [

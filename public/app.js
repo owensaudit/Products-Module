@@ -494,11 +494,12 @@ function mappingFromForm(data) {
 
 let presidencySaveTimer = null;
 
-function presidencyNamesFromForm() {
-  return (state?.presidency || []).map((_, index) => {
-    const input = presidencyHost?.querySelector(`[name="name-${index}"]`);
-    return String(input?.value ?? "").trim();
-  });
+function presidencyMembersFromForm() {
+  return (state?.presidency || []).map((member, index) => ({
+    name: String(presidencyHost?.querySelector(`[name="name-${index}"]`)?.value ?? member.name).trim(),
+    phone: String(presidencyHost?.querySelector(`[name="phone-${index}"]`)?.value ?? "").trim(),
+    email: String(presidencyHost?.querySelector(`[name="email-${index}"]`)?.value ?? "").trim(),
+  }));
 }
 
 function syncPresidencyDropdowns() {
@@ -510,19 +511,31 @@ function syncPresidencyDropdowns() {
 }
 
 function savePresidencyNames() {
-  const names = presidencyNamesFromForm();
-  if (!names.length || names.some((name) => !name)) return;
-  if (names.every((name, index) => name === state.presidency[index]?.name)) return;
-  post("/api/presidency", { members: names.map((name) => ({ name })) }).then((next) => {
+  const members = presidencyMembersFromForm();
+  if (!members.length || members.some((member) => !member.name)) return;
+  const unchanged = members.every((member, index) => {
+    const current = state.presidency[index] || {};
+    return member.name === current.name && member.phone === (current.phone || "") && member.email === (current.email || "");
+  });
+  if (unchanged) return;
+  post("/api/presidency", { members }).then((next) => {
     state = next;
     syncPresidencyDropdowns();
   }).catch(showError);
 }
 
 presidencyHost?.addEventListener("input", (event) => {
-  if (!(event.target instanceof HTMLInputElement) || !event.target.name.startsWith("name-")) return;
+  const name = event.target?.name || "";
+  if (!(event.target instanceof HTMLInputElement) || !/^(name|phone|email)-/.test(name)) return;
   clearTimeout(presidencySaveTimer);
   presidencySaveTimer = setTimeout(savePresidencyNames, 400);
+});
+
+presidencyHost?.addEventListener("focusout", (event) => {
+  const name = event.target?.name || "";
+  if (!(event.target instanceof HTMLInputElement) || !/^(name|phone|email)-/.test(name)) return;
+  clearTimeout(presidencySaveTimer);
+  savePresidencyNames();
 });
 
 presidencyHost?.addEventListener("submit", (event) => {
@@ -637,8 +650,12 @@ function renderPresidency() {
   presidencyHost.innerHTML = `<form class="presidency-board">
     <p class="eyebrow">EQ Presidency</p>
     <span class="pres-head">Name</span>
+    <span class="pres-head">Phone</span>
+    <span class="pres-head">Email</span>
     <span class="pres-head">Position</span>
-    ${members.map((member, index) => `<input id="pres-name-${index}" class="${index === 0 ? "is-president" : ""}" name="name-${index}" value="${esc(member.name)}" required autocomplete="off" aria-label="${esc(member.role)} name">
+    ${members.map((member, index) => `<input id="pres-name-${index}" class="pres-name${index === 0 ? " is-president" : ""}" name="name-${index}" value="${esc(member.name)}" required autocomplete="off" aria-label="${esc(member.role)} name">
+      <input name="phone-${index}" type="tel" inputmode="tel" autocomplete="off" value="${esc(member.phone || "")}" aria-label="${esc(member.role)} phone" placeholder="Phone">
+      <input name="email-${index}" type="email" inputmode="email" autocomplete="off" value="${esc(member.email || "")}" aria-label="${esc(member.role)} email" placeholder="Email">
       <p class="position${index === 0 ? " is-president" : ""}">${esc(member.role)}</p>`).join("")}
   </form>`;
 }
