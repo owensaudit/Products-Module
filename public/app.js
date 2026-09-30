@@ -283,6 +283,7 @@ app.addEventListener("click", (event) => {
     view = "people";
     detailForm = null;
     render();
+    document.querySelector(".layout .card:last-child")?.scrollIntoView({ block: "nearest" });
   } else if (action === "form") {
     detailForm = button.dataset.form;
     render();
@@ -345,6 +346,22 @@ app.addEventListener("submit", (event) => {
   event.preventDefault();
   const data = new FormData(form);
   const kind = form.dataset.form;
+  if (kind === "youth-companion") {
+    saveYouthCompanion(selectedPersonId, data.get("companion")).catch(showError);
+    return;
+  }
+  if (kind === "youth-meeting") {
+    post(`/api/people/${selectedPersonId}/contact`, {
+      meetingDate: { date: data.get("date"), time: data.get("time") },
+    }).then(render).catch(showError);
+    return;
+  }
+  if (kind === "assignment-visit") {
+    post(`/api/people/${form.dataset.id}/contact`, {
+      visitDate: { date: data.get("date"), time: data.get("time") },
+    }).then(render).catch(showError);
+    return;
+  }
   if (kind === "add-assignment") {
     addYouthAssignment(form.dataset.youthId, data.get("assignment")).catch(showError);
     return;
@@ -490,6 +507,11 @@ app.addEventListener("input", (event) => {
 });
 
 app.addEventListener("focusout", (event) => {
+  const youthCompanion = event.target.closest?.("form[data-form='youth-companion'] [name=companion]");
+  if (youthCompanion) {
+    saveYouthCompanion(selectedPersonId, youthCompanion.value).catch(showError);
+    return;
+  }
   const companion = event.target.closest?.(".companion-input");
   if (companion) {
     const card = companion.closest(".ministering-card");
@@ -509,6 +531,11 @@ app.addEventListener("focusout", (event) => {
 });
 
 app.addEventListener("change", (event) => {
+  const response = event.target.closest?.("[data-response-id]");
+  if (response) {
+    post(`/api/people/${response.dataset.responseId}/contact`, { response: response.checked ? "Responded" : "" }).then(render).catch(showError);
+    return;
+  }
   if (event.target.id === "csv-file") {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -1153,7 +1180,8 @@ function peopleForDay(iso) {
   const mark = state?.calendarMarks?.[iso] || {};
   const ids = new Set(mark.people || []);
   const prefer = new Set(mark.kinds || []);
-  return pagePeople()
+  const source = page === "youth" ? [...youthMembers(), ...youthVisits()] : pagePeople();
+  return source
     .filter((person) => ids.has(person.id))
     .slice()
     .sort((a, b) => {
@@ -1752,7 +1780,7 @@ function personMatchesFilters(person) {
 function filteredPeople() {
   const needle = search.trim().toLowerCase();
   const dayIds = viewAll || !dayFilter ? null : new Set(state.calendarMarks?.[dayFilter]?.people || []);
-  const source = pagePeople();
+  const source = page === "youth" && dayFilter ? [...youthMembers(), ...youthVisits()] : pagePeople();
   return source
     .filter((person) => !dayIds || dayIds.has(person.id))
     .filter((person) => personMatchesFilters(person))
@@ -1816,7 +1844,63 @@ function personDetail() {
     ${commentForm("person", person.id)}`;
 }
 
+function meetingParts(value) {
+  return appointmentParts(value);
+}
+
+function youthMemberDetail(person) {
+  const families = ministeringForYouth(nameKey(person)).families;
+  const companion = ministeringCompanionValue(person, families);
+  const meeting = person.sheetColumns?.["Meeting Date"] || "";
+  const responded = families.filter((family) => family.sheetColumns?.Response === "Responded").length;
+  return `${personNameField(person)}
+    ${specialNotes(person)}
+    ${contactFields(person)}
+    ${factsForm(person)}
+    <form class="companion-row" data-form="youth-companion">
+      <label>Companion <input name="companion" value="${esc(companion)}" autocomplete="off" aria-label="Companion"></label>
+    </form>
+    <h3>Youth ministry meeting</h3>
+    <p class="muted">Meet with ${esc(companion || "the companion")} to see which assignments respond, then give a date and time to visit.</p>
+    ${meeting ? `<p class="plan-line"><strong>Meeting</strong> ${esc(meeting)}${companion ? ` with ${esc(companion)}` : ""}</p>` : ""}
+    <form class="appointment-row" data-form="youth-meeting">
+      <input name="date" type="date" aria-label="Meeting date" required value="${esc(meetingParts(meeting).date)}">
+      <input name="time" type="time" aria-label="Meeting time" required value="${esc(meetingParts(meeting).time)}">
+      <button class="tiny primary" type="submit">Schedule meeting</button>
+    </form>
+    <h3>Assignments</h3>
+    <p class="muted">${responded} of ${families.length} responded</p>
+    ${families.map((family) => youthAssignmentVisit(family)).join("")}
+    <form data-form="add-assignment" data-youth-id="${esc(person.id)}" class="add-assignment">
+      <input name="assignment" placeholder="Add assignment" aria-label="Add assignment">
+      <button type="submit">Add</button>
+    </form>
+    <h3>Outreach</h3>
+    ${attemptList(person)}
+    <h3>Comments${person.commentCount ? ` <span class="muted">${person.commentCount}</span>` : ""}</h3>
+    ${commentList("person", person.id)}
+    ${commentForm("person", person.id)}`;
+}
+
+function youthAssignmentVisit(family) {
+  const responded = family.sheetColumns?.Response === "Responded";
+  const visit = family.sheetColumns?.["Visit Date"] || "";
+  const parts = meetingParts(visit);
+  return `<div class="assignment-visit${responded ? " is-responded" : ""}">
+    <input data-assignment-id="${esc(family.id)}" value="${esc(nameKey(family))}" aria-label="Assignment">
+    <label class="responded"><input type="checkbox" data-response-id="${esc(family.id)}" ${responded ? "checked" : ""}> Responded</label>
+    ${visit ? `<p class="plan-line"><strong>Visit</strong> ${esc(visit)}</p>` : ""}
+    <form class="appointment-row" data-form="assignment-visit" data-id="${esc(family.id)}">
+      <input name="date" type="date" aria-label="Visit date" required value="${esc(parts.date)}">
+      <input name="time" type="time" aria-label="Visit time" required value="${esc(parts.time)}">
+      <button class="tiny primary" type="submit">Schedule visit</button>
+    </form>
+    <button type="button" class="text-button" data-action="clear-assignment" data-id="${esc(family.id)}">Remove</button>
+  </div>`;
+}
+
 function rosterDetail(person) {
+  if (isYouthMember(person)) return youthMemberDetail(person);
   return `${personNameField(person)}
     ${specialNotes(person)}
     <p class="status-row">${statusSelect(person)}${archiveControl(person)}${person.rosterStatusKey === "scheduled" ? visitCheck(person) : ""}</p>

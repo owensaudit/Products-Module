@@ -561,6 +561,24 @@ test("an outreach row records a presidency member, how they reached out, and the
   ]);
 });
 
+test("a youth ministry meeting and a family visit mark the calendar", () => {
+  const ids = deps();
+  let state = emptyState();
+  state = addPerson(state, { displayName: "Example, Ada", group: "priests", sheetColumns: { Brother: "Example, Ada" } }, ids);
+  state = addPerson(state, { displayName: "Guest, Cam", list: "youth", sheetColumns: { Brother: "Guest, Cam", Assigned: "Example, Ada" } }, ids);
+  state = setPersonContact(state, "per_1", { meetingDate: { date: "2026-10-21", time: "19:00" }, companion: "Sample, Bea" });
+  state = setPersonContact(state, "per_2", { response: "Responded", visitDate: { date: "2026-10-22", time: "18:30" } });
+  assert.equal(state.people[0].sheetColumns["Meeting Date"], "10/21 7:00 PM");
+  assert.equal(state.people[0].sheetColumns.Companion, "Sample, Bea");
+  assert.equal(state.people[1].sheetColumns.Response, "Responded");
+  assert.equal(state.people[1].sheetColumns["Visit Date"], "10/22 6:30 PM");
+  const marks = presentState(state, "2026-10").calendarMarks;
+  assert.deepEqual(marks["2026-10-21"], { kinds: ["scheduled"], people: ["per_1"] });
+  assert.deepEqual(marks["2026-10-22"], { kinds: ["scheduled"], people: ["per_2"] });
+  state = setPersonContact(state, "per_2", { response: "" });
+  assert.equal(state.people[1].sheetColumns.Response, undefined);
+});
+
 test("removing a youth assignment deletes that household", () => {
   const ids = deps();
   let state = emptyState();
