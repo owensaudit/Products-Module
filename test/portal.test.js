@@ -561,6 +561,24 @@ test("an outreach row records a presidency member, how they reached out, and the
   ]);
 });
 
+test("an assignment card keeps the household and address", () => {
+  const ids = deps();
+  let state = emptyState();
+  state = addPerson(state, { displayName: "Guest, Cam", list: "youth", sheetColumns: { Brother: "Guest, Cam" } }, ids);
+  state = setPersonContact(state, "per_1", {
+    phone: "555-0100",
+    email: "cam@example.com",
+    household: "Cam\nAda",
+    address: "1 Main St\nTown WA 98607",
+  });
+  const person = state.people[0];
+  assert.equal(person.phone, "555-0100");
+  assert.equal(person.email, "cam@example.com");
+  assert.equal(person.household, "Cam\nAda");
+  assert.equal(person.sheetColumns["Household Members"], "Cam\nAda");
+  assert.equal(person.sheetColumns.Address, "1 Main St\nTown WA 98607");
+});
+
 test("a youth ministry meeting and a family visit mark the calendar", () => {
   const ids = deps();
   let state = emptyState();

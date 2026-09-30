@@ -939,6 +939,10 @@ function saveContactFields() {
   const notes = card.querySelector(".special-notes [name=notes]")?.value.trim() ?? "";
   const phone = card.querySelector("form[data-form='contact'] [name=phone]")?.value.trim() ?? "";
   const email = card.querySelector("form[data-form='contact'] [name=email]")?.value.trim() ?? "";
+  const householdInput = card.querySelector("form[data-form='contact'] [name=household]");
+  const addressInput = card.querySelector("form[data-form='contact'] [name=address]");
+  const household = householdInput ? householdInput.value.trim() : "";
+  const address = addressInput ? addressInput.value.trim() : "";
   const priesthood = card.querySelector("form[data-form='facts'] [name=priesthood]")?.value.trim() ?? "";
   const age = card.querySelector("form[data-form='facts'] [name=age]")?.value.trim() ?? "";
   const birthday = card.querySelector("form[data-form='facts'] [name=birthday]")?.value.trim() ?? "";
@@ -946,8 +950,12 @@ function saveContactFields() {
   const currentName = person ? nameKey(person) : "";
   if (!typedName && nameInput && currentName) nameInput.value = currentName;
   const payload = { notes, phone, email, priesthood, age, birthday };
+  if (householdInput) payload.household = household;
+  if (addressInput) payload.address = address;
   if (typedName && typedName !== currentName) payload.name = typedName;
-  if (person && !payload.name && notes === (person.notes || "") && phone === (person.phone || "") && email === (person.email || "") && priesthood === (person.priesthood || "") && age === (person.age || "") && birthday === (person.birthday || "")) return;
+  const sameHousehold = !householdInput || household === (person?.household || "");
+  const sameAddress = !addressInput || address === (person?.sheetColumns?.Address || "");
+  if (person && !payload.name && sameHousehold && sameAddress && notes === (person.notes || "") && phone === (person.phone || "") && email === (person.email || "") && priesthood === (person.priesthood || "") && age === (person.age || "") && birthday === (person.birthday || "")) return;
   post(`/api/people/${selectedPersonId}/contact`, payload).then((next) => {
     state = next;
     render();
@@ -1485,29 +1493,37 @@ function ministeringRows(quorum) {
     .sort((a, b) => nameKey(a.person).localeCompare(nameKey(b.person), "en", { sensitivity: "base" }));
 }
 
+function findPersonByName(name) {
+  const key = String(name || "").trim().toLowerCase();
+  if (!key) return null;
+  return (state?.people || []).find((person) => nameKey(person).trim().toLowerCase() === key) || null;
+}
+
+function roleCard(person, kind, fallback = "") {
+  const title = person ? nameKey(person) : fallback;
+  if (!title) return "";
+  const street = String(person?.sheetColumns?.Address || "").split("\n").find((line) => line.trim()) || "";
+  const body = `<span class="role-kicker">${esc(kind)}</span><strong>${esc(title)}</strong>${street ? `<small>${esc(street)}</small>` : ""}`;
+  if (!person) return `<article class="role-card">${body}</article>`;
+  return `<button type="button" class="role-card" data-action="select-person" data-id="${esc(person.id)}">${body}</button>`;
+}
+
 function ministeringCards(quorum) {
   const rows = ministeringRows(quorum);
   if (!rows.length) return "";
   return `<div class="ministering-cards quorum-${quorum}">
-    <div class="ministering-head"><span>Name</span><span>Companion</span><span>Assignment(s)</span></div>
     ${rows.map((row) => {
-      const companion = ministeringCompanionValue(row.person, row.families);
-      const assignments = row.families.map((family) => `<span class="assignment-line">
-        <input data-assignment-id="${esc(family.id)}" value="${esc(nameKey(family))}" aria-label="Assignment">
-        <button type="button" class="text-button" data-action="select-person" data-id="${esc(family.id)}">Open</button>
-        <button type="button" class="text-button" data-action="clear-assignment" data-id="${esc(family.id)}">Remove</button>
-      </span>`).join("");
-      return `<article class="ministering-card">
-        <button type="button" class="ministering-name" data-action="select-person" data-id="${esc(row.person.id)}">${esc(nameKey(row.person))}</button>
-        <input class="companion-input" data-youth-id="${esc(row.person.id)}" value="${esc(companion)}" aria-label="Companion" placeholder="Companion">
-        <div class="assignment-editor">
-          ${assignments}
-          <form data-form="add-assignment" data-youth-id="${esc(row.person.id)}">
-            <input name="assignment" placeholder="Add assignment" aria-label="Add assignment">
-            <button type="submit">Add</button>
-          </form>
-        </div>
-      </article>`;
+      const companionName = ministeringCompanionValue(row.person, row.families);
+      const companion = findPersonByName(companionName);
+      return `<section class="ministering-set">
+        ${roleCard(row.person, "Name")}
+        ${roleCard(companion, "Companion", companionName)}
+        ${row.families.map((family) => roleCard(family, "Assignment")).join("")}
+        <form data-form="add-assignment" data-youth-id="${esc(row.person.id)}" class="add-assignment">
+          <input name="assignment" placeholder="Add assignment" aria-label="Add assignment">
+          <button type="submit">Add</button>
+        </form>
+      </section>`;
     }).join("")}
   </div>`;
 }
@@ -1750,6 +1766,8 @@ function rosterLine(person) {
   if (person.reachOutDate) bits.push(`Reach out ${esc(person.reachOutDate)}`);
   if (person.appointment) bits.push(`Appt ${esc(person.appointment)}${placeMark(person.appointmentPlace)}`);
   if (person.list === "youth" && person.assigned?.length) bits.push(esc(person.assigned.join(" · ")));
+  if (person.list === "youth" && person.household) bits.push(esc(String(person.household).split("\n").filter(Boolean).join(", ")));
+  if (person.list === "youth" && person.sheetColumns?.Address) bits.push(esc(String(person.sheetColumns.Address).split("\n").find((line) => line.trim()) || ""));
   const touch = lastTouch(person);
   if (touch) bits.push(esc(touch));
   return bits.join(" · ") || esc(person.sheetName || "");
@@ -1892,8 +1910,21 @@ function youthAssignmentVisit(family) {
   </div>`;
 }
 
+function assignmentDetail(person) {
+  return `${personNameField(person)}
+    <p class="muted">Assignment</p>
+    ${contactFields(person, true)}
+    ${assignmentFields(person)}
+    <h3>Outreach</h3>
+    ${attemptList(person)}
+    <h3>Comments${person.commentCount ? ` <span class="muted">${person.commentCount}</span>` : ""}</h3>
+    ${commentList("person", person.id)}
+    ${commentForm("person", person.id)}`;
+}
+
 function rosterDetail(person) {
   if (isYouthMember(person)) return youthMemberDetail(person);
+  if (isYouthVisit(person)) return assignmentDetail(person);
   return `${personNameField(person)}
     ${specialNotes(person)}
     <p class="status-row">${statusSelect(person)}${archiveControl(person)}${person.rosterStatusKey === "scheduled" ? visitCheck(person) : ""}</p>
@@ -2086,10 +2117,17 @@ function specialNotes(person) {
   </label>`;
 }
 
-function contactFields(person) {
+function contactFields(person, details = false) {
   const phone = String(person.phone || "").trim();
   const email = String(person.email || "").trim();
+  const household = details ? `<label class="wide">Household
+      <textarea name="household" rows="4">${esc(person.household || "")}</textarea>
+    </label>
+    <label class="wide">Address
+      <textarea name="address" rows="3">${esc(person.sheetColumns?.Address || "")}</textarea>
+    </label>` : "";
   return `<form class="contact-fields" data-form="contact">
+    ${household}
     <div>
       <label>Phone <input name="phone" type="tel" autocomplete="off" inputmode="tel" value="${esc(phone)}" class="${phone ? "" : "is-missing"}"></label>
       <span class="contact-actions">
