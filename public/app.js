@@ -535,11 +535,16 @@ function openCalendarDay(iso) {
 }
 
 function peopleForDay(iso) {
-  const ids = new Set(state?.calendarMarks?.[iso]?.people || []);
+  const mark = state?.calendarMarks?.[iso] || {};
+  const ids = new Set(mark.people || []);
+  const prefer = new Set(mark.kinds || []);
   return state.people
     .filter((person) => ids.has(person.id))
     .slice()
-    .sort((a, b) => nameKey(a).localeCompare(nameKey(b), "en", { sensitivity: "base" }));
+    .sort((a, b) => {
+      const rank = (person) => (prefer.has(person.rosterStatusKey) ? 0 : 1);
+      return rank(a) - rank(b) || nameKey(a).localeCompare(nameKey(b), "en", { sensitivity: "base" });
+    });
 }
 
 function renderMessageInbox() {
