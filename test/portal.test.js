@@ -223,6 +223,9 @@ test("a phone number and email can be saved on a person", () => {
   assert.equal(state.people[0].sheetColumns.Assigned, "Ada Example, Bea Sample");
   assert.deepEqual(presentState(state, "2026-09").people[0].assigned, ["Ada Example", "Bea Sample"]);
   assert.equal(state.people[0].phone, "");
+  state = setPersonContact(state, "per_1", { assigned: ["Ada, Example", "Bea, Sample"] });
+  assert.equal(state.people[0].sheetColumns.Assigned, "Ada, Example | Bea, Sample");
+  assert.deepEqual(presentState(state, "2026-09").people[0].assigned, ["Ada, Example", "Bea, Sample"]);
   state = setPersonContact(state, "per_1", { assigned: ["Ada Example", "Ada Example"] });
   assert.equal(state.people[0].sheetColumns.Assigned, "Ada Example");
   state = setPersonContact(state, "per_1", { assigned: [] });

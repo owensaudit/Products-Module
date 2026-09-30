@@ -1402,9 +1402,28 @@ function youthEntryButton(entry) {
       ${visitedMark(person)}
       ${state.rosterMode ? statusSelect(person) : `<span class="pill ${person.outreachStatus}">${esc(STATUS_LABELS[person.outreachStatus])}</span>`}
       <small>${state.rosterMode ? rosterLine(person) : esc(latestLine(person))}</small>
+      ${ministeringLines(nameKey(person))}
     </div>`;
   }
-  return `<div class="person leader-row"><strong>${esc(entry.name)}</strong><small>${esc(entry.role)}</small></div>`;
+  return `<div class="person leader-row"><strong>${esc(entry.name)}</strong><small>${esc(entry.role)}</small>${ministeringLines(entry.name)}</div>`;
+}
+
+function ministeringLines(name) {
+  const key = String(name || "").trim().toLowerCase();
+  if (!key) return "";
+  const visits = youthVisits().filter((person) => String(person.assigned?.[0] || "").trim().toLowerCase() === key);
+  if (!visits.length) return "";
+  const companions = [];
+  for (const visit of visits) {
+    for (const item of visit.assigned || []) {
+      if (item.trim().toLowerCase() === key || companions.includes(item)) continue;
+      companions.push(item);
+    }
+  }
+  const companion = companions.length ? `<small>Companion ${esc(companions.join(" · "))}</small>` : "";
+  const families = visits.map((person) => nameKey(person)).filter(Boolean);
+  const assignments = families.length ? `<small>${esc(families.join(" · "))}</small>` : "";
+  return `${companion}${assignments}`;
 }
 
 function youthRosterSummary() {
@@ -1548,6 +1567,7 @@ function rosterLine(person) {
   if (person.priesthood) bits.push(esc(person.priesthood));
   if (person.reachOutDate) bits.push(`Reach out ${esc(person.reachOutDate)}`);
   if (person.appointment) bits.push(`Appt ${esc(person.appointment)}${placeMark(person.appointmentPlace)}`);
+  if (person.list === "youth" && person.assigned?.length) bits.push(esc(person.assigned.join(" · ")));
   const touch = lastTouch(person);
   if (touch) bits.push(esc(touch));
   return bits.join(" · ") || esc(person.sheetName || "");
@@ -1739,17 +1759,20 @@ function assignedCountButton(name, people = eldersPeople(), quorum = "") {
 }
 
 function assignmentFields(person) {
-  if (person.rosterStatusKey !== "scheduled") return "";
+  const youthVisit = person.list === "youth";
+  if (!youthVisit && person.rosterStatusKey !== "scheduled") return "";
   const assigned = person.assigned || [];
   const members = leaderNamesFor(person);
   const options = (selected) => {
     const extra = selected && !members.includes(selected) ? [selected] : [];
     return ["", ...members, ...extra].map((name) => `<option value="${esc(name)}" ${name === selected ? "selected" : ""}>${esc(name || "—")}</option>`).join("");
   };
+  const firstLabel = youthVisit ? "Assigned youth" : "First assigned presidency member";
+  const secondLabel = youthVisit ? "Companion" : "Second assigned presidency member";
   return `<form class="assign-row" data-form="assign">
     <span>Assigned</span>
-    <select name="assigned-1" aria-label="First assigned presidency member">${options(assigned[0] || "")}</select>
-    <select name="assigned-2" aria-label="Second assigned presidency member">${options(assigned[1] || "")}</select>
+    <select name="assigned-1" aria-label="${firstLabel}">${options(assigned[0] || "")}</select>
+    <select name="assigned-2" aria-label="${secondLabel}">${options(assigned[1] || "")}</select>
   </form>`;
 }
 
