@@ -1531,14 +1531,19 @@ function roleCard(person, kind, fallback = "") {
   return `<button type="button" class="role-card${tone}" data-action="select-person" data-id="${esc(person.id)}">${body}</button>`;
 }
 
-function ministeringCards(quorum) {
+function ministeringCards(quorum, membersOnly = false) {
   const rows = ministeringRows(quorum);
   if (!rows.length) return "";
+  const role = quorum === "teachers" ? "Teacher" : "Priest";
+  if (membersOnly) {
+    return `<div class="ministering-cards quorum-${quorum}">
+      ${rows.map((row) => roleCard(row.person, role)).join("")}
+    </div>`;
+  }
   return `<div class="ministering-cards quorum-${quorum}">
     ${rows.map((row) => {
       const companionName = ministeringCompanionValue(row.person, row.families);
       const companion = findPersonByName(companionName);
-      const role = quorum === "teachers" ? "Teacher" : "Priest";
       return `<section class="ministering-set">
         ${roleCard(row.person, role)}
         ${roleCard(companion, "Companion", companionName)}
@@ -1605,9 +1610,10 @@ function youthListMarkup() {
   const lists = youthVisibleLists();
   const single = lists.length === 1;
   return lists.map(([id, label, quorum]) => {
+    const membersOnly = single && (id === "priests-quorum" || id === "teachers-quorum");
     const body = id === "leaders"
       ? visibleLeaders().map((entry) => youthEntryButton(entry, entry.quorum)).join("")
-      : ministeringCards(quorum);
+      : ministeringCards(quorum, membersOnly);
     if (!body) return "";
     return `<section class="youth-list-block">
       ${single ? "" : `<h3>${esc(label)}</h3>`}
