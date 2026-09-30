@@ -545,8 +545,7 @@ body[data-page="youth"] .presidency-board input[name^="email-"] {
 
 .month-cal {
   justify-self: center;
-  transform: translateX(2rem);
-  width: min(100%, 320px);
+  width: min(100%, 280px);
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: 16px;
