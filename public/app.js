@@ -1018,10 +1018,9 @@ const YOUTH_SECTIONS = [
 ];
 
 const YOUTH_LISTS = [
-  ["priests-quorum", "Priests Quorum", "priests", "presidency"],
-  ["priests-adults", "Priests Quorum Adult Leaders", "priests", "adults"],
-  ["teachers-quorum", "Teachers Quorum", "teachers", "presidency"],
-  ["teachers-adults", "Teachers Quorum Adult Leaders", "teachers", "adults"],
+  ["priests-quorum", "Priests Quorum", "priests"],
+  ["teachers-quorum", "Teachers Quorum", "teachers"],
+  ["leaders", "Leaders", ""],
 ];
 
 const openYouthSections = new Set();
@@ -1412,25 +1411,61 @@ function youthVisibleLists() {
   return YOUTH_LISTS.filter(([id]) => id === youthList);
 }
 
-function youthListSize(quorum, section) {
-  if (section === "presidency") return youthMembers(quorum).length;
-  return youthRosterEntries(quorum, section).length;
+function youthLeaders() {
+  const entries = [];
+  for (const quorum of ["priests", "teachers"]) {
+    (state?.youthLeadership?.[quorum] || []).forEach((row, index) => {
+      const name = String(row.name || "").trim();
+      if (!name) return;
+      const role = String(row.role || "").trim();
+      if (role.toLowerCase() !== "president" && row.section !== "adults") return;
+      entries.push({ kind: "leader", name, role, quorum, index });
+    });
+  }
+  return entries;
+}
+
+function visibleLeaders() {
+  const needle = search.trim().toLowerCase();
+  return youthLeaders().filter((entry) => {
+    if (!needle) return true;
+    return `${entry.name} ${entry.role} ${entry.quorum}`.toLowerCase().includes(needle);
+  });
+}
+
+function youthListSize(id, quorum) {
+  if (id === "leaders") return youthLeaders().length;
+  return youthMembers(quorum).length;
 }
 
 function youthVisibleEntries() {
-  return youthVisibleLists().flatMap(([, , quorum, section]) => {
-    if (section === "presidency") return ministeringRows(quorum);
-    return youthRosterEntries(quorum, section).filter(youthEntryVisible);
-  });
+  if (youthList === "all") {
+    const seen = new Set();
+    const rows = [];
+    const add = (key, row) => {
+      const name = key.trim().toLowerCase();
+      if (!name || seen.has(name)) return;
+      seen.add(name);
+      rows.push(row);
+    };
+    for (const quorum of ["priests", "teachers"]) {
+      for (const row of ministeringRows(quorum)) add(nameKey(row.person), row);
+    }
+    for (const leader of visibleLeaders()) add(leader.name, leader);
+    return rows;
+  }
+  if (youthList === "leaders") return visibleLeaders();
+  const quorum = youthList === "teachers-quorum" ? "teachers" : "priests";
+  return ministeringRows(quorum);
 }
 
 function youthListMarkup() {
   const lists = youthVisibleLists();
   const single = lists.length === 1;
-  return lists.map(([, label, quorum, section]) => {
-    const body = section === "presidency"
-      ? ministeringTable(quorum)
-      : youthRosterEntries(quorum, section).filter(youthEntryVisible).map((entry) => youthEntryButton(entry, quorum)).join("");
+  return lists.map(([id, label, quorum]) => {
+    const body = id === "leaders"
+      ? visibleLeaders().map((entry) => youthEntryButton(entry, entry.quorum)).join("")
+      : ministeringTable(quorum);
     if (!body) return "";
     return `<section class="youth-list-block">
       ${single ? "" : `<h3>${esc(label)}</h3>`}
@@ -1452,7 +1487,8 @@ function youthEntryButton(entry, quorum = "") {
       ${ministeringLines(nameKey(person))}
     </div>`;
   }
-  return `<div class="person leader-row${tone}"><strong>${esc(entry.name)}</strong><small>${esc(entry.role)}</small>${ministeringLines(entry.name)}</div>`;
+  const place = entry.quorum === "teachers" ? "Teachers" : "Priests";
+  return `<div class="person leader-row${tone}"><strong>${esc(entry.name)}</strong><small>${esc(entry.role)}${entry.role ? ` · ${place}` : place}</small>${ministeringLines(entry.name)}</div>`;
 }
 
 function ministeringLines(name) {
@@ -1478,14 +1514,15 @@ function youthRosterSummary() {
   const archivedCount = visits.filter((person) => personIsArchived(person)).length;
   const activeCount = visits.length - archivedCount;
   const listsOpen = showingYouthLists();
-  const allCount = YOUTH_LISTS.reduce((sum, [, , quorum, section]) => sum + youthListSize(quorum, section), 0);
-  const listButtons = YOUTH_LISTS.map(([id, label, quorum, section]) => {
+  const names = new Set();
+  for (const person of [...youthMembers("priests"), ...youthMembers("teachers")]) names.add(nameKey(person).trim().toLowerCase());
+  for (const leader of youthLeaders()) names.add(leader.name.trim().toLowerCase());
+  const allCount = names.size;
+  const listButtons = YOUTH_LISTS.map(([id, label, quorum]) => {
     const pressed = listsOpen && youthList === id;
-    return `<button type="button" data-action="youth-list" data-list="${id}" aria-pressed="${pressed}">${esc(label)} ${youthListSize(quorum, section)}</button>`;
+    return `<button type="button" data-action="youth-list" data-list="${id}" aria-pressed="${pressed}">${esc(label)} ${youthListSize(id, quorum)}</button>`;
   }).join("");
-  const people = YOUTH_LISTS.flatMap(([, , quorum, section]) => youthRosterEntries(quorum, section))
-    .filter((entry) => entry.kind === "person")
-    .map((entry) => entry.person);
+  const people = [...youthMembers("priests"), ...youthMembers("teachers")];
   const offices = [...new Set(people.map((person) => person.priesthood).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const allPressed = listsOpen && youthList === "all";
   const visitPressed = !listsOpen && !archiveOpen && !viewAll && !assigneeFilter && !dayFilter && statusFilter === "all";
