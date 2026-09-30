@@ -14,6 +14,7 @@ import {
   emptyState,
   importRows,
   logOutreach,
+  updateOutreach,
   presentState,
   setAppointment,
   setReachOutDate,
@@ -167,6 +168,13 @@ export function createPortalServer(store) {
 
         if (pathname === "/api/presidency") {
           const next = await store.update((state) => setPresidency(state, body.members));
+          sendJson(response, 200, presentState(next, month, viewOptions));
+          return;
+        }
+
+        const outreachEdit = pathname.match(/^\/api\/outreach\/([^/]+)$/);
+        if (outreachEdit) {
+          const next = await store.update((state) => updateOutreach(state, decodeURIComponent(outreachEdit[1]), body));
           sendJson(response, 200, presentState(next, month, viewOptions));
           return;
         }

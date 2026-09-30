@@ -18,6 +18,7 @@ import {
   emptyState,
   importRows,
   logOutreach,
+  updateOutreach,
   setAppointment,
   setReachOutDate,
   setPersonContact,
@@ -462,6 +463,13 @@ test("an outreach row records a presidency member, how they reached out, and the
   assert.equal(state.outreachAttempts[1].channel, "text");
   assert.equal(state.outreachAttempts[1].date, "2026-08-28");
   assert.equal(state.outreachAttempts[1].sheetColumns.By, undefined);
+  const edited = updateOutreach(state, state.outreachAttempts[0].id, { by: "Tyler Sanders", channel: "phone", date: "2026-09-30" });
+  assert.equal(edited.outreachAttempts[0].sheetColumns.By, "Tyler Sanders");
+  assert.equal(edited.outreachAttempts[0].channel, "phone");
+  assert.equal(edited.outreachAttempts[0].date, "2026-09-30");
+  const cleared = updateOutreach(edited, edited.outreachAttempts[0].id, { by: "", channel: "text", date: "9/1/2026" });
+  assert.equal(cleared.outreachAttempts[0].sheetColumns.By, undefined);
+  assert.equal(cleared.outreachAttempts[0].date, "2026-09-01");
 
   state = setPresidency(state, [
     { name: "Mark Lillenberg", role: "changed" },

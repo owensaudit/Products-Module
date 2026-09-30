@@ -579,7 +579,9 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
 }
 
 .outreach-add select,
-.outreach-add input[type="date"] {
+.outreach-add input[type="date"],
+.outreach-edit select,
+.outreach-edit input[type="date"] {
   width: 100%;
   background: #f6f1e6;
   border: 0;

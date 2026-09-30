@@ -81,6 +81,19 @@ app.addEventListener("change", (event) => {
     applyStatus(target.dataset.personId, target.value);
     return;
   }
+  const editRow = target.closest?.("[data-outreach-edit]");
+  if (editRow) {
+    const by = editRow.querySelector("[name=by]").value;
+    const channel = editRow.querySelector("[name=channel]").value;
+    const date = editRow.querySelector("[name=date]").value;
+    if (channel && date) {
+      post(`/api/outreach/${editRow.dataset.id}`, { by, channel, date }).then((next) => {
+        state = next;
+        render();
+      }).catch(showError);
+    }
+    return;
+  }
   const addRow = target.closest?.("[data-outreach-add]");
   if (addRow) {
     const by = addRow.querySelector("[name=by]").value;
@@ -1290,11 +1303,7 @@ function attemptList(person) {
 function outreachTable(attempts) {
   const person = selectedPerson();
   const members = state.presidency || [];
-  const rows = attempts.map((attempt) => `<div class="cell-row">
-      <span>${esc(whoLabel(attempt) || "—")}</span>
-      <span>${esc(CHANNEL_LABELS[attempt.channel] || attempt.channel)}</span>
-      <span>${esc(formatShortDate(attempt.date))}</span>
-    </div>`).join("");
+  const rows = attempts.map((attempt) => outreachEditRow(attempt)).join("");
   return `<div class="cell-table">
     <div class="cell-row outreach-add" data-outreach-add data-person-id="${esc(person?.id || "")}">
       <select name="by" aria-label="Who">
@@ -1311,6 +1320,25 @@ function outreachTable(attempts) {
       <input name="date" type="date" aria-label="Date">
     </div>
     ${rows}
+  </div>`;
+}
+
+function outreachEditRow(attempt) {
+  const members = state.presidency || [];
+  const who = whoLabel(attempt);
+  const names = [...new Set([who, ...members.map((member) => member.name)].filter(Boolean))];
+  const channels = ["text", "phone", "email", "in_person"];
+  if (attempt.channel === "driveby") channels.push("driveby");
+  const option = (value, label, selected) => `<option value="${esc(value)}" ${selected ? "selected" : ""}>${esc(label)}</option>`;
+  return `<div class="cell-row outreach-edit" data-outreach-edit data-id="${esc(attempt.id)}">
+    <select name="by" aria-label="Who">
+      ${option("", "—", !who)}
+      ${names.map((name) => option(name, name, name === who)).join("")}
+    </select>
+    <select name="channel" aria-label="How">
+      ${channels.map((key) => option(key, CHANNEL_LABELS[key] || key, key === attempt.channel)).join("")}
+    </select>
+    <input name="date" type="date" aria-label="Date" value="${esc(attempt.date || "")}">
   </div>`;
 }
 
