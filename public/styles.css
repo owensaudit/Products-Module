@@ -939,7 +939,7 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
   min-width: 0;
 }
 
-.person-list { display: grid; gap: 8px; min-width: 0; overflow-x: auto; }
+.person-list { display: grid; gap: 8px; min-width: 0; overflow-x: auto; padding: 4px; }
 
 .youth-list-block { display: grid; gap: 8px; }
 .youth-list-block + .youth-list-block { margin-top: 16px; }
@@ -1223,8 +1223,20 @@ button.mark-visited {
 .person.do_not_contact, .person.not_interested { background: var(--rose-soft); }
 .person.no_response { background: var(--status-peach); }
 .person.none, .person.not_contacted { background: var(--status-none); }
-.person.to-visit.none, .person.to-visit.not_contacted { background: var(--status-peach); color: #6a3412; }
-.person.to-visit.none small, .person.to-visit.not_contacted small { color: #6a3412; }
+.person.to-visit {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 0 0 3px var(--status-peach);
+}
+.person.to-visit small { color: var(--muted); }
+.person.to-visit > .visited-check { color: #14643a; }
+.status-line {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: start;
+}
 .person.moved, .person.no_contact_info { background: #ece7dc; }
 .person.mission { background: var(--blue-soft); }
 

@@ -1668,13 +1668,20 @@ function personButtons(people = filteredPeople()) {
     const label = statusFilter === "all" ? "this search" : STATUS_LABELS[statusFilter];
     return `<p class="empty">No one is in ${esc(label)}.${archiveOpen ? "" : " Choose Everyone to see the full roster."}</p>`;
   }
-  return people.map((person) => `<div class="person ${state.rosterMode ? person.rosterStatusKey : person.outreachStatus}${person.list === "youth" ? " to-visit" : ""}" data-action="select-person" data-id="${esc(person.id)}" aria-current="${person.id === selectedPersonId}">
+  return people.map((person) => {
+    const youthVisit = person.list === "youth";
+    const confirmVisit = youthVisit && state.rosterMode && person.rosterStatusKey === "scheduled";
+    const statusControl = state.rosterMode
+      ? (confirmVisit ? `<span class="status-line">${statusSelect(person)}${visitCheck(person)}</span>` : statusSelect(person))
+      : `<span class="pill ${person.outreachStatus}">${esc(STATUS_LABELS[person.outreachStatus])}</span>`;
+    return `<div class="person ${state.rosterMode ? person.rosterStatusKey : person.outreachStatus}${youthVisit ? " to-visit" : ""}" data-action="select-person" data-id="${esc(person.id)}" aria-current="${person.id === selectedPersonId}">
       ${outreachMarks(person) ? `<span class="card-marks">${outreachMarks(person)}</span>` : ""}
       <strong>${esc(personLabel(person))}</strong>
-      ${visitedMark(person)}
-      ${state.rosterMode ? statusSelect(person) : `<span class="pill ${person.outreachStatus}">${esc(STATUS_LABELS[person.outreachStatus])}</span>`}
+      ${confirmVisit ? "" : visitedMark(person)}
+      ${statusControl}
       <small>${state.rosterMode ? rosterLine(person) : esc(latestLine(person))}</small>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 }
 
 const ACTIVE_CHOICES = [
@@ -1759,7 +1766,7 @@ function phoneIcon() {
 }
 
 function visitCheck(person) {
-  return `<button type="button" class="mark-visited" data-action="mark-visited" data-person-id="${esc(person.id)}" aria-label="Mark visited">✓</button>`;
+  return `<button type="button" class="mark-visited" data-action="mark-visited" data-person-id="${esc(person.id)}" aria-label="Confirm visit">✓</button>`;
 }
 
 function rosterLine(person) {
@@ -1913,8 +1920,10 @@ function youthAssignmentVisit(family) {
 }
 
 function assignmentDetail(person) {
+  const confirm = person.rosterStatusKey === "scheduled" ? visitCheck(person) : "";
   return `${personNameField(person)}
     <p class="muted">Assignment</p>
+    <p class="status-row">${statusSelect(person)}${confirm}</p>
     ${contactFields(person, true)}
     ${assignmentFields(person)}
     <h3>Outreach</h3>
