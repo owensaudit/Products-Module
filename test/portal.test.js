@@ -8,6 +8,7 @@ import { suggestMapping } from "../lib/fields.js";
 import {
   CALENDAR_NAME,
   PRESIDENCY,
+  activePresidency,
   addComment,
   emptyState,
   importRows,
@@ -241,16 +242,39 @@ test("an outreach row records a presidency member, how they reached out, and the
   assert.equal(state.outreachAttempts[0].sheetColumns.By, "Josh Owens");
 
   state = setPresidency(state, [
-    { name: "Mark Lillenberg", role: "EQ President" },
-    { name: "Tyler Sanders", role: "EQ Counselor" },
-    { name: "Brad Conger", role: "EQ Counselor" },
-    { name: "Ada Example", role: "EQ Secretary" },
-    { name: "Harrison Bardo", role: "EQ Assistant Secretary" },
+    { name: "Mark Lillenberg", role: "changed" },
+    { name: "Tyler Sanders" },
+    { name: "Brad Conger" },
+    { name: "Ada Example" },
+    { name: "Harrison Bardo" },
   ]);
   const view = presentState(state, "2026-09");
+  assert.deepEqual(view.presidency.map((member) => member.role), [
+    "EQ President",
+    "EQ 1st Counselor",
+    "EQ 2nd Counselor",
+    "EQ Secretary",
+    "EQ Asst. Secretary",
+  ]);
   assert.equal(view.presidency[3].name, "Ada Example");
-  assert.equal(view.presidency[3].role, "EQ Secretary");
   assert.equal(view.presidency.length, 5);
+
+  const migrated = activePresidency({
+    presidency: [
+      { name: "Mark Lillenberg", role: "EQ President" },
+      { name: "Tyler Sanders", role: "EQ Counselor" },
+      { name: "Brad Conger", role: "EQ Counselor" },
+      { name: "Josh Owens", role: "EQ Assistant Secretary" },
+      { name: "Harrison Bardo", role: "EQ Secretary" },
+    ],
+  });
+  assert.deepEqual(migrated.map((member) => `${member.role}: ${member.name}`), [
+    "EQ President: Mark Lillenberg",
+    "EQ 1st Counselor: Tyler Sanders",
+    "EQ 2nd Counselor: Brad Conger",
+    "EQ Secretary: Harrison Bardo",
+    "EQ Asst. Secretary: Josh Owens",
+  ]);
 });
 
 test("the fresh portal and the csv template contain no member rows", async () => {

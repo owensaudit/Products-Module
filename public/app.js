@@ -304,7 +304,6 @@ presidencyHost?.addEventListener("submit", (event) => {
   const data = new FormData(event.target);
   const members = (state?.presidency || []).map((_, index) => ({
     name: data.get(`name-${index}`),
-    role: data.get(`role-${index}`),
   }));
   post("/api/presidency", { members }).then((next) => {
     state = next;
@@ -334,11 +333,13 @@ function renderPresidency() {
   }
   presidencyHost.innerHTML = `<form class="presidency-board">
     <p class="eyebrow">EQ Presidency</p>
+    <div class="pres-row pres-head"><span>Name</span><span>Position</span></div>
     ${members.map((member, index) => `<div class="pres-row">
-      <label>Name <input name="name-${index}" value="${esc(member.name)}" required autocomplete="off"></label>
-      <label>Position <input name="role-${index}" value="${esc(member.role)}" required autocomplete="off"></label>
+      <label class="visually-hidden" for="pres-name-${index}">${esc(member.role)}</label>
+      <input id="pres-name-${index}" name="name-${index}" value="${esc(member.name)}" required autocomplete="off" aria-label="${esc(member.role)} name">
+      <p class="position">${esc(member.role)}</p>
     </div>`).join("")}
-    <button class="primary" type="submit">Save presidency</button>
+    <button class="primary" type="submit">Save names</button>
   </form>`;
 }
 
