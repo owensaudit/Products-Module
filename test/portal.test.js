@@ -235,20 +235,25 @@ test("a brother sheet keeps names filterable and hides contact details", () => {
 test("calendar marks visit days in green and reach-out days in gold", () => {
   const marks = calendarMarks({
     people: [
-      { rosterStatusKey: "scheduled", appointment: "10/21 7:00 PM" },
-      { rosterStatusKey: "visited", appointment: "07/03 5:30 PM" },
+      { id: "ada", rosterStatusKey: "scheduled", appointment: "10/21 7:00 PM" },
+      { id: "bea", rosterStatusKey: "visited", appointment: "07/03 5:30 PM" },
     ],
-    outreachAttempts: [{ date: "2026-09-29" }, { date: "2026-09-10" }, { date: "2026-10-21" }],
+    outreachAttempts: [
+      { personId: "cy", date: "2026-09-29" },
+      { personId: "cy", date: "2026-09-29" },
+      { personId: "dee", date: "2026-09-10" },
+      { personId: "ada", date: "2026-10-21" },
+    ],
     visits: [
-      { date: "2026-09-16", status: "scheduled" },
-      { date: "2026-09-02", status: "completed" },
+      { personId: "eve", date: "2026-09-16", status: "scheduled" },
+      { personId: "finn", date: "2026-09-02", status: "completed" },
     ],
   });
-  assert.deepEqual(marks["2026-10-21"], ["scheduled", "reach_out"]);
+  assert.deepEqual(marks["2026-10-21"], { kinds: ["scheduled", "reach_out"], people: ["ada"] });
   assert.equal(marks["2026-07-03"], undefined);
-  assert.deepEqual(marks["2026-09-29"], ["reach_out"]);
-  assert.deepEqual(marks["2026-09-10"], ["reach_out"]);
-  assert.deepEqual(marks["2026-09-16"], ["scheduled"]);
+  assert.deepEqual(marks["2026-09-29"], { kinds: ["reach_out"], people: ["cy"] });
+  assert.deepEqual(marks["2026-09-10"], { kinds: ["reach_out"], people: ["dee"] });
+  assert.deepEqual(marks["2026-09-16"], { kinds: ["scheduled"], people: ["eve"] });
   assert.equal(marks["2026-09-02"], undefined);
 
   const sheet = [
@@ -256,8 +261,8 @@ test("calendar marks visit days in green and reach-out days in gold", () => {
     "Example, Ada\t10/21 7:00 PM\t\tScheduled\tElder\t40\t1 Jan 1986\t\t\tJO\t09/29\tText",
   ].join("\n");
   const view = presentState(brotherSheetToState(sheet, deps()), "2026-09");
-  assert.deepEqual(view.calendarMarks["2026-10-21"], ["scheduled"]);
-  assert.deepEqual(view.calendarMarks["2026-09-29"], ["reach_out"]);
+  assert.deepEqual(view.calendarMarks["2026-10-21"], { kinds: ["scheduled"], people: [view.people[0].id] });
+  assert.deepEqual(view.calendarMarks["2026-09-29"], { kinds: ["reach_out"], people: [view.people[0].id] });
 });
 
 test("an outreach row records a presidency member, how they reached out, and the date", () => {

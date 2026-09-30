@@ -34,6 +34,7 @@ let statusFilter = "all";
 let officeFilter = "all";
 let appointmentFilter = "all";
 let search = "";
+let dayFilter = "";
 let selectedPersonId = null;
 let selectedSlotId = null;
 let detailForm = null;
@@ -95,6 +96,7 @@ app.addEventListener("change", (event) => {
   if (target.dataset.action === "office") officeFilter = target.value;
   if (target.dataset.action === "appointment") appointmentFilter = target.value;
   if (target.dataset.action === "office" || target.dataset.action === "appointment") {
+    dayFilter = "";
     view = "people";
     const current = selectedPerson();
     if (current && !personMatchesFilters(current)) selectedPersonId = null;
@@ -149,6 +151,7 @@ app.addEventListener("click", (event) => {
   } else if (action === "filter") {
     statusFilter = button.dataset.status;
     search = "";
+    dayFilter = "";
     view = "people";
     const current = selectedPerson();
     if (current && !personMatchesFilters(current)) selectedPersonId = null;
@@ -392,6 +395,12 @@ presidencyHost?.addEventListener("submit", (event) => {
   event.preventDefault();
 });
 
+document.querySelector("#month-calendar")?.addEventListener("click", (event) => {
+  const day = event.target.closest("[data-action='open-day']");
+  if (!day) return;
+  openCalendarDay(day.dataset.date);
+});
+
 function render() {
   renderPresidency();
   renderCalendar();
@@ -441,7 +450,9 @@ function renderCalendar() {
   for (let index = 0; index < firstWeekday; index += 1) cells.push(`<span class="cal-day is-empty"></span>`);
   for (let day = 1; day <= daysInMonth; day += 1) {
     const iso = `${monthKey}-${String(day).padStart(2, "0")}`;
-    const kinds = marks[iso] || [];
+    const mark = marks[iso] || {};
+    const kinds = mark.kinds || [];
+    const people = mark.people || [];
     const dots = kinds.map((kind) => {
       const label = kind === "scheduled" ? "Visit scheduled" : "Reach out";
       return `<span class="cal-dot ${kind}" title="${label}"></span>`;
@@ -450,10 +461,14 @@ function renderCalendar() {
     if (kinds.includes("scheduled")) described.push("visit scheduled");
     if (kinds.includes("reach_out")) described.push("reach out");
     const today = day === now.getDate() ? " is-today" : "";
-    cells.push(`<span class="cal-day${today}" data-date="${iso}" data-marks="${esc(kinds.join(" "))}" aria-label="${esc(described.join(", "))}">
-      <span class="cal-marks">${dots}</span>
-      <span class="cal-num">${day}</span>
-    </span>`);
+    const open = dayFilter === iso ? " is-open" : "";
+    const inner = `<span class="cal-marks">${dots}</span><span class="cal-num">${day}</span>`;
+    if (people.length) {
+      described.push("show the brothers for this day");
+      cells.push(`<button type="button" class="cal-day${today}${open}" data-action="open-day" data-date="${iso}" data-marks="${esc(kinds.join(" "))}" aria-pressed="${dayFilter === iso}" aria-label="${esc(described.join(", "))}">${inner}</button>`);
+    } else {
+      cells.push(`<span class="cal-day${today}" data-date="${iso}" data-marks="${esc(kinds.join(" "))}" aria-label="${esc(described.join(", "))}">${inner}</span>`);
+    }
   }
   host.innerHTML = `<p class="cal-title">${esc(title)}</p>
     <div class="cal-grid">${cells.join("")}</div>
@@ -461,6 +476,30 @@ function renderCalendar() {
       <span><i class="cal-dot scheduled"></i> Visit scheduled</span>
       <span><i class="cal-dot reach_out"></i> Reach out</span>
     </p>`;
+}
+
+function openCalendarDay(iso) {
+  const people = peopleForDay(iso);
+  if (!people.length) return;
+  dayFilter = iso;
+  statusFilter = "all";
+  officeFilter = "all";
+  appointmentFilter = "all";
+  search = "";
+  view = "people";
+  detailForm = null;
+  selectedPersonId = people[0].id;
+  render();
+  document.querySelector(".person[aria-current='true']")?.scrollIntoView({ block: "nearest" });
+  document.querySelector(".layout .card:last-child")?.scrollIntoView({ block: "nearest" });
+}
+
+function peopleForDay(iso) {
+  const ids = new Set(state?.calendarMarks?.[iso]?.people || []);
+  return state.people
+    .filter((person) => ids.has(person.id))
+    .slice()
+    .sort((a, b) => nameKey(a).localeCompare(nameKey(b), "en", { sensitivity: "base" }));
 }
 
 function rosterNeeded() {
@@ -566,7 +605,7 @@ function countStatuses() {
 
 function peopleView() {
   const people = filteredPeople();
-  const title = statusFilter === "all" ? "People" : STATUS_LABELS[statusFilter];
+  const title = dayFilter ? formatDate(dayFilter) : statusFilter === "all" ? "People" : STATUS_LABELS[statusFilter];
   const showDetail = !state.rosterMode || Boolean(selectedPersonId) || detailForm === "add-person";
   return `<section class="layout${showDetail ? "" : " layout-single"}">
     <div class="card" id="people-card">
@@ -645,7 +684,9 @@ function personMatchesFilters(person) {
 
 function filteredPeople() {
   const needle = search.trim().toLowerCase();
+  const dayIds = dayFilter ? new Set(state.calendarMarks?.[dayFilter]?.people || []) : null;
   return state.people
+    .filter((person) => !dayIds || dayIds.has(person.id))
     .filter((person) => personMatchesFilters(person))
     .filter((person) => {
       if (!needle) return true;
