@@ -1510,12 +1510,23 @@ function findPersonByName(name) {
   return (state?.people || []).find((person) => nameKey(person).trim().toLowerCase() === key) || null;
 }
 
+function contactLines(person) {
+  if (!person) return "";
+  const lines = [
+    String(person.household || "").trim(),
+    String(person.sheetColumns?.Address || "").trim(),
+    String(person.phone || "").trim(),
+    String(person.email || "").trim(),
+  ].filter(Boolean);
+  return lines.map((line) => `<small class="contact-line">${esc(line)}</small>`).join("");
+}
+
 function roleCard(person, kind, fallback = "") {
   const title = person ? nameKey(person) : fallback;
   if (!title) return "";
-  const street = String(person?.sheetColumns?.Address || "").split("\n").find((line) => line.trim()) || "";
   const tone = kind === "Assignment" ? " role-assignment" : "";
-  const body = `<span class="role-kicker">${esc(kind)}</span><strong>${esc(title)}</strong>${street ? `<small>${esc(street)}</small>` : ""}`;
+  const facts = kind === "Assignment" ? contactLines(person) : "";
+  const body = `<span class="role-kicker">${esc(kind)}</span><strong>${esc(title)}</strong>${facts}`;
   if (!person) return `<article class="role-card${tone}">${body}</article>`;
   return `<button type="button" class="role-card${tone}" data-action="select-person" data-id="${esc(person.id)}">${body}</button>`;
 }
@@ -1687,6 +1698,7 @@ function personButtons(people = filteredPeople()) {
       <strong>${esc(personLabel(person))}</strong>
       ${confirmVisit ? "" : visitedMark(person)}
       ${statusControl}
+      ${youthVisit ? contactLines(person) : ""}
       <small>${state.rosterMode ? rosterLine(person) : esc(latestLine(person))}</small>
     </div>`;
   }).join("");
@@ -1783,8 +1795,6 @@ function rosterLine(person) {
   if (person.reachOutDate) bits.push(`Reach out ${esc(person.reachOutDate)}`);
   if (person.appointment) bits.push(`Appt ${esc(person.appointment)}${placeMark(person.appointmentPlace)}`);
   if (person.list === "youth" && person.assigned?.length) bits.push(esc(person.assigned.join(" · ")));
-  if (person.list === "youth" && person.household) bits.push(esc(String(person.household).split("\n").filter(Boolean).join(", ")));
-  if (person.list === "youth" && person.sheetColumns?.Address) bits.push(esc(String(person.sheetColumns.Address).split("\n").find((line) => line.trim()) || ""));
   const touch = lastTouch(person);
   if (touch) bits.push(esc(touch));
   return bits.join(" · ") || esc(person.sheetName || "");

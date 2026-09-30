@@ -978,6 +978,7 @@ article.role-card { cursor: default; }
   text-transform: uppercase;
 }
 .role-card small { color: var(--muted); }
+.contact-line { white-space: pre-line; }
 .ministering-cards.quorum-priests .role-card { box-shadow: 0 0 0 3px #ffe56a; }
 .ministering-cards.quorum-teachers .role-card { box-shadow: 0 0 0 3px #3caf62; }
 .role-card.role-assignment,
