@@ -178,6 +178,10 @@ test("a phone number and email can be saved on a person", () => {
   state = setPersonContact(state, "per_1", { phone: " ", email: "" });
   assert.equal(state.people[0].phone, "");
   assert.equal(state.people[0].email, "");
+  assert.equal(state.people[0].notes, "Drive by and knock");
+  state = setPersonContact(state, "per_1", { notes: "  Knock first  " });
+  assert.equal(state.people[0].notes, "Knock first");
+  assert.equal(state.people[0].phone, "");
 });
 
 test("moved, mission, do not contact, not interested, no contact info, declined, and visited are archive statuses", () => {

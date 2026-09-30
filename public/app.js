@@ -367,14 +367,14 @@ app.addEventListener("input", (event) => {
     search = event.target.value;
     renderPeopleList();
   }
-  if (event.target.closest?.("form[data-form='contact']")) {
+  if (event.target.closest?.("form[data-form='contact'], .special-notes")) {
     clearTimeout(contactTimer);
     contactTimer = setTimeout(saveContactFields, 400);
   }
 });
 
 app.addEventListener("focusout", (event) => {
-  if (!event.target.closest?.("form[data-form='contact']")) return;
+  if (!event.target.closest?.("form[data-form='contact'], .special-notes")) return;
   clearTimeout(contactTimer);
   saveContactFields();
 });
@@ -512,42 +512,51 @@ document.querySelector("#message-inbox")?.addEventListener("click", () => {
 
 let contactTimer = null;
 
+function contactCard() {
+  return document.querySelector(".layout .card:last-child");
+}
+
 function readContactDraft() {
-  const form = document.activeElement?.closest?.("form[data-form='contact']");
-  if (!form) return null;
+  const card = contactCard();
   const field = document.activeElement;
+  if (!card || !field || !card.contains(field)) return null;
+  if (!field.closest?.("form[data-form='contact'], .special-notes")) return null;
   return {
     personId: selectedPersonId,
-    field: field?.name || "",
-    phone: form.querySelector("[name=phone]")?.value ?? "",
-    email: form.querySelector("[name=email]")?.value ?? "",
-    start: field?.selectionStart,
-    end: field?.selectionEnd,
+    field: field.name || "",
+    notes: card.querySelector(".special-notes [name=notes]")?.value ?? "",
+    phone: card.querySelector("form[data-form='contact'] [name=phone]")?.value ?? "",
+    email: card.querySelector("form[data-form='contact'] [name=email]")?.value ?? "",
+    start: field.selectionStart,
+    end: field.selectionEnd,
   };
 }
 
 function restoreContactDraft(draft) {
   if (!draft || draft.personId !== selectedPersonId) return;
-  const form = document.querySelector("form[data-form='contact']");
-  if (!form) return;
-  const phone = form.querySelector("[name=phone]");
-  const email = form.querySelector("[name=email]");
+  const card = contactCard();
+  if (!card) return;
+  const notes = card.querySelector(".special-notes [name=notes]");
+  const phone = card.querySelector("form[data-form='contact'] [name=phone]");
+  const email = card.querySelector("form[data-form='contact'] [name=email]");
+  if (notes) notes.value = draft.notes;
   if (phone) phone.value = draft.phone;
   if (email) email.value = draft.email;
-  const field = form.querySelector(`[name="${draft.field}"]`);
-  if (!(field instanceof HTMLInputElement)) return;
+  const field = card.querySelector(`[name="${draft.field}"]`);
+  if (!(field instanceof HTMLInputElement) && !(field instanceof HTMLTextAreaElement)) return;
   field.focus();
   if (typeof draft.start === "number" && typeof draft.end === "number") field.setSelectionRange(draft.start, draft.end);
 }
 
 function saveContactFields() {
-  const form = document.querySelector("form[data-form='contact']");
-  if (!form || !selectedPersonId) return;
-  const phone = form.querySelector("[name=phone]")?.value.trim() ?? "";
-  const email = form.querySelector("[name=email]")?.value.trim() ?? "";
+  const card = contactCard();
+  if (!card || !selectedPersonId) return;
+  const notes = card.querySelector(".special-notes [name=notes]")?.value.trim() ?? "";
+  const phone = card.querySelector("form[data-form='contact'] [name=phone]")?.value.trim() ?? "";
+  const email = card.querySelector("form[data-form='contact'] [name=email]")?.value.trim() ?? "";
   const person = selectedPerson();
-  if (person && phone === (person.phone || "") && email === (person.email || "")) return;
-  post(`/api/people/${selectedPersonId}/contact`, { phone, email }).then((next) => {
+  if (person && notes === (person.notes || "") && phone === (person.phone || "") && email === (person.email || "")) return;
+  post(`/api/people/${selectedPersonId}/contact`, { notes, phone, email }).then((next) => {
     state = next;
   }).catch(showError);
 }
@@ -1016,8 +1025,8 @@ function rosterDetail(person) {
   const facts = [person.priesthood, person.age ? `Age ${person.age}` : "", person.birthday ? `Birthday ${person.birthday}` : ""].filter(Boolean);
   return `<h2>${esc(personLabel(person))}</h2>
     ${specialNotes(person)}
-    ${contactFields(person)}
     <p class="status-row">${statusSelect(person)}${archiveControl(person)}</p>
+    ${contactFields(person)}
     ${facts.length ? `<p>${esc(facts.join(" · "))}</p>` : ""}
     ${planLine(person)}
     ${planForm(person)}
@@ -1088,8 +1097,9 @@ function appointmentParts(appointment) {
 }
 
 function specialNotes(person) {
-  if (!person.notes) return "";
-  return `<p class="special-notes"><span>Special notes</span> ${esc(person.notes)}</p>`;
+  return `<label class="special-notes">Special notes
+    <textarea name="notes" rows="2">${esc(person.notes || "")}</textarea>
+  </label>`;
 }
 
 function contactFields(person) {

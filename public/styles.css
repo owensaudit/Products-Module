@@ -157,15 +157,17 @@ h1 { margin: 0; font-size: 40px; line-height: 1.05; }
 
 .special-notes {
   margin: 2px 0 10px;
-  line-height: 1.4;
-}
-
-.special-notes span {
-  display: block;
-  margin-bottom: 2px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
+  line-height: 1.4;
+}
+
+.special-notes textarea {
+  min-height: 44px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 400;
 }
 
 .contact-fields {
