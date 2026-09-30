@@ -973,10 +973,10 @@ function rosterSummary() {
   const offices = [...new Set(cohort.map((person) => person.priesthood).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const archiveButton = `<button type="button" class="archive-toggle" data-action="archive" aria-pressed="${!viewAll && archiveOpen}">Archive ${archivedCount}</button>`;
   const visitButton = archiveOpen && !viewAll
-    ? `<button type="button" data-action="show-people">People to Visit ${activeCount}</button>`
-    : filterButton("all", activeCount, "People to Visit");
+    ? `<button type="button" data-action="show-people">To Visit ${activeCount}</button>`
+    : filterButton("all", activeCount, "To Visit");
   const statusButtons = keys.map((key) => filterButton(key, counts[key] || 0, STATUS_LABELS[key] || key)).join("");
-  const allButton = `<button type="button" data-action="view-all" aria-pressed="${viewAll}">All People ${state.people.length}</button>`;
+  const allButton = `<button type="button" data-action="view-all" aria-pressed="${viewAll}">All ${state.people.length}</button>`;
   return `<div class="summary" aria-label="Brother filters">
     ${allButton}
     ${visitButton}
@@ -1003,7 +1003,7 @@ function countStatuses() {
 
 function peopleView() {
   const people = filteredPeople();
-  const title = viewAll ? "All People" : dayFilter ? formatDate(dayFilter) : archiveOpen && statusFilter === "all" ? "Archive" : statusFilter === "all" ? "People to Visit" : STATUS_LABELS[statusFilter];
+  const title = viewAll ? "All" : dayFilter ? formatDate(dayFilter) : archiveOpen && statusFilter === "all" ? "Archive" : statusFilter === "all" ? "To Visit" : STATUS_LABELS[statusFilter];
   const showDetail = !state.rosterMode || Boolean(selectedPersonId) || detailForm === "add-person";
   return `<section class="layout${showDetail ? "" : " layout-single"}">
     <div class="card" id="people-card">
