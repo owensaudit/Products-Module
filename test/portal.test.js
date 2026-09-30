@@ -19,6 +19,7 @@ import {
   importRows,
   logOutreach,
   setAppointment,
+  setReachOutDate,
   setPersonStatus,
   setPresidency,
   personOutreachStatus,
@@ -115,6 +116,27 @@ test("an appointment is a date and time that marks the brother scheduled", () =>
   assert.deepEqual(presentState(state, "2027-10").calendarMarks["2027-10-21"], { kinds: ["scheduled"], people: ["per_1"] });
   assert.equal(presentState(state, "2026-10").calendarMarks["2026-10-21"], undefined);
   assert.throws(() => setAppointment(state, "per_1", { date: "2026-10-21", time: "7pm" }), /HH:MM/);
+});
+
+test("a reach out needs a date and marks that calendar day", () => {
+  let state = emptyState();
+  state = {
+    ...state,
+    people: [{ id: "per_1", displayName: "Ada Example", phone: "", email: "", household: "", notes: "", sheetColumns: {}, createdAt: "2026-09-29T12:00:00.000Z", updatedAt: "2026-09-29T12:00:00.000Z" }],
+  };
+  state = setReachOutDate(state, "per_1", { date: "2026-10-05" });
+  assert.equal(state.people[0].sheetColumns["Reach Out Date"], "10/5");
+  assert.equal(state.people[0].sheetColumns.Status, "Reach Out");
+  const view = presentState(state, "2026-10");
+  assert.equal(view.people[0].reachOutDate, "10/5");
+  assert.equal(view.people[0].rosterStatusKey, "reach_out");
+  assert.deepEqual(view.calendarMarks["2026-10-05"], { kinds: ["reach_out"], people: ["per_1"] });
+  state = setReachOutDate(state, "per_1", { date: "10/5/2027" });
+  assert.equal(state.people[0].sheetColumns["Reach Out Date"], "10/5/2027");
+  assert.deepEqual(presentState(state, "2027-10").calendarMarks["2027-10-05"], { kinds: ["reach_out"], people: ["per_1"] });
+  state = setPersonStatus(state, "per_1", "Visited");
+  assert.equal(presentState(state, "2027-10").calendarMarks["2027-10-05"], undefined);
+  assert.throws(() => setReachOutDate(state, "per_1", { date: "soon" }), /Reach out date/);
 });
 
 test("comments attach to a person or a visit", () => {

@@ -35,6 +35,7 @@ let officeFilter = "all";
 let appointmentFilter = "all";
 let search = "";
 let dayFilter = "";
+let focusReachOutDate = false;
 let messagesOpen = false;
 let editingCommentId = "";
 let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -70,6 +71,7 @@ if (monthInput) {
 app.addEventListener("change", (event) => {
   const target = event.target;
   if (target instanceof HTMLSelectElement && target.classList.contains("status-pill")) {
+    if (target.value === "Reach Out") focusReachOutDate = true;
     post(`/api/people/${target.dataset.personId}/status`, { status: target.value }).then((next) => {
       state = next;
       render();
@@ -267,6 +269,20 @@ app.addEventListener("submit", (event) => {
       selectedSlotId = slotValue;
       view = "month";
       detailForm = "visit";
+      render();
+    }).catch(showError);
+  } else if (kind === "reach-out") {
+    const date = String(data.get("date") || "");
+    post(`/api/people/${selectedPersonId}/reach-out`, { date }).then(() => {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        const [year, month] = date.split("-").map(Number);
+        calendarMonth = new Date(year, month - 1, 1);
+        dayFilter = date;
+        statusFilter = "all";
+        officeFilter = "all";
+        appointmentFilter = "all";
+        search = "";
+      }
       render();
     }).catch(showError);
   } else if (kind === "appointment") {
@@ -470,6 +486,10 @@ function render() {
     return;
   }
   app.innerHTML = `${messagesPanel()}${tabs()}${summary()}${view === "people" ? peopleView() : view === "month" ? monthView() : importView()}`;
+  if (focusReachOutDate) {
+    focusReachOutDate = false;
+    document.querySelector('form[data-form="reach-out"] input[name="date"]')?.focus();
+  }
 }
 
 function renderPresidency() {
@@ -766,7 +786,7 @@ function visitedMark(person) {
 }
 
 function rosterLine(person) {
-  const bits = [person.priesthood, person.appointment ? `Appt ${person.appointment}` : ""].filter(Boolean);
+  const bits = [person.priesthood, person.reachOutDate ? `Reach out ${person.reachOutDate}` : "", person.appointment ? `Appt ${person.appointment}` : ""].filter(Boolean);
   const touch = lastTouch(person);
   if (touch) bits.push(touch);
   return bits.join(" · ") || person.sheetName || "";
@@ -850,6 +870,8 @@ function rosterDetail(person) {
   return `<h2>${esc(personLabel(person))}</h2>
     <p>${statusSelect(person)}</p>
     ${facts.length ? `<p>${esc(facts.join(" · "))}</p>` : ""}
+    ${person.reachOutDate ? `<p><strong>Reach out</strong> ${esc(person.reachOutDate)}</p>` : `<p class="muted">Pick a date to schedule the reach out.</p>`}
+    ${reachOutForm(person)}
     ${person.appointment ? `<p><strong>Appointment</strong> ${esc(person.appointment)}</p>` : `<p class="muted">No appointment date yet.</p>`}
     ${appointmentForm(person)}
     ${person.notes ? `<p>${esc(person.notes)}</p>` : ""}
@@ -859,6 +881,21 @@ function rosterDetail(person) {
     <h3>Comments <span class="muted">${person.commentCount}</span></h3>
     ${commentList("person", person.id)}
     ${commentForm("person", person.id)}`;
+}
+
+function reachOutParts(value) {
+  const match = String(value || "").trim().match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/);
+  if (!match) return "";
+  let year = match[3] ? Number(match[3]) : 2026;
+  if (year < 100) year += 2000;
+  return `${year}-${match[1].padStart(2, "0")}-${match[2].padStart(2, "0")}`;
+}
+
+function reachOutForm(person) {
+  return `<form class="appointment-row" data-form="reach-out">
+    <input name="date" type="date" aria-label="Reach out date" required value="${esc(reachOutParts(person.reachOutDate))}">
+    <button class="tiny primary" type="submit">Schedule</button>
+  </form>`;
 }
 
 function appointmentParts(appointment) {

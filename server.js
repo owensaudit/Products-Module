@@ -16,6 +16,7 @@ import {
   logOutreach,
   presentState,
   setAppointment,
+  setReachOutDate,
   setPresidency,
   previewImport,
   scheduleVisit,
@@ -128,6 +129,13 @@ export function createPortalServer(store) {
         const body = await readBody(request);
         const month = body.month || currentMonth();
         const viewOptions = { includePrivate: body.includePrivate === true };
+
+        const personReachOut = pathname.match(/^\/api\/people\/([^/]+)\/reach-out$/);
+        if (personReachOut) {
+          const next = await store.update((state) => setReachOutDate(state, decodeURIComponent(personReachOut[1]), body));
+          sendJson(response, 200, presentState(next, month, viewOptions));
+          return;
+        }
 
         const personAppointment = pathname.match(/^\/api\/people\/([^/]+)\/appointment$/);
         if (personAppointment) {
