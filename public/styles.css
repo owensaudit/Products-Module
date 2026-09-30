@@ -337,6 +337,7 @@ button.cal-day.is-open {
 
 .cal-dot.reach_out { background: var(--status-reach); }
 .cal-dot.scheduled { background: var(--status-scheduled); }
+.cal-dot.reschedule { background: #7dcea0; }
 
 .cal-num {
   font-size: 13px;

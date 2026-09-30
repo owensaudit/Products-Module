@@ -562,11 +562,12 @@ function renderCalendar() {
     const kinds = mark.kinds || [];
     const people = mark.people || [];
     const dots = kinds.map((kind) => {
-      const label = kind === "scheduled" ? "Scheduled" : "Reach out";
+      const label = kind === "scheduled" ? "Scheduled" : kind === "reschedule" ? "Re-Schedule" : "Reach out";
       return `<span class="cal-dot ${kind}" title="${label}"></span>`;
     }).join("");
     const described = [`${title} ${day}`];
     if (kinds.includes("scheduled")) described.push("scheduled");
+    if (kinds.includes("reschedule")) described.push("re-schedule");
     if (kinds.includes("reach_out")) described.push("reach out");
     const today = viewingNow && day === now.getDate() ? " is-today" : "";
     const open = dayFilter === iso ? " is-open" : "";
@@ -586,6 +587,7 @@ function renderCalendar() {
     <div class="cal-grid">${cells.join("")}</div>
     <p class="cal-legend">
       <span><i class="cal-dot scheduled"></i> Scheduled</span>
+      <span><i class="cal-dot reschedule"></i> Re-Schedule</span>
       <span><i class="cal-dot reach_out"></i> Reach out</span>
     </p>`;
 }
@@ -738,9 +740,16 @@ function applyStatus(personId, status) {
     search = "";
     officeFilter = "all";
     appointmentFilter = "all";
-  } else if (archiveOpen) {
-    archiveOpen = false;
-    statusFilter = "all";
+  } else {
+    const activeKey = {
+      "Reach Out": "reach_out",
+      "No Response": "no_response",
+      "Re-Schedule": "reschedule",
+      Scheduled: "scheduled",
+      Declined: "declined",
+    }[status] || "none";
+    if (archiveOpen) archiveOpen = false;
+    if (statusFilter !== "all" && statusFilter !== activeKey) statusFilter = "all";
   }
   archiveChoicesFor = "";
   post(`/api/people/${personId}/status`, { status }).then((next) => {
