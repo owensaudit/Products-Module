@@ -280,7 +280,7 @@ h1 { margin: 0; font-size: 40px; line-height: 1.05; }
 }
 
 .presidency-board {
-  grid-template-columns: minmax(7.5rem, 1fr) 4.75rem 6.75rem max-content;
+  grid-template-columns: minmax(7.5rem, max-content) 3.25rem 3.25rem max-content;
   column-gap: 10px;
   row-gap: 4px;
   align-items: center;
@@ -489,21 +489,37 @@ input[type="text"], input[type="month"], input[type="date"], input[type="email"]
 
 .presidency-board input[name^="phone-"],
 .presidency-board input[name^="email-"] {
+  width: 100%;
+  max-width: 100%;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
+  color: transparent;
+  caret-color: transparent;
+}
+
+.presidency-board input[name^="phone-"]::placeholder,
+.presidency-board input[name^="email-"]::placeholder {
+  color: transparent;
 }
 
 .presidency-board input[name^="phone-"]:is(:hover, :focus),
 .presidency-board input[name^="email-"]:is(:hover, :focus) {
-  overflow: visible;
-  text-overflow: clip;
   width: max-content;
+  max-width: none;
   min-width: 100%;
+  overflow: visible;
+  color: var(--ink);
+  caret-color: var(--ink);
   field-sizing: content;
-  z-index: 2;
+  position: relative;
+  z-index: 3;
   background: var(--paper);
   box-shadow: 0 0 0 3px var(--paper);
+}
+
+.presidency-board input[name^="phone-"]:is(:hover, :focus)::placeholder,
+.presidency-board input[name^="email-"]:is(:hover, :focus)::placeholder {
+  color: #8aa0a8;
 }
 
 textarea { min-height: 72px; width: 100%; resize: vertical; }
