@@ -388,6 +388,7 @@ h1 { margin: 0; font-size: 40px; line-height: 1.05; }
 
 .month-cal {
   justify-self: center;
+  transform: translateX(2rem);
   width: min(100%, 320px);
   background: var(--card);
   border: 1px solid var(--line);
@@ -1018,7 +1019,7 @@ button.mark-visited {
 
 @media (max-width: 1040px) {
   .site-header { display: block; }
-  .month-cal { margin: 16px 0; }
+  .month-cal { margin: 16px 0; transform: none; }
 }
 
 @media (max-width: 800px) {
