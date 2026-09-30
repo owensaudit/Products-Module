@@ -359,6 +359,11 @@ button.title-link {
 
 .lede { margin: 8px 0 0; max-width: 46ch; color: var(--muted); }
 
+body[data-page="youth"] .lede,
+[data-page-header="youth"] .lede {
+  display: none !important;
+}
+
 .quorum-titles {
   display: grid;
   align-content: start;
