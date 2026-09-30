@@ -1081,4 +1081,22 @@ button.mark-visited {
   .header-tools { justify-content: flex-start; margin-top: 16px; }
   .header-tools label { width: 100%; }
   input[type="month"], #author-name { width: 100%; }
+  #presidency { max-width: 100%; }
+  .presidency-board {
+    justify-content: start;
+    width: 100%;
+    padding-right: 0;
+    column-gap: 8px;
+    grid-template-columns: max-content minmax(2.5rem, 2.75rem) minmax(2.5rem, 2.75rem) max-content;
+  }
+}
+
+@media (max-width: 359px) {
+  .presidency-board {
+    column-gap: 6px;
+    font-size: 12px;
+    grid-template-columns: max-content 2.2rem 2.2rem max-content;
+  }
+  .presidency-board input,
+  .presidency-board .position { font-size: 12px; }
 }
