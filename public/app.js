@@ -35,6 +35,8 @@ let officeFilter = "all";
 let appointmentFilter = "all";
 let search = "";
 let dayFilter = "";
+let messagesOpen = false;
+let editingCommentId = "";
 let selectedPersonId = null;
 let selectedSlotId = null;
 let detailForm = null;
@@ -184,6 +186,18 @@ app.addEventListener("click", (event) => {
     post(`/api/visits/${button.dataset.id}/cancel`, {}).then(() => render()).catch(showError);
   } else if (action === "complete-visit") {
     post(`/api/visits/${button.dataset.id}/complete`, {}).then(() => render()).catch(showError);
+  } else if (action === "edit-comment") {
+    editingCommentId = button.dataset.id;
+    render();
+    document.querySelector(`form[data-form="edit-comment"] textarea`)?.focus();
+  } else if (action === "cancel-edit") {
+    editingCommentId = "";
+    render();
+  } else if (action === "resolve-comment") {
+    post(`/api/comments/${button.dataset.id}/resolve`, {}).then(() => {
+      editingCommentId = "";
+      render();
+    }).catch(showError);
   } else if (action === "reset") {
     if (confirm("Clear everyone, outreach, visits, and comments stored in this portal?")) {
       post("/api/reset", {}).then(() => {
@@ -255,6 +269,16 @@ app.addEventListener("submit", (event) => {
       body: data.get("body"),
     }).then(() => {
       detailForm = detailForm === "comment" ? null : detailForm;
+      render();
+    }).catch(showError);
+  } else if (kind === "edit-comment") {
+    post(`/api/comments/${data.get("id")}`, { body: data.get("body") }).then(() => {
+      editingCommentId = "";
+      render();
+    }).catch(showError);
+  } else if (kind === "reply") {
+    post("/api/comments", { parentId: data.get("parentId"), body: data.get("body") }).then(() => {
+      editingCommentId = "";
       render();
     }).catch(showError);
   } else if (kind === "import") {
@@ -401,18 +425,25 @@ document.querySelector("#month-calendar")?.addEventListener("click", (event) => 
   openCalendarDay(day.dataset.date);
 });
 
+document.querySelector("#message-inbox")?.addEventListener("click", () => {
+  messagesOpen = !messagesOpen;
+  render();
+  if (messagesOpen) document.querySelector("#messages")?.scrollIntoView({ block: "nearest" });
+});
+
 function render() {
   renderPresidency();
   renderCalendar();
+  renderMessageInbox();
   if (!state) {
     app.innerHTML = `<p class="empty">Loading the portal…</p>`;
     return;
   }
   if (!state.people.length && view === "people") {
-    app.innerHTML = `${tabs()}${rosterNeeded()}`;
+    app.innerHTML = `${messagesPanel()}${tabs()}${rosterNeeded()}`;
     return;
   }
-  app.innerHTML = `${tabs()}${summary()}${view === "people" ? peopleView() : view === "month" ? monthView() : importView()}`;
+  app.innerHTML = `${messagesPanel()}${tabs()}${summary()}${view === "people" ? peopleView() : view === "month" ? monthView() : importView()}`;
 }
 
 function renderPresidency() {
@@ -498,6 +529,42 @@ function peopleForDay(iso) {
     .filter((person) => ids.has(person.id))
     .slice()
     .sort((a, b) => nameKey(a).localeCompare(nameKey(b), "en", { sensitivity: "base" }));
+}
+
+function renderMessageInbox() {
+  const button = document.querySelector("#message-inbox");
+  if (!button) return;
+  const count = state?.openMessages?.length || 0;
+  const bubble = button.querySelector(".message-bubble");
+  if (bubble) {
+    bubble.hidden = count === 0;
+    bubble.textContent = String(count);
+  }
+  button.setAttribute("aria-expanded", messagesOpen ? "true" : "false");
+  button.classList.toggle("is-open", messagesOpen);
+}
+
+function messagesPanel() {
+  if (!messagesOpen || !state) return "";
+  const items = state.openMessages || [];
+  const cards = items.length
+    ? items.map((message) => messageCard(message)).join("")
+    : `<p class="empty">No messages need an answer.</p>`;
+  return `<section class="card messages-panel" id="messages">
+    <h2>Messages</h2>
+    <p class="muted">A note that mentions someone stays here until it gets a response or is resolved.</p>
+    ${cards}
+  </section>`;
+}
+
+function messageCard(message) {
+  const about = message.personName ? `<button type="button" class="ghost" data-action="select-person" data-id="${esc(message.personId)}">${esc(message.personName)}</button>` : "";
+  return `<article class="message-card">
+    <p class="muted">Question for ${esc(message.mentions.join(", "))}</p>
+    ${about}
+    ${commentBody(message)}
+    ${answerTools(message.id)}
+  </article>`;
 }
 
 function rosterNeeded() {
@@ -951,10 +1018,62 @@ function outreachTable(attempts) {
   </div>`;
 }
 
+function commentThreads(targetType, targetId) {
+  const all = state.comments.filter((comment) => comment.targetType === targetType && comment.targetId === targetId);
+  const replies = new Map();
+  for (const comment of all) {
+    if (!comment.parentId) continue;
+    if (!replies.has(comment.parentId)) replies.set(comment.parentId, []);
+    replies.get(comment.parentId).push(comment);
+  }
+  for (const list of replies.values()) list.sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+  return all
+    .filter((comment) => !comment.parentId)
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+    .map((comment) => ({ comment, replies: replies.get(comment.id) || [] }));
+}
+
 function commentList(targetType, targetId) {
-  const comments = state.comments.filter((comment) => comment.targetType === targetType && comment.targetId === targetId);
-  if (!comments.length) return `<p class="empty">No comments yet. Type @ to mention someone.</p>`;
-  return comments.map((comment) => `<article class="comment">${comment.authorName ? `<strong>${esc(comment.authorName)}</strong>` : ""}<div>${mentionHtml(comment.body)}</div></article>`).join("");
+  const threads = commentThreads(targetType, targetId);
+  if (!threads.length) return `<p class="empty">No comments yet. Type @ to mention someone.</p>`;
+  return threads.map(({ comment, replies }) => `<article class="comment">
+    ${commentBody(comment)}
+    ${commentNeedsAnswer(comment) ? `<p class="needs-answer">Needs an answer</p>${answerTools(comment.id)}` : ""}
+    ${comment.resolvedAt ? `<p class="muted">Resolved</p>` : ""}
+    ${replies.map((reply) => `<div class="reply">${commentBody(reply)}</div>`).join("")}
+  </article>`).join("");
+}
+
+function commentNeedsAnswer(comment) {
+  return (state.openMessages || []).some((message) => message.id === comment.id);
+}
+
+function commentBody(comment) {
+  if (editingCommentId === comment.id) {
+    return `<form class="stack" data-form="edit-comment">
+      <input type="hidden" name="id" value="${esc(comment.id)}">
+      <label>Correct this note <textarea name="body" required>${esc(comment.body)}</textarea></label>
+      <div class="mention-menu" hidden></div>
+      <div class="actions">
+        <button class="primary" type="submit">Save</button>
+        <button type="button" class="ghost" data-action="cancel-edit">Cancel</button>
+      </div>
+    </form>`;
+  }
+  return `<div class="comment-text">${mentionHtml(comment.body)}</div>
+    <button type="button" class="ghost comment-edit" data-action="edit-comment" data-id="${esc(comment.id)}">Edit</button>`;
+}
+
+function answerTools(commentId) {
+  return `<form class="stack reply-form" data-form="reply">
+    <input type="hidden" name="parentId" value="${esc(commentId)}">
+    <label>Response <textarea name="body" required placeholder="Write a response"></textarea></label>
+    <div class="mention-menu" hidden></div>
+    <div class="actions">
+      <button class="primary" type="submit">Respond</button>
+      <button type="button" class="ghost" data-action="resolve-comment" data-id="${esc(commentId)}">Resolve</button>
+    </div>
+  </form>`;
 }
 
 function mentionHtml(body) {
@@ -970,7 +1089,7 @@ function commentForm(targetType, targetId) {
   return `<form class="stack" data-form="comment">
     <input type="hidden" name="targetType" value="${esc(targetType)}">
     <input type="hidden" name="targetId" value="${esc(targetId)}">
-    <label>Comment <textarea name="body" required placeholder="Write a note. Type @ to mention someone."></textarea></label>
+    <label>Comment <textarea name="body" required placeholder="Write a note. Type @ to ask someone a question."></textarea></label>
     <div class="mention-menu" hidden></div>
     <button class="primary" type="submit">Add comment</button>
   </form>`;

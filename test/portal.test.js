@@ -10,6 +10,10 @@ import {
   PRESIDENCY,
   activePresidency,
   addComment,
+  mentionedMembers,
+  openMessages,
+  resolveComment,
+  updateComment,
   emptyState,
   importRows,
   logOutreach,
@@ -105,6 +109,37 @@ test("comments attach to a person or a visit", () => {
   state = setPersonStatus(state, "per_1", "");
   assert.equal(state.people[0].sheetColumns.Status, undefined);
   assert.throws(() => addComment(state, { targetType: "person", targetId: "missing", authorName: "Josh Owens", body: "Hello" }, deps()), /not found/);
+});
+
+test("a mention needs a response or a resolve, and a comment can be corrected", () => {
+  let state = emptyState();
+  state = {
+    ...state,
+    people: [{ id: "per_1", displayName: "Ada Example", phone: "555-0100", email: "ada@example.com", household: "", notes: "", sheetColumns: { Brother: "Example, Ada" }, createdAt: "2026-09-29T12:00:00.000Z", updatedAt: "2026-09-29T12:00:00.000Z" }],
+  };
+  assert.deepEqual(mentionedMembers("@Tyler How many?", activePresidency(state)), ["Tyler Sanders"]);
+  state = addComment(state, { targetType: "person", targetId: "per_1", body: "@Tyler How many?" }, deps());
+  const question = state.comments[0];
+  assert.equal(openMessages(state).length, 1);
+  state = updateComment(state, question.id, { body: "@Tyler Sanders How many June bugs?" }, deps());
+  assert.equal(state.comments[0].body, "@Tyler Sanders How many June bugs?");
+  assert.equal(openMessages(state)[0].id, question.id);
+
+  let view = presentState(state, "2026-09");
+  assert.equal(view.openMessages.length, 1);
+  assert.equal(view.openMessages[0].personName, "Example, Ada");
+  assert.equal(view.openMessages[0].mentions[0], "Tyler Sanders");
+  assert.equal(JSON.stringify(view.openMessages).includes("555-0100"), false);
+  assert.equal(JSON.stringify(view.openMessages).includes("ada@example.com"), false);
+
+  state = addComment(state, { parentId: question.id, body: "Plenty." }, deps());
+  assert.equal(openMessages(state).length, 0);
+
+  state = addComment(state, { targetType: "person", targetId: "per_1", body: "@Josh Owens Can you check?" }, deps());
+  state = resolveComment(state, state.comments[2].id, deps());
+  assert.equal(openMessages(state).length, 0);
+  view = presentState(state, "2026-09");
+  assert.equal(view.openMessages.length, 0);
 });
 
 test("csv import keeps extra columns and does not invent blank rows", () => {

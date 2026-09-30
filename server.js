@@ -7,6 +7,8 @@ import { parseCsv } from "./lib/csv.js";
 import {
   PortalError,
   addComment,
+  resolveComment,
+  updateComment,
   addPerson,
   emptyState,
   importRows,
@@ -159,6 +161,20 @@ export function createPortalServer(store) {
         if (pathname === "/api/comments") {
           const next = await store.update((state) => addComment(state, body));
           sendJson(response, 201, presentState(next, month, viewOptions));
+          return;
+        }
+
+        const commentEdit = pathname.match(/^\/api\/comments\/([^/]+)$/);
+        if (commentEdit) {
+          const next = await store.update((state) => updateComment(state, decodeURIComponent(commentEdit[1]), body));
+          sendJson(response, 200, presentState(next, month, viewOptions));
+          return;
+        }
+
+        const commentResolve = pathname.match(/^\/api\/comments\/([^/]+)\/resolve$/);
+        if (commentResolve) {
+          const next = await store.update((state) => resolveComment(state, decodeURIComponent(commentResolve[1])));
+          sendJson(response, 200, presentState(next, month, viewOptions));
           return;
         }
 
