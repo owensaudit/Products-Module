@@ -1538,8 +1538,9 @@ function ministeringCards(quorum) {
     ${rows.map((row) => {
       const companionName = ministeringCompanionValue(row.person, row.families);
       const companion = findPersonByName(companionName);
+      const role = quorum === "teachers" ? "Teacher" : "Priest";
       return `<section class="ministering-set">
-        ${roleCard(row.person, "Name")}
+        ${roleCard(row.person, role)}
         ${roleCard(companion, "Companion", companionName)}
         ${row.families.map((family) => roleCard(family, "Assignment")).join("")}
       </section>`;
