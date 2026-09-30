@@ -45,6 +45,8 @@ let officeFilter = "all";
 let search = "";
 let dayFilter = "";
 let viewAll = false;
+let assigneeFilter = "";
+let preserveListScroll = true;
 let blankPlanFor = "";
 let focusReachOutDate = false;
 let commentsOpen = false;
@@ -88,6 +90,10 @@ app.addEventListener("change", (event) => {
   }
   if (target instanceof HTMLSelectElement && target.classList.contains("status-pill")) {
     applyStatus(target.dataset.personId, target.value);
+    return;
+  }
+  if (target instanceof HTMLSelectElement && target.form?.dataset.form === "assign") {
+    saveAssignment(target.form);
     return;
   }
   const editRow = target.closest?.("[data-outreach-edit]");
@@ -192,6 +198,7 @@ app.addEventListener("click", (event) => {
     search = "";
     dayFilter = "";
     officeFilter = "all";
+    assigneeFilter = "";
     viewAll = false;
     view = "people";
     detailForm = null;
@@ -209,6 +216,7 @@ app.addEventListener("click", (event) => {
     search = "";
     dayFilter = "";
     officeFilter = "all";
+    assigneeFilter = "";
     view = "people";
     render();
   } else if (action === "show-people") {
@@ -218,6 +226,7 @@ app.addEventListener("click", (event) => {
     statusFilter = "all";
     search = "";
     dayFilter = "";
+    assigneeFilter = "";
     view = "people";
     const current = selectedPerson();
     if (current && personIsArchived(current)) selectedPersonId = null;
@@ -229,6 +238,7 @@ app.addEventListener("click", (event) => {
     archiveChoicesFor = "";
     search = "";
     dayFilter = "";
+    assigneeFilter = "";
     view = "people";
     const current = selectedPerson();
     if (current && personIsArchived(current) !== archiveOpen) selectedPersonId = null;
@@ -243,6 +253,7 @@ app.addEventListener("click", (event) => {
     statusFilter = button.dataset.status;
     search = "";
     dayFilter = "";
+    assigneeFilter = "";
     view = "people";
     const current = selectedPerson();
     if (current && !personMatchesFilters(current)) selectedPersonId = null;
@@ -496,6 +507,7 @@ function showToday() {
   const iso = todayIso();
   const people = peopleForDay(iso);
   viewAll = false;
+  assigneeFilter = "";
   dayFilter = iso;
   archiveChoicesFor = "";
   statusFilter = "all";
@@ -599,6 +611,24 @@ presidencyHost?.addEventListener("focusout", (event) => {
   if (!(event.target instanceof HTMLInputElement) || !/^(name|phone|email)-/.test(name)) return;
   clearTimeout(presidencySaveTimer);
   savePresidencyNames();
+});
+
+presidencyHost?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-action='show-assigned']");
+  if (!button) return;
+  const name = button.dataset.name || "";
+  assigneeFilter = assigneeFilter === name ? "" : name;
+  viewAll = false;
+  archiveOpen = false;
+  commentsOpen = false;
+  dayFilter = "";
+  search = "";
+  officeFilter = "all";
+  statusFilter = assigneeFilter ? "scheduled" : "all";
+  view = "people";
+  preserveListScroll = false;
+  render();
+  preserveListScroll = true;
 });
 
 presidencyHost?.addEventListener("submit", (event) => {
@@ -718,7 +748,7 @@ function render() {
     app.innerHTML = `${tabs()}${rosterNeeded()}`;
     return;
   }
-  const listScroll = document.querySelector("#person-list")?.scrollTop ?? 0;
+  const listScroll = preserveListScroll ? (document.querySelector("#person-list")?.scrollTop ?? 0) : 0;
   app.innerHTML = `${tabs()}${summary()}${view === "people" ? peopleView() : view === "month" ? monthView() : importView()}`;
   restoreContactDraft(contactDraft);
   const list = document.querySelector("#person-list");
@@ -737,7 +767,8 @@ function render() {
 
 function renderPresidency() {
   if (!presidencyHost) return;
-  if (presidencyHost.contains(document.activeElement)) return;
+  const active = document.activeElement;
+  if (active && presidencyHost.contains(active) && active.matches("input, textarea, select")) return;
   const members = state?.presidency || [];
   if (!members.length) {
     presidencyHost.innerHTML = "";
@@ -749,7 +780,7 @@ function renderPresidency() {
     <span class="pres-head">Phone</span>
     <span class="pres-head">Email</span>
     <span class="pres-head">Position</span>
-    ${members.map((member, index) => `<input id="pres-name-${index}" class="pres-name${index === 0 ? " is-president" : ""}" name="name-${index}" value="${esc(member.name)}" required autocomplete="off" aria-label="${esc(member.role)} name">
+    ${members.map((member, index) => `<span class="pres-name-line"><input id="pres-name-${index}" class="pres-name${index === 0 ? " is-president" : ""}" name="name-${index}" value="${esc(member.name)}" required autocomplete="off" aria-label="${esc(member.role)} name">${assignedCountButton(member.name)}</span>
       <input name="phone-${index}" type="tel" inputmode="tel" autocomplete="off" value="${esc(member.phone || "")}" aria-label="${esc(member.role)} phone" placeholder="Phone">
       <input name="email-${index}" type="email" inputmode="email" autocomplete="off" value="${esc(member.email || "")}" aria-label="${esc(member.role)} email" placeholder="Email">
       <p class="position${index === 0 ? " is-president" : ""}">${esc(member.role)}</p>`).join("")}
@@ -814,6 +845,7 @@ function openCalendarDay(iso) {
   if (!people.length) return;
   commentsOpen = false;
   viewAll = false;
+  assigneeFilter = "";
   dayFilter = iso;
   archiveOpen = people.every((person) => personIsArchived(person));
   archiveChoicesFor = "";
@@ -953,6 +985,7 @@ function applyStatus(personId, status) {
   }[status];
   if (archiveKey) {
     viewAll = false;
+    assigneeFilter = "";
     archiveOpen = true;
     statusFilter = archiveKey;
     dayFilter = "";
@@ -967,6 +1000,7 @@ function applyStatus(personId, status) {
       "Drive by": "driveby",
     }[status] || "none";
     viewAll = false;
+    assigneeFilter = "";
     if (archiveOpen) archiveOpen = false;
     if (statusFilter !== "all" && statusFilter !== activeKey) statusFilter = "all";
   }
@@ -1021,7 +1055,7 @@ function countStatuses() {
 
 function peopleView() {
   const people = filteredPeople();
-  const title = viewAll ? "All" : dayFilter ? formatDate(dayFilter) : archiveOpen && statusFilter === "all" ? "Archive" : statusFilter === "all" ? "To Visit" : STATUS_LABELS[statusFilter];
+  const title = assigneeFilter ? assigneeFilter : viewAll ? "All" : dayFilter ? formatDate(dayFilter) : archiveOpen && statusFilter === "all" ? "Archive" : statusFilter === "all" ? "To Visit" : STATUS_LABELS[statusFilter];
   const showDetail = !state.rosterMode || Boolean(selectedPersonId) || detailForm === "add-person";
   return `<section class="layout${showDetail ? "" : " layout-single"}">
     <div class="card" id="people-card">
@@ -1162,6 +1196,7 @@ function personMatchesFilters(person) {
     if (key !== statusFilter) return false;
   }
   if (state.rosterMode && officeFilter !== "all" && person.priesthood !== officeFilter) return false;
+  if (assigneeFilter && !(person.assigned || []).includes(assigneeFilter)) return false;
   return true;
 }
 
@@ -1238,6 +1273,7 @@ function rosterDetail(person) {
     ${contactFields(person)}
     ${factsForm(person)}
     ${planLine(person)}
+    ${assignmentFields(person)}
     ${planForm(person)}
     <h3>Outreach</h3>
     ${attemptList(person)}
@@ -1304,6 +1340,38 @@ function planParts(person) {
   if (person.reachOutDate) return { date: reachOutParts(person.reachOutDate), time: "", kind: "", place: "" };
   if (person.appointment) return { ...appointmentParts(person.appointment), kind: "", place: person.appointmentPlace || "" };
   return { date: "", time: "", kind: "", place: "" };
+}
+
+function assignedCountButton(name) {
+  const count = state.people.filter((person) => person.rosterStatusKey === "scheduled" && (person.assigned || []).includes(name)).length;
+  if (!count) return "";
+  return `<button type="button" class="assign-count" data-action="show-assigned" data-name="${esc(name)}" aria-pressed="${assigneeFilter === name}" aria-label="${count} scheduled ${count === 1 ? "person" : "people"} assigned to ${esc(name)}">${count}</button>`;
+}
+
+function assignmentFields(person) {
+  if (person.rosterStatusKey !== "scheduled") return "";
+  const assigned = person.assigned || [];
+  const members = (state.presidency || []).map((member) => member.name).filter(Boolean);
+  const options = (selected) => {
+    const extra = selected && !members.includes(selected) ? [selected] : [];
+    return ["", ...members, ...extra].map((name) => `<option value="${esc(name)}" ${name === selected ? "selected" : ""}>${esc(name || "—")}</option>`).join("");
+  };
+  return `<form class="assign-row" data-form="assign">
+    <span>Assigned</span>
+    <select name="assigned-1" aria-label="First assigned presidency member">${options(assigned[0] || "")}</select>
+    <select name="assigned-2" aria-label="Second assigned presidency member">${options(assigned[1] || "")}</select>
+  </form>`;
+}
+
+function saveAssignment(form) {
+  if (!selectedPersonId) return;
+  const first = form.querySelector("[name=assigned-1]")?.value.trim() || "";
+  const second = form.querySelector("[name=assigned-2]")?.value.trim() || "";
+  const assigned = [...new Set([first, second].filter(Boolean))].slice(0, 2);
+  post(`/api/people/${selectedPersonId}/contact`, { assigned }).then((next) => {
+    state = next;
+    render();
+  }).catch(showError);
 }
 
 function planForm(person) {

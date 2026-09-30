@@ -217,6 +217,14 @@ test("a phone number and email can be saved on a person", () => {
   assert.equal(presentState(state, "2026-09").people[0].sheetName, "Sample, Bea");
   assert.equal(state.people[0].notes, "Knock first");
   assert.throws(() => setPersonContact(state, "per_1", { name: "  " }), /name is required/);
+  state = setPersonContact(state, "per_1", { assigned: [" Ada Example ", "Bea Sample", "Cal Fixture"] });
+  assert.equal(state.people[0].sheetColumns.Assigned, "Ada Example, Bea Sample");
+  assert.deepEqual(presentState(state, "2026-09").people[0].assigned, ["Ada Example", "Bea Sample"]);
+  assert.equal(state.people[0].phone, "");
+  state = setPersonContact(state, "per_1", { assigned: ["Ada Example", "Ada Example"] });
+  assert.equal(state.people[0].sheetColumns.Assigned, "Ada Example");
+  state = setPersonContact(state, "per_1", { assigned: [] });
+  assert.equal(state.people[0].sheetColumns.Assigned, undefined);
 });
 
 test("moved, mission, do not contact, not interested, no contact info, declined, and visited are archive statuses", () => {

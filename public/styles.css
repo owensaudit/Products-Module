@@ -578,6 +578,45 @@ input.person-name:focus {
   field-sizing: content;
 }
 
+.pres-name-line {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+button.assign-count {
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0 5px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--church);
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+button.assign-count[aria-pressed="true"] {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
+.assign-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 0 0 10px;
+}
+
+.assign-row select {
+  width: auto;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
 .facts-row select,
 .facts-row input {
   height: 32px;
