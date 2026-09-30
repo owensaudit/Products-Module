@@ -994,7 +994,7 @@ function render() {
 function renderPageChrome() {
   document.body.dataset.page = page;
   document.querySelectorAll("[data-page-header]").forEach((block) => {
-    block.hidden = block.dataset.pageHeader !== page;
+    block.hidden = page === "youth" && block.dataset.pageHeader !== "youth";
   });
   document.querySelectorAll("[data-page-link]").forEach((button) => {
     button.setAttribute("aria-pressed", button.dataset.pageLink === page ? "true" : "false");

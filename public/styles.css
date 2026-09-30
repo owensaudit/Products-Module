@@ -395,6 +395,7 @@ body[data-page="youth"] .lede,
 .quorum-titles {
   display: grid;
   align-content: start;
+  gap: 22px;
   width: 28rem;
   max-width: 100%;
   min-width: 0;
