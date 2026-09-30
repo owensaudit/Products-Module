@@ -44,13 +44,41 @@ body {
   color: white;
 }
 
-.church-brand {
+.church-bar-inner {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 14px 32px;
+  padding: 10px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 28px;
+}
+
+.church-brand {
   display: flex;
   align-items: center;
   gap: 14px;
+  min-width: 0;
+}
+
+.quorum-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.quorum-nav button {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: white;
+  font-weight: 650;
+  padding: 6px 12px;
+}
+
+.quorum-nav button[aria-pressed="true"] {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .church-mark { width: 46px; height: 64px; flex: none; }
@@ -367,22 +395,13 @@ body[data-page="youth"] .lede,
 .quorum-titles {
   display: grid;
   align-content: start;
+  width: 28rem;
+  max-width: 100%;
   min-width: 0;
 }
 
-.title-stack { min-width: 0; }
-
-.page-switch {
-  display: block;
-  margin: 6px 0 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--church);
-  font-weight: 650;
-  font-size: 15px;
-  text-align: left;
-}
+.title-block,
+.title-row { width: 100%; }
 
 .roster-switch {
   display: flex;
@@ -1202,7 +1221,7 @@ button.mark-visited {
 }
 
 @media (max-width: 800px) {
-  .church-brand, .site-header, #app { padding-left: 16px; padding-right: 16px; }
+  .church-bar-inner, .site-header, #app { padding-left: 16px; padding-right: 16px; }
   .site-header, .layout { display: block; }
   h1, button.title-link { font-size: 32px; }
   .header-tools { justify-content: flex-start; margin-top: 16px; }

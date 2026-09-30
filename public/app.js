@@ -886,6 +886,9 @@ function renderPageChrome() {
   document.querySelectorAll("[data-page-header]").forEach((block) => {
     block.hidden = block.dataset.pageHeader !== page;
   });
+  document.querySelectorAll("[data-page-link]").forEach((button) => {
+    button.setAttribute("aria-pressed", button.dataset.pageLink === page ? "true" : "false");
+  });
   presidencyHost?.setAttribute("aria-label", page === "youth" ? "Youth quorums" : "EQ Presidency");
 }
 
