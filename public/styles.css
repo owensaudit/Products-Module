@@ -566,7 +566,10 @@ input.person-name:focus {
   padding: 0;
 }
 
-.presidency-board .pres-head:nth-child(2),
+.presidency-board .pres-head:nth-child(2) {
+  text-align: left;
+}
+
 .presidency-board input.pres-name {
   text-align: right;
 }
