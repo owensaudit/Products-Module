@@ -236,8 +236,8 @@ app.addEventListener("click", (event) => {
   } else if (action === "toggle-archive") {
     archiveChoicesFor = archiveChoicesFor === selectedPersonId ? "" : selectedPersonId;
     render();
-  } else if (action === "set-status") {
-    applyStatus(button.dataset.personId, button.dataset.status);
+  } else if (action === "set-status" || action === "mark-visited") {
+    applyStatus(button.dataset.personId, action === "mark-visited" ? "Visited" : button.dataset.status);
   } else if (action === "filter") {
     viewAll = false;
     statusFilter = button.dataset.status;
@@ -1097,8 +1097,13 @@ function hasBeenVisited(person) {
 }
 
 function visitedMark(person) {
-  if (!hasBeenVisited(person)) return "";
-  return `<span class="visited-check" aria-label="Visited">✓</span>`;
+  if (hasBeenVisited(person)) return `<span class="visited-check" aria-label="Visited">✓</span>`;
+  if (state.rosterMode && person.rosterStatusKey === "scheduled") return visitCheck(person);
+  return "";
+}
+
+function visitCheck(person) {
+  return `<button type="button" class="mark-visited" data-action="mark-visited" data-person-id="${esc(person.id)}" aria-label="Mark visited">✓</button>`;
 }
 
 function rosterLine(person) {
@@ -1194,7 +1199,7 @@ function personDetail() {
 function rosterDetail(person) {
   return `${personNameField(person)}
     ${specialNotes(person)}
-    <p class="status-row">${statusSelect(person)}${archiveControl(person)}</p>
+    <p class="status-row">${statusSelect(person)}${archiveControl(person)}${person.rosterStatusKey === "scheduled" ? visitCheck(person) : ""}</p>
     ${contactFields(person)}
     ${factsForm(person)}
     ${planLine(person)}
