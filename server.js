@@ -17,6 +17,7 @@ import {
   presentState,
   setAppointment,
   setReachOutDate,
+  setPersonContact,
   setPresidency,
   previewImport,
   scheduleVisit,
@@ -140,6 +141,13 @@ export function createPortalServer(store) {
         const personAppointment = pathname.match(/^\/api\/people\/([^/]+)\/appointment$/);
         if (personAppointment) {
           const next = await store.update((state) => setAppointment(state, decodeURIComponent(personAppointment[1]), body));
+          sendJson(response, 200, presentState(next, month, viewOptions));
+          return;
+        }
+
+        const personContact = pathname.match(/^\/api\/people\/([^/]+)\/contact$/);
+        if (personContact) {
+          const next = await store.update((state) => setPersonContact(state, decodeURIComponent(personContact[1]), body));
           sendJson(response, 200, presentState(next, month, viewOptions));
           return;
         }

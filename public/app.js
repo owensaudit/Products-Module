@@ -297,6 +297,9 @@ app.addEventListener("submit", (event) => {
       detailForm = "visit";
       render();
     }).catch(showError);
+  } else if (kind === "contact") {
+    clearTimeout(contactTimer);
+    saveContactFields();
   } else if (kind === "plan") {
     const date = String(data.get("date") || "");
     const plan = String(data.get("kind") || "");
@@ -364,6 +367,16 @@ app.addEventListener("input", (event) => {
     search = event.target.value;
     renderPeopleList();
   }
+  if (event.target.closest?.("form[data-form='contact']")) {
+    clearTimeout(contactTimer);
+    contactTimer = setTimeout(saveContactFields, 400);
+  }
+});
+
+app.addEventListener("focusout", (event) => {
+  if (!event.target.closest?.("form[data-form='contact']")) return;
+  clearTimeout(contactTimer);
+  saveContactFields();
 });
 
 app.addEventListener("change", (event) => {
@@ -497,7 +510,50 @@ document.querySelector("#message-inbox")?.addEventListener("click", () => {
   if (messagesOpen) document.querySelector("#messages")?.scrollIntoView({ block: "nearest" });
 });
 
+let contactTimer = null;
+
+function readContactDraft() {
+  const form = document.activeElement?.closest?.("form[data-form='contact']");
+  if (!form) return null;
+  const field = document.activeElement;
+  return {
+    personId: selectedPersonId,
+    field: field?.name || "",
+    phone: form.querySelector("[name=phone]")?.value ?? "",
+    email: form.querySelector("[name=email]")?.value ?? "",
+    start: field?.selectionStart,
+    end: field?.selectionEnd,
+  };
+}
+
+function restoreContactDraft(draft) {
+  if (!draft || draft.personId !== selectedPersonId) return;
+  const form = document.querySelector("form[data-form='contact']");
+  if (!form) return;
+  const phone = form.querySelector("[name=phone]");
+  const email = form.querySelector("[name=email]");
+  if (phone) phone.value = draft.phone;
+  if (email) email.value = draft.email;
+  const field = form.querySelector(`[name="${draft.field}"]`);
+  if (!(field instanceof HTMLInputElement)) return;
+  field.focus();
+  if (typeof draft.start === "number" && typeof draft.end === "number") field.setSelectionRange(draft.start, draft.end);
+}
+
+function saveContactFields() {
+  const form = document.querySelector("form[data-form='contact']");
+  if (!form || !selectedPersonId) return;
+  const phone = form.querySelector("[name=phone]")?.value.trim() ?? "";
+  const email = form.querySelector("[name=email]")?.value.trim() ?? "";
+  const person = selectedPerson();
+  if (person && phone === (person.phone || "") && email === (person.email || "")) return;
+  post(`/api/people/${selectedPersonId}/contact`, { phone, email }).then((next) => {
+    state = next;
+  }).catch(showError);
+}
+
 function render() {
+  const contactDraft = readContactDraft();
   renderPresidency();
   renderCalendar();
   renderMessageInbox();
@@ -510,6 +566,7 @@ function render() {
     return;
   }
   app.innerHTML = `${messagesPanel()}${tabs()}${summary()}${view === "people" ? peopleView() : view === "month" ? monthView() : importView()}`;
+  restoreContactDraft(contactDraft);
   if (focusReachOutDate) {
     focusReachOutDate = false;
     document.querySelector('form[data-form="plan"] input[name="date"]')?.focus();
@@ -672,7 +729,7 @@ function monthValue() {
 }
 
 function privateOn() {
-  return Boolean(revealInput?.checked);
+  return true;
 }
 
 function savedAuthor() {
@@ -958,12 +1015,12 @@ function personDetail() {
 function rosterDetail(person) {
   const facts = [person.priesthood, person.age ? `Age ${person.age}` : "", person.birthday ? `Birthday ${person.birthday}` : ""].filter(Boolean);
   return `<h2>${esc(personLabel(person))}</h2>
+    ${specialNotes(person)}
+    ${contactFields(person)}
     <p class="status-row">${statusSelect(person)}${archiveControl(person)}</p>
     ${facts.length ? `<p>${esc(facts.join(" · "))}</p>` : ""}
     ${planLine(person)}
     ${planForm(person)}
-    ${person.notes ? `<p>${esc(person.notes)}</p>` : ""}
-    ${contactLine(person)}
     <h3>Outreach</h3>
     ${attemptList(person)}
     <h3>Comments <span class="muted">${person.commentCount}</span></h3>
@@ -1028,6 +1085,18 @@ function appointmentParts(appointment) {
     date: `${year}-${match[1].padStart(2, "0")}-${match[2].padStart(2, "0")}`,
     time: `${String(hour).padStart(2, "0")}:${match[5]}`,
   };
+}
+
+function specialNotes(person) {
+  if (!person.notes) return "";
+  return `<p class="special-notes"><span>Special notes</span> ${esc(person.notes)}</p>`;
+}
+
+function contactFields(person) {
+  return `<form class="contact-fields" data-form="contact">
+    <label>Phone <input name="phone" type="tel" autocomplete="off" inputmode="tel" value="${esc(person.phone || "")}"></label>
+    <label>Email <input name="email" type="email" autocomplete="off" inputmode="email" value="${esc(person.email || "")}"></label>
+  </form>`;
 }
 
 function contactLine(person) {

@@ -20,6 +20,7 @@ import {
   logOutreach,
   setAppointment,
   setReachOutDate,
+  setPersonContact,
   setPersonStatus,
   setPresidency,
   personOutreachStatus,
@@ -154,6 +155,29 @@ test("a reach out needs a date and marks that calendar day", () => {
   state = setPersonStatus(state, "per_1", "Visited");
   assert.equal(presentState(state, "2027-10").calendarMarks["2027-10-05"], undefined);
   assert.throws(() => setReachOutDate(state, "per_1", { date: "soon" }), /Reach out date/);
+});
+
+test("a phone number and email can be saved on a person", () => {
+  let state = emptyState();
+  state = {
+    ...state,
+    people: [{ id: "per_1", displayName: "Ada Example", phone: "", email: "", household: "", notes: "Drive by and knock", sheetColumns: { Brother: "Example, Ada" }, createdAt: "2026-09-29T12:00:00.000Z", updatedAt: "2026-09-29T12:00:00.000Z" }],
+  };
+  state = setPersonContact(state, "per_1", { phone: " 555-0100 ", email: "ada@example.com" });
+  assert.equal(state.people[0].phone, "555-0100");
+  assert.equal(state.people[0].email, "ada@example.com");
+  assert.equal(state.people[0].notes, "Drive by and knock");
+  const hidden = presentState(state, "2026-09");
+  assert.equal(hidden.people[0].phone, "");
+  assert.equal(hidden.people[0].email, "");
+  assert.equal(hidden.people[0].phoneOnFile, true);
+  assert.equal(hidden.people[0].emailOnFile, true);
+  const shown = presentState(state, "2026-09", { includePrivate: true });
+  assert.equal(shown.people[0].phone, "555-0100");
+  assert.equal(shown.people[0].email, "ada@example.com");
+  state = setPersonContact(state, "per_1", { phone: " ", email: "" });
+  assert.equal(state.people[0].phone, "");
+  assert.equal(state.people[0].email, "");
 });
 
 test("moved, mission, do not contact, not interested, no contact info, declined, and visited are archive statuses", () => {
