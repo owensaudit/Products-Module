@@ -921,9 +921,10 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
   border-radius: 16px;
   box-shadow: var(--shadow);
   padding: 16px;
+  min-width: 0;
 }
 
-.person-list { display: grid; gap: 8px; }
+.person-list { display: grid; gap: 8px; min-width: 0; overflow-x: auto; }
 
 .youth-list-block { display: grid; gap: 8px; }
 .youth-list-block + .youth-list-block { margin-top: 16px; }
@@ -936,6 +937,49 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+
+.ministering-table {
+  width: 100%;
+  min-width: 36rem;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.ministering-table th {
+  text-align: left;
+  font-weight: 700;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ministering-table td {
+  vertical-align: top;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ministering-table tbody tr:nth-child(even) { background: #f6f8f9; }
+
+.ministering-table th:nth-child(1),
+.ministering-table td:nth-child(1) { width: 28%; }
+
+.ministering-table th:nth-child(2),
+.ministering-table td:nth-child(2) { width: 24%; }
+
+.ministering-name {
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--church);
+  font: inherit;
+  text-align: left;
+}
+
+.ministering-name:hover { text-decoration: underline; }
+
+.ministering-table td:nth-child(3) .ministering-name + .ministering-name { margin-top: 2px; }
 
 .person {
   width: 100%;

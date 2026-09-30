@@ -1371,24 +1371,70 @@ function youthEntryVisible(entry) {
   return true;
 }
 
+function ministeringForYouth(name) {
+  const key = String(name || "").trim().toLowerCase();
+  const visits = youthVisits().filter((person) => String(person.assigned?.[0] || "").trim().toLowerCase() === key);
+  const companion = visits.map((person) => person.assigned?.[1]).find((item) => String(item || "").trim()) || "";
+  return { companion, families: visits };
+}
+
+function ministeringRows(quorum) {
+  const needle = search.trim().toLowerCase();
+  return youthMembers(quorum)
+    .map((person) => ({ person, ...ministeringForYouth(nameKey(person)) }))
+    .filter((row) => {
+      if (officeFilter !== "all" && row.person.priesthood !== officeFilter) return false;
+      if (!needle) return true;
+      const haystack = [nameKey(row.person), row.companion, ...row.families.map((person) => nameKey(person))].join(" ").toLowerCase();
+      return haystack.includes(needle);
+    })
+    .sort((a, b) => nameKey(a.person).localeCompare(nameKey(b.person), "en", { sensitivity: "base" }));
+}
+
+function ministeringTable(quorum) {
+  const rows = ministeringRows(quorum);
+  if (!rows.length) return "";
+  const assignmentButton = (person) => `<button type="button" class="ministering-name" data-action="select-person" data-id="${esc(person.id)}">${esc(nameKey(person))}</button>`;
+  return `<table class="ministering-table">
+    <thead><tr><th>Name</th><th>Companion</th><th>Assignment(s)</th></tr></thead>
+    <tbody>
+      ${rows.map((row) => `<tr>
+        <td>${assignmentButton(row.person)}</td>
+        <td>${row.companion ? esc(row.companion) : ""}</td>
+        <td>${row.families.map(assignmentButton).join("")}</td>
+      </tr>`).join("")}
+    </tbody>
+  </table>`;
+}
+
 function youthVisibleLists() {
   if (youthList === "all") return YOUTH_LISTS;
   return YOUTH_LISTS.filter(([id]) => id === youthList);
 }
 
+function youthListSize(quorum, section) {
+  if (section === "presidency") return youthMembers(quorum).length;
+  return youthRosterEntries(quorum, section).length;
+}
+
 function youthVisibleEntries() {
-  return youthVisibleLists().flatMap(([, , quorum, section]) => youthRosterEntries(quorum, section).filter(youthEntryVisible));
+  return youthVisibleLists().flatMap(([, , quorum, section]) => {
+    if (section === "presidency") return ministeringRows(quorum);
+    return youthRosterEntries(quorum, section).filter(youthEntryVisible);
+  });
 }
 
 function youthListMarkup() {
   const lists = youthVisibleLists();
   const single = lists.length === 1;
   return lists.map(([, label, quorum, section]) => {
-    const entries = youthRosterEntries(quorum, section).filter(youthEntryVisible);
-    if (!entries.length) return "";
+    const body = section === "presidency"
+      ? ministeringTable(quorum)
+      : youthRosterEntries(quorum, section).filter(youthEntryVisible).map(youthEntryButton).join("");
+    if (!body) return "";
     return `<section class="youth-list-block">
       ${single ? "" : `<h3>${esc(label)}</h3>`}
-      ${entries.map(youthEntryButton).join("")}
+      ${body}
     </section>`;
   }).join("");
 }
@@ -1431,10 +1477,10 @@ function youthRosterSummary() {
   const archivedCount = visits.filter((person) => personIsArchived(person)).length;
   const activeCount = visits.length - archivedCount;
   const listsOpen = showingYouthLists();
-  const allCount = YOUTH_LISTS.reduce((sum, [, , quorum, section]) => sum + youthRosterEntries(quorum, section).length, 0);
+  const allCount = YOUTH_LISTS.reduce((sum, [, , quorum, section]) => sum + youthListSize(quorum, section), 0);
   const listButtons = YOUTH_LISTS.map(([id, label, quorum, section]) => {
     const pressed = listsOpen && youthList === id;
-    return `<button type="button" data-action="youth-list" data-list="${id}" aria-pressed="${pressed}">${esc(label)} ${youthRosterEntries(quorum, section).length}</button>`;
+    return `<button type="button" data-action="youth-list" data-list="${id}" aria-pressed="${pressed}">${esc(label)} ${youthListSize(quorum, section)}</button>`;
   }).join("");
   const people = YOUTH_LISTS.flatMap(([, , quorum, section]) => youthRosterEntries(quorum, section))
     .filter((entry) => entry.kind === "person")
