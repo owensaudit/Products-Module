@@ -851,6 +851,8 @@ function readContactDraft() {
     notes: card.querySelector(".special-notes [name=notes]")?.value ?? "",
     phone: card.querySelector("form[data-form='contact'] [name=phone]")?.value ?? "",
     email: card.querySelector("form[data-form='contact'] [name=email]")?.value ?? "",
+    household: card.querySelector("form[data-form='contact'] [name=household]")?.value ?? "",
+    address: card.querySelector("form[data-form='contact'] [name=address]")?.value ?? "",
     priesthood: card.querySelector("form[data-form='facts'] [name=priesthood]")?.value ?? "",
     age: card.querySelector("form[data-form='facts'] [name=age]")?.value ?? "",
     birthday: card.querySelector("form[data-form='facts'] [name=birthday]")?.value ?? "",
@@ -867,6 +869,8 @@ function restoreContactDraft(draft) {
   const notes = card.querySelector(".special-notes [name=notes]");
   const phone = card.querySelector("form[data-form='contact'] [name=phone]");
   const email = card.querySelector("form[data-form='contact'] [name=email]");
+  const household = card.querySelector("form[data-form='contact'] [name=household]");
+  const address = card.querySelector("form[data-form='contact'] [name=address]");
   const priesthood = card.querySelector("form[data-form='facts'] [name=priesthood]");
   const age = card.querySelector("form[data-form='facts'] [name=age]");
   const birthday = card.querySelector("form[data-form='facts'] [name=birthday]");
@@ -874,6 +878,8 @@ function restoreContactDraft(draft) {
   if (notes) notes.value = draft.notes;
   if (phone) phone.value = draft.phone;
   if (email) email.value = draft.email;
+  if (household) household.value = draft.household;
+  if (address) address.value = draft.address;
   if (priesthood) priesthood.value = draft.priesthood;
   if (age) age.value = draft.age;
   if (birthday) birthday.value = draft.birthday;
@@ -1925,7 +1931,7 @@ function youthMemberDetail(person) {
   const responded = families.filter((family) => family.sheetColumns?.Response === "Responded").length;
   return `${personNameField(person)}
     ${specialNotes(person)}
-    ${contactFields(person)}
+    ${contactFields(person, false, true)}
     ${factsForm(person)}
     <form class="companion-row" data-form="youth-companion">
       <label>Companion <input name="companion" value="${esc(companion)}" autocomplete="off" aria-label="Companion"></label>
@@ -1985,8 +1991,7 @@ function rosterDetail(person) {
   return `${personNameField(person)}
     ${specialNotes(person)}
     <p class="status-row">${statusSelect(person)}${archiveControl(person)}${person.rosterStatusKey === "scheduled" ? visitCheck(person) : ""}</p>
-    ${contactFields(person)}
-    ${addressField(person)}
+    ${contactFields(person, false, true)}
     ${factsForm(person)}
     ${planLine(person)}
     ${assignmentFields(person)}
@@ -2183,15 +2188,16 @@ function addressField(person) {
     </label>`;
 }
 
-function contactFields(person, details = false) {
+function contactFields(person, details = false, withAddress = false) {
   const phone = String(person.phone || "").trim();
   const email = String(person.email || "").trim();
   const household = details ? `<label class="wide">Household
       <textarea name="household" rows="4">${esc(person.household || "")}</textarea>
-    </label>
-    ${addressField(person)}` : "";
+    </label>` : "";
+  const address = details || withAddress ? addressField(person) : "";
   return `<form class="contact-fields" data-form="contact">
     ${household}
+    ${address}
     <div>
       <label>Phone <input name="phone" type="tel" autocomplete="off" inputmode="tel" value="${esc(phone)}" class="${phone ? "" : "is-missing"}"></label>
       <span class="contact-actions">
