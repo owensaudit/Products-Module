@@ -1,0 +1,13 @@
+{
+  "name": "ministering-visit-portal",
+  "private": true,
+  "type": "module",
+  "description": "Local portal for Elders Quorum ministering visit outreach, scheduling, and comments.",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
