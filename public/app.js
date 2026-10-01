@@ -1533,20 +1533,12 @@ function contactLines(person) {
   if (!person) return "";
   const parts = [];
   const household = String(person.household || "").trim();
-  const address = String(person.sheetColumns?.Address || "").trim();
   const phone = String(person.phone || "").trim();
   const email = String(person.email || "").trim();
   if (household) parts.push(`<small class="contact-line">${esc(household)}</small>`);
-  if (address) parts.push(`<small class="contact-line">${esc(address)}</small>${addressPill(address)}`);
   if (phone) parts.push(`<small class="contact-line">${esc(phone)}</small>`);
   if (email) parts.push(`<small class="contact-line">${esc(email)}</small>`);
   return parts.join("");
-}
-
-function addressLine(person) {
-  const address = String(person?.sheetColumns?.Address || "").trim();
-  if (!address) return "";
-  return `<small class="contact-line">${esc(address)}</small>${addressPill(address)}`;
 }
 
 function roleCard(person, kind, fallback = "") {
@@ -1736,7 +1728,7 @@ function personButtons(people = filteredPeople()) {
       <strong>${esc(personLabel(person))}</strong>
       ${confirmVisit ? "" : visitedMark(person)}
       ${statusControl}
-      ${youthVisit ? contactLines(person) : addressLine(person)}
+      ${youthVisit ? contactLines(person) : ""}
       <small>${state.rosterMode ? rosterLine(person) : esc(latestLine(person))}</small>
     </div>`;
   }).join("");
