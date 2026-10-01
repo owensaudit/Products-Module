@@ -1520,7 +1520,7 @@ function addressPill(address) {
   const text = String(address || "").trim();
   const href = mapsHref(text);
   if (!href) return "";
-  return `<a class="address-pill" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(text)}</a>`;
+  return `<a class="tiny address-pill" href="${esc(href)}" target="_blank" rel="noopener noreferrer">Map</a>`;
 }
 
 function contactLines(person) {
@@ -1531,7 +1531,7 @@ function contactLines(person) {
   const phone = String(person.phone || "").trim();
   const email = String(person.email || "").trim();
   if (household) parts.push(`<small class="contact-line">${esc(household)}</small>`);
-  if (address) parts.push(addressPill(address));
+  if (address) parts.push(`<small class="contact-line">${esc(address)}</small>${addressPill(address)}`);
   if (phone) parts.push(`<small class="contact-line">${esc(phone)}</small>`);
   if (email) parts.push(`<small class="contact-line">${esc(email)}</small>`);
   return parts.join("");
@@ -2176,7 +2176,7 @@ function contactFields(person, details = false) {
     </label>
     <label class="wide">Address
       <textarea name="address" rows="3">${esc(person.sheetColumns?.Address || "")}</textarea>
-      ${addressPill(person.sheetColumns?.Address)}
+      <span class="contact-actions">${addressPill(person.sheetColumns?.Address)}</span>
     </label>` : "";
   return `<form class="contact-fields" data-form="contact">
     ${household}
@@ -2206,7 +2206,6 @@ function syncContactLinks(form) {
   if (addressInput && addressLink) {
     const address = addressInput.value.trim();
     addressLink.hidden = !address;
-    addressLink.textContent = address;
     addressLink.href = mapsHref(address) || "#";
   }
   phoneInput?.classList.toggle("is-missing", !phone);
