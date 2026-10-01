@@ -768,6 +768,11 @@ presidencyHost?.addEventListener("click", (event) => {
   officeFilter = "all";
   statusFilter = assigneeFilter ? "scheduled" : "all";
   view = "people";
+  const current = selectedPerson();
+  if (!current || !personMatchesFilters(current)) {
+    selectedPersonId = null;
+    detailForm = null;
+  }
   preserveListScroll = false;
   render();
   preserveListScroll = true;
