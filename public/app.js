@@ -1537,6 +1537,12 @@ function contactLines(person) {
   return parts.join("");
 }
 
+function addressLine(person) {
+  const address = String(person?.sheetColumns?.Address || "").trim();
+  if (!address) return "";
+  return `<small class="contact-line">${esc(address)}</small>${addressPill(address)}`;
+}
+
 function roleCard(person, kind, fallback = "") {
   const title = person ? nameKey(person) : fallback;
   if (!title) return "";
@@ -1724,7 +1730,7 @@ function personButtons(people = filteredPeople()) {
       <strong>${esc(personLabel(person))}</strong>
       ${confirmVisit ? "" : visitedMark(person)}
       ${statusControl}
-      ${youthVisit ? contactLines(person) : ""}
+      ${youthVisit ? contactLines(person) : addressLine(person)}
       <small>${state.rosterMode ? rosterLine(person) : esc(latestLine(person))}</small>
     </div>`;
   }).join("");
@@ -1980,6 +1986,7 @@ function rosterDetail(person) {
     ${specialNotes(person)}
     <p class="status-row">${statusSelect(person)}${archiveControl(person)}${person.rosterStatusKey === "scheduled" ? visitCheck(person) : ""}</p>
     ${contactFields(person)}
+    ${addressField(person)}
     ${factsForm(person)}
     ${planLine(person)}
     ${assignmentFields(person)}
@@ -2168,16 +2175,21 @@ function specialNotes(person) {
   </label>`;
 }
 
+function addressField(person) {
+  const address = String(person.sheetColumns?.Address || "").trim();
+  return `<label class="wide">Address
+      <textarea name="address" rows="3">${esc(address)}</textarea>
+      <span class="contact-actions">${addressPill(address)}</span>
+    </label>`;
+}
+
 function contactFields(person, details = false) {
   const phone = String(person.phone || "").trim();
   const email = String(person.email || "").trim();
   const household = details ? `<label class="wide">Household
       <textarea name="household" rows="4">${esc(person.household || "")}</textarea>
     </label>
-    <label class="wide">Address
-      <textarea name="address" rows="3">${esc(person.sheetColumns?.Address || "")}</textarea>
-      <span class="contact-actions">${addressPill(person.sheetColumns?.Address)}</span>
-    </label>` : "";
+    ${addressField(person)}` : "";
   return `<form class="contact-fields" data-form="contact">
     ${household}
     <div>
