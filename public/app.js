@@ -29,6 +29,15 @@ const STATUS_ORDER = ["replied", "awaiting_reply", "not_contacted", "scheduled",
 
 const CHANNEL_LABELS = { text: "Text", phone: "Call", email: "Email", driveby: "Drive-by", in_person: "In person" };
 
+function formatPhone(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const digits = raw.replace(/\D/g, "");
+  const national = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+  if (national.length !== 10) return raw;
+  return `(${national.slice(0, 3)}) ${national.slice(3, 6)}-${national.slice(6)}`;
+}
+
 const app = document.querySelector("#app");
 const presidencyHost = document.querySelector("#presidency");
 const notice = document.querySelector("#notice");
@@ -367,7 +376,7 @@ app.addEventListener("submit", (event) => {
     const payload = {
       displayName: data.get("displayName"),
       household: data.get("household"),
-      phone: data.get("phone"),
+      phone: formatPhone(data.get("phone")),
       email: data.get("email"),
       notes: data.get("notes"),
     };
@@ -648,7 +657,9 @@ function saveYouthMember(id) {
   const person = state?.people?.find((item) => item.id === id);
   if (!person || !presidencyHost) return;
   const typedName = String(presidencyHost.querySelector(`[name="name-member-${id}"]`)?.value ?? "").trim();
-  const phone = String(presidencyHost.querySelector(`[name="phone-member-${id}"]`)?.value ?? "").trim();
+  const phoneInput = presidencyHost.querySelector(`[name="phone-member-${id}"]`);
+  const phone = formatPhone(phoneInput?.value ?? "");
+  if (phoneInput && phoneInput.value !== phone) phoneInput.value = phone;
   const email = String(presidencyHost.querySelector(`[name="email-member-${id}"]`)?.value ?? "").trim();
   const payload = {};
   if (typedName && typedName !== nameKey(person)) payload.name = typedName;
@@ -669,7 +680,7 @@ function youthLeadershipFromForm() {
     const rows = state?.youthLeadership?.[quorum] || [];
     return rows.map((row, index) => ({
       name: String(presidencyHost?.querySelector(`[name="name-${quorum}-${index}"]`)?.value ?? row.name ?? "").trim(),
-      phone: String(presidencyHost?.querySelector(`[name="phone-${quorum}-${index}"]`)?.value ?? row.phone ?? "").trim(),
+      phone: readPhoneField(presidencyHost?.querySelector(`[name="phone-${quorum}-${index}"]`), row.phone),
       email: String(presidencyHost?.querySelector(`[name="email-${quorum}-${index}"]`)?.value ?? row.email ?? "").trim(),
     }));
   };
@@ -690,10 +701,16 @@ function saveYouthLeadership() {
   }).catch(showError);
 }
 
+function readPhoneField(input, fallback = "") {
+  const formatted = formatPhone(input ? input.value : fallback);
+  if (input && input.value !== formatted) input.value = formatted;
+  return formatted;
+}
+
 function presidencyMembersFromForm() {
   return (state?.presidency || []).map((member, index) => ({
     name: String(presidencyHost?.querySelector(`[name="name-${index}"]`)?.value ?? member.name).trim(),
-    phone: String(presidencyHost?.querySelector(`[name="phone-${index}"]`)?.value ?? "").trim(),
+    phone: readPhoneField(presidencyHost?.querySelector(`[name="phone-${index}"]`), member.phone),
     email: String(presidencyHost?.querySelector(`[name="email-${index}"]`)?.value ?? "").trim(),
   }));
 }
@@ -928,7 +945,9 @@ function saveContactFields() {
   const nameInput = card.querySelector("[name=name]");
   const typedName = nameInput?.value.trim() ?? "";
   const notes = card.querySelector(".special-notes [name=notes]")?.value.trim() ?? "";
-  const phone = card.querySelector("form[data-form='contact'] [name=phone]")?.value.trim() ?? "";
+  const phoneInput = card.querySelector("form[data-form='contact'] [name=phone]");
+  const phone = formatPhone(phoneInput?.value ?? "");
+  if (phoneInput && phoneInput.value !== phone) phoneInput.value = phone;
   const email = card.querySelector("form[data-form='contact'] [name=email]")?.value.trim() ?? "";
   const householdInput = card.querySelector("form[data-form='contact'] [name=household]");
   const addressInput = card.querySelector("form[data-form='contact'] [name=address]");
@@ -1045,7 +1064,7 @@ function renderPresidency() {
     <span class="pres-head">Email</span>
     <span class="pres-head">Position</span>
     ${members.map((member, index) => `<span class="pres-name-line"><input id="pres-name-${index}" class="pres-name${index === 0 ? " is-president" : ""}" name="name-${index}" value="${esc(member.name)}" required autocomplete="off" aria-label="${esc(member.role)} name">${assignedCountButton(member.name, eldersPeople())}</span>
-      <input name="phone-${index}" type="tel" inputmode="tel" autocomplete="off" value="${esc(member.phone || "")}" aria-label="${esc(member.role)} phone" placeholder="Phone">
+      <input name="phone-${index}" type="tel" inputmode="tel" autocomplete="off" value="${esc(formatPhone(member.phone || ""))}" aria-label="${esc(member.role)} phone" placeholder="Phone">
       <input name="email-${index}" type="email" inputmode="email" autocomplete="off" value="${esc(member.email || "")}" aria-label="${esc(member.role)} email" placeholder="Email">
       <p class="position${index === 0 ? " is-president" : ""}">${esc(member.role)}</p>`).join("")}
   </form>`;
@@ -1136,13 +1155,13 @@ function youthSectionBoard(quorum, label, rows, members) {
   const leaderRows = rows.map(({ row, index }) => {
     const president = index === 0 ? " is-president" : "";
     return `<span class="pres-name-line"><input class="pres-name${president}" name="name-${quorum}-${index}" value="${esc(row.name || "")}" autocomplete="off" aria-label="${esc(label)} ${esc(row.role)} name">${assignedCountButton(row.name, visits, quorum)}</span>
-      <input name="phone-${quorum}-${index}" type="tel" inputmode="tel" autocomplete="off" value="${esc(row.phone || "")}" aria-label="${esc(row.role)} phone" placeholder="Phone">
+      <input name="phone-${quorum}-${index}" type="tel" inputmode="tel" autocomplete="off" value="${esc(formatPhone(row.phone || ""))}" aria-label="${esc(row.role)} phone" placeholder="Phone">
       <input name="email-${quorum}-${index}" type="email" inputmode="email" autocomplete="off" value="${esc(row.email || "")}" aria-label="${esc(row.role)} email" placeholder="Email">
       <p class="position${president}">${esc(row.role)}</p>`;
   }).join("");
   const memberLabel = members.length ? `<span class="pres-section">Members</span>` : "";
   const memberRows = members.map((person) => `<span class="pres-name-line"><input class="pres-name" name="name-member-${esc(person.id)}" value="${esc(nameKey(person))}" autocomplete="off" aria-label="${esc(nameKey(person))} name">${assignedCountButton(nameKey(person), visits, quorum)}</span>
-      <input name="phone-member-${esc(person.id)}" type="tel" inputmode="tel" autocomplete="off" value="${esc(person.phone || "")}" aria-label="${esc(nameKey(person))} phone" placeholder="Phone">
+      <input name="phone-member-${esc(person.id)}" type="tel" inputmode="tel" autocomplete="off" value="${esc(formatPhone(person.phone || ""))}" aria-label="${esc(nameKey(person))} phone" placeholder="Phone">
       <input name="email-member-${esc(person.id)}" type="email" inputmode="email" autocomplete="off" value="${esc(person.email || "")}" aria-label="${esc(nameKey(person))} email" placeholder="Email">
       <p class="position">${esc(person.priesthood || (quorum === "teachers" ? "Teacher" : "Priest"))}</p>`).join("");
   return `<form class="presidency-board quorum-${quorum}" data-quorum="${quorum}">
@@ -2196,7 +2215,7 @@ function contactFields(person, details = false, withAddress = false) {
     ${household}
     ${address}
     <div>
-      <label>Phone <input name="phone" type="tel" autocomplete="off" inputmode="tel" value="${esc(phone)}" class="${phone ? "" : "is-missing"}"></label>
+      <label>Phone <input name="phone" type="tel" autocomplete="off" inputmode="tel" value="${esc(formatPhone(phone))}" class="${phone ? "" : "is-missing"}"></label>
       <span class="contact-actions">
         <a class="tiny" data-contact="call" href="${phone ? `tel:${esc(phone)}` : ""}" ${phone ? "" : "hidden"}>Call</a>
         <a class="tiny" data-contact="text" href="${phone ? `sms:${esc(phone)}` : ""}" ${phone ? "" : "hidden"}>Text</a>

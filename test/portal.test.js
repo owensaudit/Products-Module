@@ -541,6 +541,14 @@ test("an outreach row records a presidency member, how they reached out, and the
   )));
   assert.equal(presentState(state, "2026-09").presidency[0].phone, "555-0101");
   assert.equal(presentState(state, "2026-09").presidency[0].email, "ada@example.com");
+  const withPhone = presentState(state, "2026-09");
+  state = setPresidency(state, withPhone.presidency.map((member, index) => (
+    index === 4 ? { ...member, phone: "5550101999" } : member
+  )));
+  assert.equal(presentState(state, "2026-09").presidency[4].phone, "(555) 010-1999");
+  assert.equal(presentState(state, "2026-09").presidency[0].email, "ada@example.com");
+  state = setPersonContact(state, "per_1", { phone: "1 (555) 010-2000" });
+  assert.equal(state.people[0].phone, "(555) 010-2000");
   assert.equal(presentState(state, "2026-09").presidency[1].phone, "");
 
   const migrated = activePresidency({
