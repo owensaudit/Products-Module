@@ -1895,6 +1895,12 @@ function companionPill(name) {
   return hasCompanionPair(name) ? `<span class="pill companion-pair">Companion</span>` : "";
 }
 
+function noCompanionPill(name) {
+  const youth = (state?.people || []).find((person) => (person.group === "priests" || person.group === "teachers") && nameVariants(nameKey(person)).some((key) => nameVariants(name).includes(key)));
+  if (!youth || hasCompanionPair(name)) return "";
+  return `<span class="pill no-companion">No companion</span>`;
+}
+
 function directoryNameMatches(left, right) {
   const fold = (value) => String(value || "").trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ");
   const variants = (value) => {
@@ -1926,15 +1932,18 @@ function directoryListMarkup(rows) {
   }
   return rows.map((row) => {
     const open = directoryFocus?.id === row.id;
+    const needsVisit = !directoryAssignment(row);
     const members = (row.members || []).map((member) => {
       const name = directoryPersonName(row, member);
-      const paired = hasCompanionPair(name) ? " has-companion" : "";
-      return `<span class="directory-member${paired}">${esc(name)}</span>`;
+      const paired = hasCompanionPair(name);
+      const mark = paired ? " has-companion" : (needsVisit ? " needs-visit" : "");
+      return `<span class="directory-member${mark}">${esc(name)}</span>`;
     }).join("");
     const paired = (row.members || []).some((member) => hasCompanionPair(directoryPersonName(row, member)));
-    return `<div class="person directory-card${paired ? " has-companion" : ""}" data-action="open-directory-household" data-id="${esc(row.id)}" aria-current="${open ? "true" : "false"}">
+    return `<div class="person directory-card${paired ? " has-companion" : ""}${needsVisit ? " needs-visit" : ""}" data-action="open-directory-household" data-id="${esc(row.id)}" aria-current="${open ? "true" : "false"}">
       <strong>${esc(row.name)}</strong>
       ${paired ? `<span class="pill companion-pair">Companion</span>` : ""}
+      ${needsVisit ? `<span class="pill no-visit">No visit</span>` : ""}
       <div class="directory-members">${members}</div>
     </div>`;
   }).join("");
@@ -1952,6 +1961,7 @@ function directoryHouseholdCard(record) {
   const confirm = visit?.rosterStatusKey === "scheduled" ? visitCheck(visit) : "";
   const status = visit ? `<p class="status-row">${statusSelect(visit)}${confirm}</p>` : "";
   return `<input class="person-name" name="name" value="${esc(record.name)}" aria-label="Household name" autocomplete="off">
+    ${visit ? "" : `<p><span class="pill no-visit">No visit</span></p>`}
     ${status}
     <form class="contact-fields" data-form="directory-household" data-id="${esc(record.id)}">
       <label class="wide">Household
@@ -2017,7 +2027,7 @@ function roleCard(person, kind, fallback = "") {
   const paired = hasCompanionPair(title) ? " has-companion" : "";
   const tone = `${kind === "Assignment" ? " role-assignment" : ""}${paired}`;
   const facts = kind === "Assignment" ? contactLines(person) : "";
-  const body = `<span class="role-kicker">${esc(kind)}</span><strong>${esc(title)}</strong>${companionPill(title)}${facts}`;
+  const body = `<span class="role-kicker">${esc(kind)}</span><strong>${esc(title)}</strong>${companionPill(title)}${kind === "Priest" || kind === "Teacher" ? noCompanionPill(title) : ""}${facts}`;
   if (!person) return `<article class="role-card${tone}">${body}</article>`;
   if (kind === "Assignment") return `<div class="role-card${tone}" data-action="select-person" data-id="${esc(person.id)}">${body}</div>`;
   return `<button type="button" class="role-card${tone}" data-action="select-person" data-id="${esc(person.id)}">${body}</button>`;
@@ -2122,6 +2132,7 @@ function youthEntryButton(entry, quorum = "") {
       ${outreachMarks(person) ? `<span class="card-marks">${outreachMarks(person)}</span>` : ""}
       <strong>${esc(personLabel(person))}</strong>
       ${companionPill(nameKey(person))}
+      ${noCompanionPill(nameKey(person))}
       ${visitedMark(person)}
       ${state.rosterMode ? statusSelect(person) : `<span class="pill ${person.outreachStatus}">${esc(STATUS_LABELS[person.outreachStatus])}</span>`}
       <small>${state.rosterMode ? rosterLine(person) : esc(latestLine(person))}</small>

@@ -1058,6 +1058,13 @@ article.role-card { cursor: default; }
 .person.has-companion,
 .role-card.has-companion { box-shadow: inset 0 0 0 3px #8fd4a8; }
 .pill.companion-pair { background: var(--status-reschedule); color: #145c34; }
+.pill.no-companion,
+.pill.no-visit { background: var(--status-none); color: #3d3200; }
+.directory-member.needs-visit {
+  background: #fff6cc;
+  border-color: #e6d48a;
+  color: #3d3200;
+}
 .household-edit { display: grid; gap: 8px; margin-top: 12px; }
 .household-edit input,
 .household-edit textarea { width: 100%; }
