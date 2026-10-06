@@ -28,6 +28,7 @@ import {
   setPersonStatus,
   setVisitStatus,
 } from "./lib/model.js";
+import { emailAllowed, parseAllowlist } from "./lib/allowlist.js";
 import { addDirectoryMember, addDirectoryVisit, applyDirectory, assignDirectoryHousehold, moveDirectoryPerson, parseDirectory, removeDirectoryMember, setDirectoryCompanion, updateDirectoryHousehold } from "./lib/directory.js";
 import { createStore } from "./lib/store.js";
 
@@ -96,7 +97,38 @@ async function sendFile(response, file) {
   createReadStream(file.file).pipe(response);
 }
 
-export function createPortalServer(store) {
+function firebaseWebConfig() {
+  const raw = process.env.FIREBASE_WEB_CONFIG;
+  if (!raw) return null;
+  try {
+    const config = JSON.parse(raw);
+    return config && typeof config === "object" ? config : null;
+  } catch {
+    return null;
+  }
+}
+
+async function verifyGoogleToken(request) {
+  const header = String(request.headers.authorization || "");
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  if (!match) throw new PortalError("Sign in required", 401);
+  const { getApps, initializeApp } = await import("firebase-admin/app");
+  const { getAuth } = await import("firebase-admin/auth");
+  if (!getApps().length) initializeApp({ projectId: process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || "prunehill" });
+  try {
+    const decoded = await getAuth().verifyIdToken(match[1]);
+    if (!decoded.email_verified) throw new PortalError("Sign in required", 401);
+    return String(decoded.email || "");
+  } catch (error) {
+    if (error instanceof PortalError) throw error;
+    throw new PortalError("Sign in required", 401);
+  }
+}
+
+export function createPortalServer(store, options = {}) {
+  const authRequired = options.requireAuth === true || process.env.REQUIRE_AUTH === "1";
+  const allow = options.allow || parseAllowlist(process.env.ALLOWED_EMAILS);
+  const authenticate = options.authenticate || verifyGoogleToken;
   return http.createServer(async (request, response) => {
     try {
       const url = new URL(request.url || "/", "http://127.0.0.1");
@@ -116,6 +148,20 @@ export function createPortalServer(store) {
       if (request.method === "GET" && pathname === "/api/health") {
         sendJson(response, 200, { ok: true });
         return;
+      }
+
+      if (request.method === "GET" && pathname === "/api/config") {
+        sendJson(response, 200, { auth: authRequired, firebase: firebaseWebConfig() });
+        return;
+      }
+
+      if (authRequired && pathname.startsWith("/api/")) {
+        const email = await authenticate(request);
+        if (!emailAllowed(email, allow)) throw new PortalError("This Google account cannot open this portal", 403);
+      }
+
+      if (request.method === "POST" && pathname === "/api/reset" && authRequired) {
+        throw new PortalError("Clearing the shared portal is turned off", 403);
       }
 
       if (request.method === "GET" && pathname === "/api/state") {

@@ -86,6 +86,10 @@ let importPreview = null;
 let importCsv = "";
 let importFileName = "";
 let importResult = null;
+let authRequired = false;
+let authToken = "";
+let authUser = null;
+let firebaseAuth = null;
 
 if (authorInput) {
   authorInput.value = localStorage.getItem("mvp-author") || "";
@@ -749,7 +753,7 @@ app.addEventListener("change", (event) => {
   }
 });
 
-refresh().catch(showError);
+start().catch(showError);
 
 function currentMonth() {
   const now = new Date();
@@ -791,10 +795,61 @@ function post(path, body) {
 }
 
 async function api(path, options) {
-  const response = await fetch(path, options);
+  const headers = { ...(options?.headers || {}) };
+  if (authToken) headers.authorization = `Bearer ${authToken}`;
+  const response = await fetch(path, { ...options, headers });
   const body = await response.json().catch(() => ({}));
+  if (response.status === 401 && firebaseAuth?.currentUser) {
+    authToken = await firebaseAuth.currentUser.getIdToken(true);
+    headers.authorization = `Bearer ${authToken}`;
+    const retry = await fetch(path, { ...options, headers });
+    const retryBody = await retry.json().catch(() => ({}));
+    if (!retry.ok) throw new Error(retryBody.error || "Request failed");
+    return retryBody;
+  }
   if (!response.ok) throw new Error(body.error || "Request failed");
   return body;
+}
+
+async function start() {
+  const config = await fetch("/api/config").then((response) => response.json()).catch(() => ({ auth: false }));
+  authRequired = Boolean(config.auth);
+  if (authRequired) await signIn(config.firebase);
+  await refresh();
+}
+
+async function signIn(firebaseConfig) {
+  if (!firebaseConfig?.apiKey) throw new Error("Google sign-in is not configured");
+  const { initializeApp } = await import("https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js");
+  const { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } = await import("https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js");
+  const auth = getAuth(initializeApp(firebaseConfig));
+  firebaseAuth = auth;
+  authUser = await new Promise((resolve) => {
+    const stop = onAuthStateChanged(auth, (user) => {
+      stop();
+      resolve(user);
+    });
+  });
+  if (!authUser) {
+    document.querySelector("#sign-in").hidden = false;
+    document.querySelector("#app").hidden = true;
+    await new Promise((resolve, reject) => {
+      document.querySelector("#google-sign-in").addEventListener("click", () => {
+        signInWithPopup(auth, new GoogleAuthProvider()).then((result) => {
+          authUser = result.user;
+          resolve();
+        }).catch(reject);
+      }, { once: true });
+    });
+    document.querySelector("#sign-in").hidden = true;
+    document.querySelector("#app").hidden = false;
+  }
+  authToken = await authUser.getIdToken();
+  const signOutButton = document.querySelector("#sign-out");
+  signOutButton.hidden = false;
+  signOutButton.addEventListener("click", () => {
+    signOut(auth).then(() => window.location.reload());
+  });
 }
 
 function selectedPerson() {
@@ -3560,12 +3615,12 @@ function importView() {
   return `<section class="card stack">
     <h2>Import a spreadsheet export</h2>
     <p>Export the outreach sheet as CSV and upload it here. Extra columns stay on each person. Phone and email columns stay hidden until you show contact details.</p>
-    <p>This portal has no login. Do not import phone numbers or email addresses unless only people you trust can open this site.</p>
+    <p>Phone numbers and email addresses stay hidden until you show contact details.</p>
     <p><a href="/template.csv">Download a header-only template</a>. It has no member rows.</p>
     <label>CSV file <input id="csv-file" type="file" accept=".csv,text/csv"></label>
     ${preview ? previewBlock(preview) : ""}
     ${importResult ? `<p class="banner">Imported ${importResult.imported}. Skipped ${importResult.skipped.length}.${skipReasons(importResult.skipped)}</p>` : ""}
-    <button type="button" class="ghost" data-action="reset">Clear portal data</button>
+    ${authRequired ? "" : `<button type="button" class="ghost" data-action="reset">Clear portal data</button>`}
   </section>`;
 }
 

@@ -3,9 +3,14 @@
   "private": true,
   "type": "module",
   "description": "Local portal for Elders Quorum ministering visit outreach, scheduling, and comments.",
+  "main": "function.js",
   "scripts": {
     "start": "node server.js",
     "test": "node --test"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.5.0",
+    "firebase-functions": "^6.4.0"
   },
   "engines": {
     "node": ">=22"

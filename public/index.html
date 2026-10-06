@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ministering Visit Portal</title>
-    <link rel="stylesheet" href="/styles.css?v=101">
+    <link rel="stylesheet" href="/styles.css?v=102">
   </head>
   <body>
     <a class="skip" href="#app">Skip to the portal</a>
@@ -25,6 +25,7 @@
           </p>
         </div>
         <nav class="quorum-nav" aria-label="Quorum">
+          <button type="button" id="sign-out" class="tiny sign-out" hidden>Sign out</button>
           <button type="button" id="open-elders" data-page-link="elders" aria-pressed="true">Ministering visits</button>
           <button type="button" id="open-youth" data-page-link="youth" aria-pressed="false">Youth ministry</button>
           <button type="button" id="open-directory" data-page-link="directory" aria-pressed="false">Directory</button>
@@ -63,7 +64,14 @@
       <aside id="presidency" aria-label="EQ Presidency"></aside>
     </header>
     <p id="notice" class="notice" role="status" hidden></p>
+    <section id="sign-in" class="sign-in" hidden>
+      <div class="card stack">
+        <h2>Sign in</h2>
+        <p>Use the Google account that was invited to the PruneHill portal.</p>
+        <button type="button" class="primary" id="google-sign-in">Sign in with Google</button>
+      </div>
+    </section>
     <main id="app" tabindex="-1"></main>
-    <script src="/app.js?v=118" type="module"></script>
+    <script src="/app.js?v=119" type="module"></script>
   </body>
 </html>

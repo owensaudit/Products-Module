@@ -1459,6 +1459,14 @@ button.mark-visited {
   line-height: 1.4;
 }
 
+.sign-in {
+  max-width: 32rem;
+  margin: 32px auto;
+  padding: 0 16px;
+}
+
+.sign-out { margin-right: 8px; }
+
 .primary {
   background: var(--church-deep);
   color: white;

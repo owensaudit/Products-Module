@@ -37,7 +37,9 @@ import {
 } from "../lib/model.js";
 import { addDirectoryMember, addDirectoryVisit, applyDirectory, applyMinisteringGroups, assignDirectoryHousehold, directoryAddressKey, findDirectoryRecord, mergeDirectoryByAddress, moveDirectoryPerson, parseDirectory, removeDirectoryMember, setDirectoryCompanion, updateDirectoryHousehold } from "../lib/directory.js";
 import { brotherSheetToState, calendarMarks, canonicalRosterStatus, isArchiveStatus, rosterStatusKey } from "../lib/roster.js";
+import { emailAllowed, parseAllowlist } from "../lib/allowlist.js";
 import { createStore } from "../lib/store.js";
+import { PortalError } from "../lib/model.js";
 import { createPortalServer } from "../server.js";
 
 function deps() {
@@ -1213,4 +1215,46 @@ test("a ministering companionship keeps its companions and assigned households",
   const added = addDirectoryVisit(pair, { directoryId: "dir_bea", member: "Bea", householdId: "dir_home" });
   assert.deepEqual(added.directory.find((row) => row.id === "dir_bea").memberVisits.bea.map((item) => item.label), ["Keeper, Ada & Bob", "Sample, Mike & Melinda"]);
   assert.equal(added.people[0].displayName, "Keep");
+});
+
+test("the shared portal requires an invited Google account", async () => {
+  const allow = parseAllowlist("Leader@Example.com, second@example.com");
+  assert.equal(emailAllowed("leader@example.com", allow), true);
+  assert.equal(emailAllowed("other@example.com", allow), false);
+  const directory = await mkdtemp(path.join(tmpdir(), "portal-auth-"));
+  const server = createPortalServer(createStore(path.join(directory, "portal.json")), {
+    requireAuth: true,
+    allow,
+    authenticate(request) {
+      const header = String(request.headers.authorization || "");
+      if (header === "Bearer allowed") return "leader@example.com";
+      if (header === "Bearer other") return "other@example.com";
+      throw new PortalError("Sign in required", 401);
+    },
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const config = await fetch(`${base}/api/config`);
+    assert.equal((await config.json()).auth, true);
+    const anonymous = await fetch(`${base}/api/state`);
+    assert.equal(anonymous.status, 401);
+    const stranger = await fetch(`${base}/api/state`, { headers: { authorization: "Bearer other" } });
+    assert.equal(stranger.status, 403);
+    const invited = await fetch(`${base}/api/people`, {
+      method: "POST",
+      headers: { authorization: "Bearer allowed", "content-type": "application/json" },
+      body: JSON.stringify({ displayName: "Ada Example" }),
+    });
+    assert.equal(invited.status, 201);
+    const reset = await fetch(`${base}/api/reset`, {
+      method: "POST",
+      headers: { authorization: "Bearer allowed" },
+    });
+    assert.equal(reset.status, 403);
+    const saved = await createStore(path.join(directory, "portal.json")).read();
+    assert.equal(saved.people.length, 1);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
 });
