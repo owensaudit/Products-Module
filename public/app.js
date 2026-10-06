@@ -2063,8 +2063,12 @@ function directoryMissingCompanion(entry) {
   return !pairedCompanionName(entry.name);
 }
 
+function directorySharesHousehold(entry) {
+  return (entry.record?.members || []).length > 1;
+}
+
 function directoryMissingHousehold(entry) {
-  return !String(entry.household || "").trim();
+  return !directorySharesHousehold(entry);
 }
 
 function directoryEntryVisible(entry, needle) {
@@ -2084,8 +2088,9 @@ function directoryGapCount(kind) {
   return directoryEntries().filter((entry) => (kind === "companion" ? directoryMissingCompanion(entry) : directoryMissingHousehold(entry))).length;
 }
 
-function directoryHouseholdOptions(selectedId) {
+function directoryHouseholdOptions(selectedId, sharedOnly = false) {
   return (state?.directory || [])
+    .filter((row) => !sharedOnly || (row.members || []).length > 1)
     .slice()
     .sort((a, b) => String(a.name).localeCompare(String(b.name), "en", { sensitivity: "base" }))
     .map((row) => `<option value="${esc(row.id)}" ${row.id === selectedId ? "selected" : ""}>${esc(row.name)}</option>`)
@@ -2102,10 +2107,11 @@ function directoryListMarkup(rows) {
   }
   return rows.map((entry) => {
     const open = directoryFocus?.directoryId === entry.directoryId && directoryFocus?.member === entry.member;
+    const home = directorySharesHousehold(entry) ? `<small>${esc(entry.household)}</small>` : "";
     return `<div class="person" data-action="open-directory-person" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}" aria-current="${open ? "true" : "false"}">
       <strong>${esc(entry.name)}</strong>
       ${directoryStatusPills(entry.name)}
-      <small>${esc(entry.household)}</small>
+      ${home}
     </div>`;
   }).join("");
 }
@@ -2123,7 +2129,7 @@ function directoryPersonCard(entry) {
     ${status ? `<p class="status-row">${status}</p>` : ""}
     <form class="assign-row" data-form="directory-home" data-id="${esc(record.id)}" data-member="${esc(entry.member)}">
       <span>Household</span>
-      <select name="household" aria-label="Household">${directoryHouseholdOptions(record.id)}</select>
+      <select name="household" aria-label="Household">${directorySharesHousehold(entry) ? "" : `<option value="">—</option>`}${directoryHouseholdOptions(directorySharesHousehold(entry) ? record.id : "", true)}</select>
     </form>
     <form class="contact-fields" data-form="directory-contact" data-id="${esc(record.id)}">
       <label class="wide">Address

@@ -937,7 +937,11 @@ test("moving a directory person keeps both households and their companions", () 
   assert.equal(moved.directory[1].memberCompanions.ben, "Example, Dee");
   assert.equal(moved.people.length, 1);
   assert.equal(moved.people[0].displayName, "Keep");
-  assert.throws(() => moveDirectoryPerson(moved, { directoryId: "dir_1", member: "Ana", householdId: "dir_2" }), /at least one person/);
+  const joined = moveDirectoryPerson(moved, { directoryId: "dir_1", member: "Ana", householdId: "dir_2" });
+  assert.equal(joined.directory.length, 1);
+  assert.deepEqual(joined.directory[0].members, ["Cam", "Ben", "Ana"]);
+  assert.equal(joined.directory[0].address, "20 Other Ave");
+  assert.equal(joined.people[0].displayName, "Keep");
 });
 
 test("a directory member can be added or removed without touching the roster", () => {
