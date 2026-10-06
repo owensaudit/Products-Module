@@ -641,6 +641,23 @@ test("removing a youth assignment deletes that household", () => {
   assert.throws(() => removePerson(removed, "per_1"), /youth assignment/);
 });
 
+test("a young man's priesthood is stored on his card and chooses his quorum", () => {
+  const ids = deps();
+  let state = emptyState();
+  state = addPerson(state, { displayName: "Example, Ada", group: "priests", sheetColumns: { Brother: "Example, Ada" } }, ids);
+  assert.equal(state.people[0].sheetColumns.Priesthood, "Priest");
+  assert.equal(state.people[0].group, "priests");
+  state = addPerson(state, { displayName: "Sample, Bea", group: "teachers", sheetColumns: { Brother: "Sample, Bea", Priesthood: "Deacon" } }, ids);
+  assert.equal(state.people[1].sheetColumns.Priesthood, "Deacon");
+  state = setPersonContact(state, "per_1", { priesthood: "Teacher" });
+  assert.equal(state.people[0].group, "teachers");
+  assert.equal(state.people[0].sheetColumns.Priesthood, "Teacher");
+  state = addPerson(state, { displayName: "Keeper, Ed", sheetColumns: { Brother: "Keeper, Ed", Priesthood: "Elder" } }, ids);
+  state = setPersonContact(state, "per_3", { priesthood: "Priest" });
+  assert.equal(state.people[2].group, undefined);
+  assert.equal(state.people[2].sheetColumns.Priesthood, "Priest");
+});
+
 test("a youth member keeps a quorum and a blank leadership name", async () => {
   let state = emptyState();
   state = addPerson(state, {

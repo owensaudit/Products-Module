@@ -1429,7 +1429,7 @@ function youthSectionBoard(quorum, label, rows, members) {
   const memberRows = members.map((person) => `<span class="pres-name-line"><input class="pres-name" name="name-member-${esc(person.id)}" value="${esc(nameKey(person))}" autocomplete="off" aria-label="${esc(nameKey(person))} name">${assignedCountButton(nameKey(person), visits, quorum)}</span>
       <input name="phone-member-${esc(person.id)}" type="tel" inputmode="tel" autocomplete="off" value="${esc(formatPhone(person.phone || ""))}" aria-label="${esc(nameKey(person))} phone" placeholder="Phone">
       <input name="email-member-${esc(person.id)}" type="email" inputmode="email" autocomplete="off" value="${esc(person.email || "")}" aria-label="${esc(nameKey(person))} email" placeholder="Email">
-      <p class="position">${esc(person.priesthood || (quorum === "teachers" ? "Teacher" : "Priest"))}</p>`).join("");
+      <p class="position">${esc(person.priesthood || "")}</p>`).join("");
   return `<form class="presidency-board quorum-${quorum}" data-quorum="${quorum}">
     <span class="pres-head">Name</span>
     <span class="pres-head">Phone</span>
@@ -2470,10 +2470,10 @@ function roleCard(person, kind, fallback = "") {
 function ministeringCards(quorum, membersOnly = false) {
   const rows = ministeringRows(quorum);
   if (!rows.length) return "";
-  const role = quorum === "teachers" ? "Teacher" : "Priest";
+  const roleFor = (person) => String(person?.priesthood || "").trim();
   if (membersOnly) {
     return `<div class="ministering-cards quorum-${quorum}">
-      ${rows.map((row) => roleCard(row.person, role)).join("")}
+      ${rows.map((row) => roleCard(row.person, roleFor(row.person))).join("")}
     </div>`;
   }
   return `<div class="ministering-cards quorum-${quorum}">
@@ -2481,7 +2481,7 @@ function ministeringCards(quorum, membersOnly = false) {
       const companionName = ministeringCompanionValue(row.person, row.families);
       const companion = findPersonByName(companionName);
       return `<section class="ministering-set">
-        ${roleCard(row.person, role)}
+        ${roleCard(row.person, roleFor(row.person))}
         ${roleCard(companion, "Companion", companionName)}
         ${row.families.map((family) => roleCard(family, "Assignment")).join("")}
       </section>`;
@@ -2545,15 +2545,15 @@ function youthVisibleEntries() {
 
 function noneListMarkup() {
   const blocks = [
-    ["priests", "Priests Quorum", "Priest"],
-    ["teachers", "Teachers Quorum", "Teacher"],
-  ].map(([quorum, label, role]) => {
+    ["priests", "Priests Quorum"],
+    ["teachers", "Teachers Quorum"],
+  ].map(([quorum, label]) => {
     const people = youthWithoutCompanions(quorum);
     if (!people.length) return "";
     return `<section class="youth-list-block">
       <h3>${esc(label)}</h3>
       <div class="ministering-cards quorum-${quorum}">
-        ${people.map((person) => roleCard(person, role)).join("")}
+        ${people.map((person) => roleCard(person, String(person.priesthood || "").trim())).join("")}
       </div>
     </section>`;
   }).join("");
