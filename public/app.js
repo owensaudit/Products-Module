@@ -275,8 +275,10 @@ app.addEventListener("click", (event) => {
   } else if (action === "toggle-archive") {
     archiveChoicesFor = archiveChoicesFor === selectedPersonId ? "" : selectedPersonId;
     render();
-  } else if (action === "set-status" || action === "mark-visited") {
-    applyStatus(button.dataset.personId, action === "mark-visited" ? "Visited" : button.dataset.status);
+  } else if (action === "mark-visited") {
+    applyStatus(button.dataset.personId, "Visited", { keepView: true });
+  } else if (action === "set-status") {
+    applyStatus(button.dataset.personId, button.dataset.status);
   } else if (action === "filter") {
     viewAll = false;
     statusFilter = button.dataset.status;
@@ -1321,42 +1323,46 @@ function personIsArchived(person) {
   return ARCHIVE_STATUS_ORDER.includes(person?.rosterStatusKey || "");
 }
 
-function applyStatus(personId, status) {
+function applyStatus(personId, status, options = {}) {
   if (status === "Reach Out") focusReachOutDate = true;
-  const archiveKey = {
-    Moved: "moved",
-    Mission: "mission",
-    "Do Not Contact": "do_not_contact",
-    "Not Interested": "not_interested",
-    "No Contact Info": "no_contact_info",
-    Declined: "declined",
-    Visited: "visited",
-  }[status];
-  if (archiveKey) {
-    viewAll = false;
-    assigneeFilter = "";
-    archiveOpen = true;
-    statusFilter = archiveKey;
-    dayFilter = "";
-    search = "";
-    officeFilter = "all";
-  } else {
-    const activeKey = {
-      "Reach Out": "reach_out",
-      "No Response": "no_response",
-      "Re-Schedule": "reschedule",
-      Scheduled: "scheduled",
-      "Drive by": "driveby",
-    }[status] || "none";
-    viewAll = false;
-    assigneeFilter = "";
-    if (archiveOpen) archiveOpen = false;
-    if (statusFilter !== "all" && statusFilter !== activeKey) statusFilter = "all";
+  if (!options.keepView) {
+    const archiveKey = {
+      Moved: "moved",
+      Mission: "mission",
+      "Do Not Contact": "do_not_contact",
+      "Not Interested": "not_interested",
+      "No Contact Info": "no_contact_info",
+      Declined: "declined",
+      Visited: "visited",
+    }[status];
+    if (archiveKey) {
+      viewAll = false;
+      assigneeFilter = "";
+      archiveOpen = true;
+      statusFilter = archiveKey;
+      dayFilter = "";
+      search = "";
+      officeFilter = "all";
+    } else {
+      const activeKey = {
+        "Reach Out": "reach_out",
+        "No Response": "no_response",
+        "Re-Schedule": "reschedule",
+        Scheduled: "scheduled",
+        "Drive by": "driveby",
+      }[status] || "none";
+      viewAll = false;
+      assigneeFilter = "";
+      if (archiveOpen) archiveOpen = false;
+      if (statusFilter !== "all" && statusFilter !== activeKey) statusFilter = "all";
+    }
   }
   archiveChoicesFor = "";
   post(`/api/people/${personId}/status`, { status }).then((next) => {
     state = next;
     selectedPersonId = personId;
+    const person = selectedPerson();
+    if (options.keepView && (!person || !personMatchesFilters(person))) selectedPersonId = null;
     render();
   }).catch(showError);
 }
