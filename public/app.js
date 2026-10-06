@@ -124,10 +124,13 @@ app.addEventListener("change", (event) => {
     }).catch(showError);
     return;
   }
-  if (target instanceof HTMLSelectElement && target.form?.dataset.form === "directory-assign" && target.name === "youth") {
-    const companion = directoryCompanionFor(target.value);
-    const field = target.form.querySelector("[name=companion]");
-    if (field && companion) field.value = companion;
+  if (target instanceof HTMLSelectElement && target.form?.dataset.form === "directory-assign") {
+    if (target.name === "youth") {
+      const companion = directoryCompanionFor(target.value);
+      const field = target.form.querySelector("[name=companion]");
+      if (field && companion) field.value = companion;
+    }
+    saveDirectoryAssignment(target.form);
     return;
   }
   if (target instanceof HTMLSelectElement && target.form?.dataset.form === "assign") {
@@ -369,9 +372,7 @@ app.addEventListener("click", (event) => {
     }).catch(showError);
   } else if (action === "open-directory-household" || action === "open-directory-person") {
     const pageTop = window.scrollY;
-    directoryFocus = action === "open-directory-person"
-      ? { kind: "person", id: button.dataset.id, member: button.dataset.member || "" }
-      : { kind: "household", id: button.dataset.id };
+    directoryFocus = { kind: "household", id: button.dataset.id };
     render();
     window.scrollTo(0, pageTop);
     requestAnimationFrame(() => window.scrollTo(0, pageTop));
@@ -422,17 +423,7 @@ app.addEventListener("submit", (event) => {
     return;
   }
   if (kind === "directory-household") {
-    post("/api/directory/household", {
-      directoryId: form.dataset.id,
-      name: data.get("name"),
-      members: data.get("members"),
-      address: data.get("address"),
-      phone: data.get("phone"),
-      email: data.get("email"),
-    }).then((next) => {
-      state = next;
-      render();
-    }).catch(showError);
+    saveDirectoryHousehold();
     return;
   }
   if (kind === "directory-assign") {
@@ -595,6 +586,13 @@ app.addEventListener("input", (event) => {
     if (page === "directory") renderDirectoryList();
     else renderPeopleList();
   }
+  if (page === "directory" && event.target.closest?.("form[data-form='directory-household'], .person-name")) {
+    const contact = event.target.closest("form[data-form='directory-household']");
+    if (contact) syncContactLinks(contact);
+    clearTimeout(contactTimer);
+    contactTimer = setTimeout(saveDirectoryHousehold, 400);
+    return;
+  }
   if (event.target.closest?.("form[data-form='contact'], form[data-form='facts'], .special-notes, .person-name")) {
     const contact = event.target.closest("form[data-form='contact']");
     if (contact) syncContactLinks(contact);
@@ -620,6 +618,11 @@ app.addEventListener("focusout", (event) => {
   const assignment = event.target.closest?.("[data-assignment-id]");
   if (assignment) {
     saveAssignmentName(assignment.dataset.assignmentId, assignment.value).catch(showError);
+    return;
+  }
+  if (page === "directory" && event.target.closest?.("form[data-form='directory-household'], .person-name")) {
+    clearTimeout(contactTimer);
+    saveDirectoryHousehold();
     return;
   }
   if (!event.target.closest?.("form[data-form='contact'], form[data-form='facts'], .special-notes, .person-name")) return;
@@ -1006,6 +1009,98 @@ function saveAssignmentName(personId, name) {
   return post(`/api/people/${personId}/contact`, { name: next }).then(render);
 }
 
+function saveDirectoryAssignment(form) {
+  const youth = form.querySelector("[name=youth]")?.value.trim() || "";
+  if (!youth) return;
+  const companion = form.querySelector("[name=companion]")?.value.trim() || "";
+  post("/api/directory/assign", {
+    directoryId: form.dataset.id,
+    youth,
+    companion,
+  }).then((next) => {
+    state = next;
+    render();
+  }).catch(showError);
+}
+
+function readDirectoryDraft() {
+  if (page !== "directory") return null;
+  const card = contactCard();
+  const field = document.activeElement;
+  if (!card || !field || !card.contains(field)) return null;
+  if (!field.closest("form[data-form='directory-household'], .person-name")) return null;
+  return {
+    id: directoryFocus?.id || "",
+    field: field.name || "",
+    name: card.querySelector(".person-name")?.value ?? "",
+    members: card.querySelector("[name=members]")?.value ?? "",
+    address: card.querySelector("[name=address]")?.value ?? "",
+    phone: card.querySelector("[name=phone]")?.value ?? "",
+    email: card.querySelector("[name=email]")?.value ?? "",
+    start: field.selectionStart,
+    end: field.selectionEnd,
+  };
+}
+
+function restoreDirectoryDraft(draft) {
+  if (!draft || draft.id !== directoryFocus?.id) return;
+  const card = contactCard();
+  if (!card) return;
+  const name = card.querySelector(".person-name");
+  const members = card.querySelector("[name=members]");
+  const address = card.querySelector("[name=address]");
+  const phone = card.querySelector("[name=phone]");
+  const email = card.querySelector("[name=email]");
+  if (name) name.value = draft.name;
+  if (members) members.value = draft.members;
+  if (address) address.value = draft.address;
+  if (phone) phone.value = draft.phone;
+  if (email) email.value = draft.email;
+  const form = card.querySelector("form[data-form='directory-household']");
+  if (form) syncContactLinks(form);
+  const field = draft.field === "name" ? name : card.querySelector(`[name="${draft.field}"]`);
+  if (!(field instanceof HTMLInputElement) && !(field instanceof HTMLTextAreaElement)) return;
+  field.focus();
+  if (typeof draft.start === "number" && typeof draft.end === "number") field.setSelectionRange(draft.start, draft.end);
+}
+
+function saveDirectoryHousehold() {
+  const card = contactCard();
+  const record = (state?.directory || []).find((row) => row.id === directoryFocus?.id);
+  if (!card || !record || page !== "directory") return;
+  const nameInput = card.querySelector(".person-name");
+  const membersInput = card.querySelector("[name=members]");
+  const name = nameInput?.value.trim() || "";
+  const members = membersInput?.value ?? "";
+  const address = card.querySelector("[name=address]")?.value.trim() ?? "";
+  const phoneInput = card.querySelector("[name=phone]");
+  const phone = formatPhone(phoneInput?.value ?? "");
+  const email = card.querySelector("[name=email]")?.value.trim() ?? "";
+  if (!name) {
+    if (nameInput) nameInput.value = record.name;
+    return;
+  }
+  if (!members.trim()) return;
+  const memberLines = (record.members || []).map((member) => directoryPersonName(record, member)).join("\n");
+  const same = name === record.name
+    && members.trim() === memberLines.trim()
+    && address === String(record.address || "").trim()
+    && phone === String(record.phone || "").trim()
+    && email === String(record.email || "").trim();
+  if (same) return;
+  post("/api/directory/household", {
+    directoryId: record.id,
+    name,
+    members,
+    address,
+    phone,
+    email,
+  }).then((next) => {
+    state = next;
+    render();
+  }).catch(showError);
+}
+
 function saveContactFields() {
   const card = contactCard();
   if (!card || !selectedPersonId) return;
@@ -1057,7 +1152,9 @@ function render() {
   }
   if (page === "directory") {
     const listScroll = preserveListScroll ? (document.querySelector("#person-list")?.scrollTop ?? 0) : 0;
+    const directoryDraft = readDirectoryDraft();
     app.innerHTML = directoryView();
+    restoreDirectoryDraft(directoryDraft);
     const list = document.querySelector("#person-list");
     if (list) list.scrollTop = listScroll;
     return;
@@ -1803,32 +1900,19 @@ function directoryListMarkup(rows) {
     return `<p class="empty">${message}</p>`;
   }
   return rows.map((row) => {
-    const openHousehold = directoryFocus?.kind === "household" && directoryFocus.id === row.id;
-    const members = (row.members || []).map((member) => directoryMemberButton(row, member)).join("");
-    return `<article class="directory-household${openHousehold ? " is-open" : ""}">
-      <button type="button" class="directory-household-name" data-action="open-directory-household" data-id="${esc(row.id)}" aria-current="${openHousehold}">${esc(row.name)}</button>
+    const open = directoryFocus?.id === row.id;
+    const members = (row.members || []).map((member) => {
+      const name = directoryPersonName(row, member);
+      const paired = hasCompanionPair(name) ? " has-companion" : "";
+      return `<span class="directory-member${paired}">${esc(name)}</span>`;
+    }).join("");
+    const paired = (row.members || []).some((member) => hasCompanionPair(directoryPersonName(row, member)));
+    return `<div class="person directory-card${paired ? " has-companion" : ""}" data-action="open-directory-household" data-id="${esc(row.id)}" aria-current="${open ? "true" : "false"}">
+      <strong>${esc(row.name)}</strong>
+      ${paired ? `<span class="pill companion-pair">Companion</span>` : ""}
       <div class="directory-members">${members}</div>
-    </article>`;
+    </div>`;
   }).join("");
-}
-
-function directoryMemberButton(row, member) {
-  const open = directoryFocus?.kind === "person" && directoryFocus.id === row.id && directoryFocus.member === member;
-  const paired = hasCompanionPair(directoryPersonName(row, member));
-  return `<button type="button" class="directory-member${open ? " is-open" : ""}${paired ? " has-companion" : ""}" data-action="open-directory-person" data-id="${esc(row.id)}" data-member="${esc(member)}">${esc(directoryPersonName(row, member))}</button>`;
-}
-
-function directoryPersonCard(record) {
-  const member = directoryFocus?.member || "";
-  const name = directoryPersonName(record, member);
-  const companion = record.memberCompanions?.[member.trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ")] || directoryCompanionFor(name);
-  return `<h2>${esc(name)}</h2>
-    <p class="muted">Household</p>
-    <p><button type="button" class="text-button" data-action="open-directory-household" data-id="${esc(record.id)}">${esc(record.name)}</button></p>
-    <form class="assign-row" data-form="directory-companion" data-id="${esc(record.id)}" data-member="${esc(member)}">
-      <label>Companion <select name="companion" aria-label="Companion">${directoryOptions(companion)}</select></label>
-    </form>
-    <p class="muted">Choose the companion, then open a household and assign that household to this pair.</p>`;
 }
 
 function directoryHouseholdCard(record) {
@@ -1839,36 +1923,43 @@ function directoryHouseholdCard(record) {
   const phone = String(record.phone || "").trim();
   const email = String(record.email || "").trim();
   const address = String(record.address || "").trim();
-  const members = (record.members || []).map((member) => directoryMemberButton(record, member)).join("");
   const memberLines = (record.members || []).map((member) => directoryPersonName(record, member)).join("\n");
-  const current = visit ? `<p class="plan-line"><strong>Youth ministry assignment</strong> ${esc(assigned.filter(Boolean).join(" · ") || "Not assigned yet")}</p>
-    <button type="button" class="text-button" data-action="open-youth-assignment" data-id="${esc(visit.id)}">Open in Youth ministry</button>` : "";
-  return `<h2>${esc(record.name)}</h2>
-    <div class="directory-members">${members}</div>
-    ${address ? `<p class="household-line">${esc(address)}</p>${addressPill(address)}` : ""}
-    ${phone ? `<p><a href="tel:${esc(phone)}">${esc(phone)}</a></p>` : ""}
-    ${email ? `<p><a href="mailto:${esc(email)}">${esc(email)}</a></p>` : ""}
-    ${current}
-    <form class="assign-row" data-form="directory-assign" data-id="${esc(record.id)}">
-      <label>Assigned youth <select name="youth" aria-label="Assigned youth" required>${directoryOptions(youth)}</select></label>
-      <label>Companion <select name="companion" aria-label="Companion">${directoryOptions(companion)}</select></label>
-      <button class="tiny primary" type="submit">${visit ? "Update assignment" : "Assign"}</button>
+  const confirm = visit?.rosterStatusKey === "scheduled" ? visitCheck(visit) : "";
+  const status = visit ? `<p class="status-row">${statusSelect(visit)}${confirm}</p>` : "";
+  return `<input class="person-name" name="name" value="${esc(record.name)}" aria-label="Household name" autocomplete="off">
+    ${status}
+    <form class="contact-fields" data-form="directory-household" data-id="${esc(record.id)}">
+      <label class="wide">Household
+        <textarea name="members" rows="4" aria-label="Household">${esc(memberLines)}</textarea>
+      </label>
+      <label class="wide">Address
+        <textarea name="address" rows="3" aria-label="Address">${esc(address)}</textarea>
+        <span class="contact-actions">${addressPill(address)}</span>
+      </label>
+      <div>
+        <label>Phone <input name="phone" type="tel" autocomplete="off" inputmode="tel" value="${esc(formatPhone(phone))}" class="${phone ? "" : "is-missing"}" aria-label="Phone"></label>
+        <span class="contact-actions">
+          <a class="tiny" data-contact="call" href="${phone ? `tel:${esc(phone)}` : ""}" ${phone ? "" : "hidden"}>Call</a>
+          <a class="tiny" data-contact="text" href="${phone ? `sms:${esc(phone)}` : ""}" ${phone ? "" : "hidden"}>Text</a>
+        </span>
+      </div>
+      <div>
+        <label>Email <input name="email" type="email" autocomplete="off" inputmode="email" value="${esc(email)}" class="${email ? "" : "is-missing"}" aria-label="Email"></label>
+        <span class="contact-actions">
+          <a class="tiny" data-contact="mail" href="${email ? `mailto:${esc(email)}` : ""}" ${email ? "" : "hidden"}>Email</a>
+        </span>
+      </div>
     </form>
-    <form class="household-edit" data-form="directory-household" data-id="${esc(record.id)}">
-      <label class="wide">Household name <input name="name" value="${esc(record.name)}" aria-label="Household name" required></label>
-      <label class="wide">People <textarea name="members" rows="4" aria-label="People in the household">${esc(memberLines)}</textarea></label>
-      <label class="wide">Address <textarea name="address" rows="3" aria-label="Household address">${esc(address)}</textarea></label>
-      <label>Phone <input name="phone" type="tel" value="${esc(phone)}" aria-label="Household phone"></label>
-      <label>Email <input name="email" type="email" value="${esc(email)}" aria-label="Household email"></label>
-      <button class="tiny" type="submit">Save household</button>
-      <p class="muted">Saving updates this household and the youth assignment linked to it. Companions stay when the people listed still match.</p>
+    <form class="assign-row" data-form="directory-assign" data-id="${esc(record.id)}">
+      <span>Assigned</span>
+      <select name="youth" aria-label="Assigned youth">${directoryOptions(youth)}</select>
+      <select name="companion" aria-label="Companion">${directoryOptions(companion)}</select>
     </form>`;
 }
 
 function directoryDetail() {
   const record = (state?.directory || []).find((row) => row.id === directoryFocus?.id);
-  if (!record) return `<h2>Directory</h2><p class="empty">Choose a household, or a person in a household. On a person, set the companion. On a household, assign that household to the pair.</p>`;
-  if (directoryFocus.kind === "person") return directoryPersonCard(record);
+  if (!record) return `<h2>Directory</h2><p class="empty">Choose a household.</p>`;
   return directoryHouseholdCard(record);
 }
 
