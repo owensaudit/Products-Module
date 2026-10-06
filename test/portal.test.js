@@ -34,7 +34,7 @@ import {
   setVisitStatus,
   slotsForMonth,
 } from "../lib/model.js";
-import { applyDirectory, assignDirectoryHousehold, findDirectoryRecord, parseDirectory, setDirectoryCompanion, updateDirectoryHousehold } from "../lib/directory.js";
+import { applyDirectory, assignDirectoryHousehold, findDirectoryRecord, moveDirectoryPerson, parseDirectory, setDirectoryCompanion, updateDirectoryHousehold } from "../lib/directory.js";
 import { brotherSheetToState, calendarMarks, canonicalRosterStatus, isArchiveStatus, rosterStatusKey } from "../lib/roster.js";
 import { createStore } from "../lib/store.js";
 import { createPortalServer } from "../server.js";
@@ -899,4 +899,43 @@ Town WA 98607
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
+});
+
+test("moving a directory person keeps both households and their companions", () => {
+  const state = {
+    ...emptyState(),
+    directory: [
+      {
+        id: "dir_1",
+        name: "Example, Ana & Ben",
+        members: ["Ana", "Ben"],
+        address: "10 Example St",
+        phone: "(360) 555-0100",
+        email: "ana@example.com",
+        memberCompanions: { ana: "Example, Cam", ben: "Example, Dee" },
+      },
+      {
+        id: "dir_2",
+        name: "Sample, Cam",
+        members: ["Cam"],
+        address: "20 Other Ave",
+        phone: "",
+        email: "",
+        memberCompanions: {},
+      },
+    ],
+    people: [{ id: "per_1", displayName: "Keep" }],
+  };
+  const moved = moveDirectoryPerson(state, { directoryId: "dir_1", member: "Ben", householdId: "dir_2" });
+  assert.deepEqual(moved.directory[0].members, ["Ana"]);
+  assert.equal(moved.directory[0].address, "10 Example St");
+  assert.equal(moved.directory[0].phone, "(360) 555-0100");
+  assert.equal(moved.directory[0].memberCompanions.ana, "Example, Cam");
+  assert.equal(moved.directory[0].memberCompanions.ben, undefined);
+  assert.deepEqual(moved.directory[1].members, ["Cam", "Ben"]);
+  assert.equal(moved.directory[1].address, "20 Other Ave");
+  assert.equal(moved.directory[1].memberCompanions.ben, "Example, Dee");
+  assert.equal(moved.people.length, 1);
+  assert.equal(moved.people[0].displayName, "Keep");
+  assert.throws(() => moveDirectoryPerson(moved, { directoryId: "dir_1", member: "Ana", householdId: "dir_2" }), /at least one person/);
 });
