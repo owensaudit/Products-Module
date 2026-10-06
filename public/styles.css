@@ -1027,6 +1027,7 @@ article.role-card { cursor: default; }
 .name-link:hover { text-decoration: underline; }
 .name-links { margin: 0 0 12px; }
 .card-back { margin: 0 0 8px; }
+.companion-who { display: block; color: var(--church-deep); font-size: 13px; }
 
 .directory-wrap { overflow: auto; max-height: calc(100vh - 220px); }
 .directory {
@@ -1396,10 +1397,11 @@ button.mark-visited {
 
 .cell-row, .outreach-cells {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.8fr) minmax(0, 0.9fr);
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.8fr) minmax(0, 0.9fr) auto;
   gap: 6px;
-  align-items: end;
+  align-items: center;
 }
+.remove-outreach { white-space: nowrap; }
 
 .outreach-add select,
 .outreach-add input[type="date"],

@@ -119,6 +119,18 @@ app.addEventListener("change", (event) => {
     else applyStatus(target.dataset.personId, target.value);
     return;
   }
+  if (target.form?.dataset.form === "directory-add" && target.name === "householdId") {
+    const record = (state?.directory || []).find((row) => row.id === target.value);
+    const form = target.form;
+    const address = form.querySelector("[name=address]");
+    const phone = form.querySelector("[name=phone]");
+    const email = form.querySelector("[name=email]");
+    if (address) address.value = record?.address || "";
+    if (phone) phone.value = record?.phone ? formatPhone(record.phone) : "";
+    if (email) email.value = record?.email || "";
+    syncContactLinks(form);
+    return;
+  }
   if (target instanceof HTMLSelectElement && target.form?.dataset.form === "directory-companion") {
     post("/api/directory/companion", {
       directoryId: target.form.dataset.id,
@@ -410,6 +422,12 @@ app.addEventListener("click", (event) => {
       editingCommentId = "";
       render();
     }).catch(showError);
+  } else if (action === "delete-outreach") {
+    if (!confirm("Remove this outreach?")) return;
+    post(`/api/outreach/${button.dataset.id}/delete`, {}).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
   } else if (action === "delete-comment") {
     if (!confirm("Delete this comment?")) return;
     post(`/api/comments/${button.dataset.id}/delete`, {}).then(() => {
@@ -441,7 +459,12 @@ app.addEventListener("click", (event) => {
     }).catch(showError);
   } else if (action === "directory-filter") {
     const next = button.dataset.filter || "all";
-    directoryFilter = directoryFilter === next ? "all" : next;
+    if (next === "all") {
+      directoryFilter = "all";
+      search = "";
+    } else {
+      directoryFilter = directoryFilter === next ? "all" : next;
+    }
     render();
   } else if (action === "open-youth-assignment") {
     page = "youth";
@@ -497,7 +520,15 @@ app.addEventListener("submit", (event) => {
     const name = String(data.get("name") || "").trim();
     const householdId = String(data.get("householdId") || "").trim();
     const householdName = String(data.get("householdName") || "").trim();
-    post("/api/directory/member", { name, householdId, householdName }).then((next) => {
+    post("/api/directory/member", {
+      name,
+      householdId,
+      address: data.get("address"),
+      phone: data.get("phone"),
+      email: data.get("email"),
+      companion: data.get("companion"),
+      visitHouseholdId: data.get("visit"),
+    }).then((next) => {
       state = next;
       directoryAdding = false;
       const record = householdId
@@ -648,6 +679,10 @@ app.addEventListener("input", (event) => {
     search = event.target.value;
     if (page === "directory") renderDirectoryList();
     else renderPeopleList();
+  }
+  if (event.target.closest?.("form[data-form='directory-add']")) {
+    syncContactLinks(event.target.closest("form[data-form='directory-add']"));
+    return;
   }
   if (page === "directory" && event.target.closest?.("form[data-form='directory-contact']")) {
     const contact = event.target.closest("form[data-form='directory-contact']");
@@ -2155,7 +2190,17 @@ function hasCompanionPair(name) {
 }
 
 function companionPill(name) {
-  return hasCompanionPair(name) ? `<span class="pill companion-pair">Companion</span>` : "";
+  if (!hasCompanionPair(name)) return "";
+  const who = directoryCompanionNames(name).join(" · ");
+  return `<span class="pill companion-pair">Companion</span>${who ? `<small class="companion-who">${esc(who)}</small>` : ""}`;
+}
+
+function companionLine(person) {
+  const names = directoryCompanionNames(nameKey(person));
+  if (!names.length) return "";
+  const hint = `data-person="${esc(person.id)}"`;
+  const links = names.map((name) => `<button type="button" class="name-link" data-action="open-name" data-name="${esc(name)}" ${hint}>${esc(name)}</button>`).join("");
+  return `<p class="name-links"><span>Companion</span>${links}</p>`;
 }
 
 function noCompanionPill(name) {
@@ -2323,16 +2368,42 @@ function directoryNameLinks(names, entry) {
 }
 
 function directoryAddForm() {
-  return `<h2>Add member</h2>
-    <form class="stack" data-form="directory-add">
-      <label>Name <input name="name" required autocomplete="off"></label>
-      <label>Household
+  return `<form class="stack" data-form="directory-add">
+      <input class="person-name" name="name" required autocomplete="off" placeholder="Name" aria-label="Name">
+      <div class="assign-row">
+        <span>Household</span>
         <select name="householdId" aria-label="Household">
           <option value="">New household</option>
           ${directoryHouseholdOptions("")}
         </select>
-      </label>
-      <label>New household <input name="householdName" autocomplete="off" placeholder="Leave blank to use the name"></label>
+      </div>
+      <div class="contact-fields">
+        <label class="wide">Address
+          <textarea name="address" rows="3" aria-label="Address"></textarea>
+          <span class="contact-actions"><a class="tiny address-pill" href="#" target="_blank" rel="noopener noreferrer" hidden>Map</a></span>
+        </label>
+        <div>
+          <label>Phone <input name="phone" type="tel" autocomplete="off" inputmode="tel" class="is-missing" aria-label="Phone"></label>
+          <span class="contact-actions">
+            <a class="tiny" data-contact="call" href="" hidden>Call</a>
+            <a class="tiny" data-contact="text" href="" hidden>Text</a>
+          </span>
+        </div>
+        <div>
+          <label>Email <input name="email" type="email" autocomplete="off" inputmode="email" class="is-missing" aria-label="Email"></label>
+          <span class="contact-actions">
+            <a class="tiny" data-contact="mail" href="" hidden>Email</a>
+          </span>
+        </div>
+      </div>
+      <div class="assign-row">
+        <span>Companion</span>
+        <select name="companion" aria-label="Companion">${directoryOptions("")}</select>
+      </div>
+      <div class="assign-row">
+        <span>Household to visit</span>
+        <select name="visit" aria-label="Household to visit"><option value="">—</option>${directoryHouseholdOptions("")}</select>
+      </div>
       <button class="primary" type="submit">Save member</button>
     </form>`;
 }
@@ -2345,9 +2416,12 @@ function directoryDetail() {
 }
 
 function directorySummary() {
+  const total = directoryEntries().length;
   const companionCount = directoryGapCount("companion");
   const householdCount = directoryGapCount("household");
+  const allPressed = directoryFilter === "all" && !search.trim();
   return `<div class="summary" aria-label="Directory filters">
+    <button type="button" data-action="directory-filter" data-filter="all" aria-pressed="${allPressed}">All ${total}</button>
     <button type="button" data-action="directory-filter" data-filter="companion" aria-pressed="${directoryFilter === "companion"}">No companion ${companionCount}</button>
     <button type="button" data-action="directory-filter" data-filter="household" aria-pressed="${directoryFilter === "household"}">No household ${householdCount}</button>
   </div>`;
@@ -2864,6 +2938,7 @@ function rosterDetail(person) {
   return `${cardBackButton()}${personNameField(person)}
     ${specialNotes(person)}
     ${householdLine(person)}
+    ${companionLine(person)}
     <p class="status-row">${statusSelect(person)}${archiveControl(person)}${missionPill(person)}${person.rosterStatusKey === "scheduled" ? visitCheck(person) : ""}</p>
     ${contactFields(person, false, true)}
     ${factsForm(person)}
@@ -3313,6 +3388,7 @@ function outreachEditRow(attempt) {
       ${channels.map((key) => option(key, CHANNEL_LABELS[key] || key, key === attempt.channel)).join("")}
     </select>
     <input name="date" type="date" aria-label="Date" value="${esc(attempt.date || "")}">
+    <button type="button" class="tiny ghost remove-outreach" data-action="delete-outreach" data-id="${esc(attempt.id)}">Remove</button>
   </div>`;
 }
 

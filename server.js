@@ -15,6 +15,7 @@ import {
   emptyState,
   importRows,
   logOutreach,
+  removeOutreach,
   updateOutreach,
   presentState,
   setAppointment,
@@ -185,6 +186,13 @@ export function createPortalServer(store) {
 
         if (pathname === "/api/youth/leadership") {
           const next = await store.update((state) => setYouthLeadership(state, body));
+          sendJson(response, 200, presentState(next, month, viewOptions));
+          return;
+        }
+
+        const outreachDelete = pathname.match(/^\/api\/outreach\/([^/]+)\/delete$/);
+        if (outreachDelete) {
+          const next = await store.update((state) => removeOutreach(state, decodeURIComponent(outreachDelete[1])));
           sendJson(response, 200, presentState(next, month, viewOptions));
           return;
         }

@@ -18,6 +18,7 @@ import {
   emptyState,
   importRows,
   logOutreach,
+  removeOutreach,
   updateOutreach,
   setAppointment,
   setReachOutDate,
@@ -502,13 +503,14 @@ test("an outreach row records a presidency member, how they reached out, and the
     ...state,
     people: [{ id: "per_1", displayName: "Ada Example", phone: "", email: "", household: "", notes: "", sheetColumns: {}, createdAt: "2026-09-29T12:00:00.000Z", updatedAt: "2026-09-29T12:00:00.000Z" }],
   };
+  const clock = deps();
   state = logOutreach(state, {
     personId: "per_1",
     channel: "in_person",
     date: "2026-09-29",
     status: "contacted",
     by: "Josh Owens",
-  }, deps());
+  }, clock);
   assert.equal(state.outreachAttempts[0].channel, "in_person");
   assert.equal(state.outreachAttempts[0].date, "2026-09-29");
   assert.equal(state.outreachAttempts[0].sheetColumns.By, "Josh Owens");
@@ -517,7 +519,7 @@ test("an outreach row records a presidency member, how they reached out, and the
     channel: "text",
     date: "2026-08-28",
     status: "contacted",
-  }, deps());
+  }, clock);
   assert.equal(state.outreachAttempts[1].channel, "text");
   assert.equal(state.outreachAttempts[1].date, "2026-08-28");
   assert.equal(state.outreachAttempts[1].sheetColumns.By, undefined);
@@ -527,13 +529,19 @@ test("an outreach row records a presidency member, how they reached out, and the
   assert.equal(edited.outreachAttempts[0].date, "2026-09-30");
   const cleared = updateOutreach(edited, edited.outreachAttempts[0].id, { by: "", channel: "text", date: "9/1/2026" });
   assert.equal(cleared.outreachAttempts[0].sheetColumns.By, undefined);
+  const kept = cleared.outreachAttempts[1];
+  const removed = removeOutreach(cleared, cleared.outreachAttempts[0].id);
+  assert.equal(removed.outreachAttempts.length, 1);
+  assert.equal(removed.outreachAttempts[0].id, kept.id);
+  assert.equal(removed.people[0].displayName, "Ada Example");
+  assert.throws(() => removeOutreach(removed, "missing"), /Outreach row not found/);
   assert.equal(cleared.outreachAttempts[0].date, "2026-09-01");
   assert.throws(() => logOutreach(state, {
     personId: "per_1",
     channel: "phone",
     date: "0002-08-10",
     status: "contacted",
-  }, deps()), /Outreach date/);
+  }, clock), /Outreach date/);
 
   state = setPresidency(state, [
     { name: "Mark Lillenberg", role: "changed" },
@@ -968,6 +976,23 @@ test("a directory member can be added or removed without touching the roster", (
   assert.equal(created.directory[1].id, "dir_new");
   assert.deepEqual(created.directory[1].members, ["Cam"]);
   assert.equal(created.directory[0].members.join("|"), "Ana|Ben");
+  const filled = addDirectoryMember(state, {
+    name: "Sample, Cam",
+    householdName: "Sample, Cam",
+    address: "9 New St",
+    phone: "3605550199",
+    email: "cam@example.com",
+    companion: "Example, Ana",
+    visitHouseholdId: "dir_1",
+  }, { id: () => "dir_new" });
+  assert.equal(filled.directory[1].address, "9 New St");
+  assert.equal(filled.directory[1].phone, "(360) 555-0199");
+  assert.equal(filled.directory[1].email, "cam@example.com");
+  assert.equal(filled.directory[1].memberCompanions.cam, "Example, Ana");
+  assert.deepEqual(filled.directory[1].memberVisits.cam, [{ directoryId: "dir_1", label: "Example, Ana & Ben" }]);
+  assert.equal(filled.directory[0].address, "10 Example St");
+  assert.equal(filled.directory[0].phone, "(360) 555-0100");
+  assert.equal(filled.people[0].displayName, "Keep");
   const removed = removeDirectoryMember(added, { directoryId: "dir_1", member: "Ben" });
   assert.deepEqual(removed.directory[0].members, ["Ana", "Dee"]);
   assert.equal(removed.directory[0].phone, "(360) 555-0100");
