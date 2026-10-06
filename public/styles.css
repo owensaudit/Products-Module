@@ -134,8 +134,10 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 600; letter-spacing: -0.02e
 
 h1 { margin: 0; font-size: 40px; line-height: 1.05; }
 
-body[data-page="elders"] [data-page-header="youth"] .eyebrow { cursor: pointer; }
-body[data-page="elders"] #open-youth-title:hover { color: var(--church-deep); }
+body[data-page="elders"] [data-page-header="youth"] .eyebrow,
+body[data-page="youth"] [data-page-header="elders"] .eyebrow { cursor: pointer; }
+body[data-page="elders"] #open-youth-title:hover,
+body[data-page="youth"] #open-elders-title:hover { color: var(--church-deep); }
 
 button.title-link {
   margin: 0;
@@ -392,9 +394,8 @@ button.title-link {
 
 .lede { margin: 8px 0 0; max-width: 46ch; color: var(--muted); }
 
-body[data-page="youth"] .lede,
 [data-page-header="youth"] .lede {
-  display: none !important;
+  display: none;
 }
 
 .quorum-titles {

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ministering Visit Portal</title>
-    <link rel="stylesheet" href="/styles.css?v=84">
+    <link rel="stylesheet" href="/styles.css?v=85">
   </head>
   <body>
     <a class="skip" href="#app">Skip to the portal</a>
@@ -35,7 +35,7 @@
         <div class="title-block" data-page-header="elders">
           <p class="eyebrow">Elders Quorum</p>
           <div class="title-row">
-            <h1>Ministering visits</h1>
+            <button type="button" class="title-link" id="open-elders-title">Ministering visits</button>
             <button type="button" id="message-inbox" class="message-inbox" aria-label="Messages that need an answer">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4 3v-3H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
@@ -45,7 +45,7 @@
           </div>
           <p class="lede">To minister as the Savior would, to Love, and Invite.</p>
         </div>
-        <div class="title-block" data-page-header="youth" hidden>
+        <div class="title-block" data-page-header="youth">
           <p class="eyebrow">Youth Quorum</p>
           <div class="title-row">
             <button type="button" class="title-link" id="open-youth-title">Youth ministry</button>
@@ -63,6 +63,6 @@
     </header>
     <p id="notice" class="notice" role="status" hidden></p>
     <main id="app" tabindex="-1"></main>
-    <script src="/app.js?v=93" type="module"></script>
+    <script src="/app.js?v=94" type="module"></script>
   </body>
 </html>

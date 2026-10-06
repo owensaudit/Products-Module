@@ -802,6 +802,8 @@ presidencyHost?.addEventListener("submit", (event) => {
 });
 
 document.querySelector("#open-elders")?.addEventListener("click", () => openPage("elders"));
+document.querySelector("#open-elders-title")?.addEventListener("click", () => openPage("elders"));
+document.querySelector("[data-page-header='elders'] .eyebrow")?.addEventListener("click", () => openPage("elders"));
 document.querySelector("#open-youth")?.addEventListener("click", () => openPage("youth"));
 document.querySelector("#open-youth-title")?.addEventListener("click", () => openPage("youth"));
 document.querySelector("[data-page-header='youth'] .eyebrow")?.addEventListener("click", () => openPage("youth"));
@@ -1014,7 +1016,7 @@ function render() {
 function renderPageChrome() {
   document.body.dataset.page = page;
   document.querySelectorAll("[data-page-header]").forEach((block) => {
-    block.hidden = page === "youth" && block.dataset.pageHeader !== "youth";
+    block.hidden = false;
   });
   document.querySelectorAll("[data-page-link]").forEach((button) => {
     button.setAttribute("aria-pressed", button.dataset.pageLink === page ? "true" : "false");
