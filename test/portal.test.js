@@ -34,7 +34,7 @@ import {
   setVisitStatus,
   slotsForMonth,
 } from "../lib/model.js";
-import { addDirectoryMember, applyDirectory, assignDirectoryHousehold, directoryAddressKey, findDirectoryRecord, mergeDirectoryByAddress, moveDirectoryPerson, parseDirectory, removeDirectoryMember, setDirectoryCompanion, updateDirectoryHousehold } from "../lib/directory.js";
+import { addDirectoryMember, addDirectoryVisit, applyDirectory, applyMinisteringGroups, assignDirectoryHousehold, directoryAddressKey, findDirectoryRecord, mergeDirectoryByAddress, moveDirectoryPerson, parseDirectory, removeDirectoryMember, setDirectoryCompanion, updateDirectoryHousehold } from "../lib/directory.js";
 import { brotherSheetToState, calendarMarks, canonicalRosterStatus, isArchiveStatus, rosterStatusKey } from "../lib/roster.js";
 import { createStore } from "../lib/store.js";
 import { createPortalServer } from "../server.js";
@@ -1110,4 +1110,65 @@ test("people at the same address join that household", () => {
   assert.deepEqual(merged.directory.find((row) => row.id === "dir_right").members, ["Cam", "Dee"]);
   assert.equal(merged.directory.find((row) => row.id === "dir_apt").members[0], "Amy");
   assert.equal(merged.directory.find((row) => row.id === "dir_apt2").members[0], "Bea");
+});
+
+test("a ministering companionship keeps its companions and assigned households", () => {
+  const people = [{ id: "per_1", displayName: "Keep" }];
+  const state = {
+    ...emptyState(),
+    people,
+    directory: [
+      {
+        id: "dir_home",
+        name: "Sample, Mike & Melinda",
+        members: ["Mike", "Melinda", "Jacob"],
+        address: "10 Example St",
+        phone: "",
+        email: "",
+        memberCompanions: {},
+      },
+      {
+        id: "dir_ada",
+        name: "Keeper, Ada & Bob",
+        members: ["Ada", "Bob", "Cam"],
+        address: "20 Other Ave",
+        phone: "",
+        email: "",
+        memberCompanions: {},
+      },
+      {
+        id: "dir_bea",
+        name: "Alone, Bea",
+        members: ["Bea"],
+        address: "30 Side Ln",
+        phone: "",
+        email: "",
+        memberCompanions: {},
+      },
+    ],
+  };
+  const trio = applyMinisteringGroups(state, [{
+    members: ["Keeper, Ada", "Keeper, Bob", "Keeper, Cam"],
+    households: ["Sample, Jacob", "Alone, Bea"],
+  }]);
+  assert.equal(trio.people, people);
+  const keepers = trio.directory.find((row) => row.id === "dir_ada");
+  assert.deepEqual(keepers.memberCompanions.ada, ["Keeper, Bob", "Keeper, Cam"]);
+  assert.deepEqual(keepers.memberCompanions.bob, ["Keeper, Ada", "Keeper, Cam"]);
+  assert.deepEqual(keepers.memberVisits.ada.map((item) => item.label), ["Sample, Jacob", "Alone, Bea"]);
+  assert.equal(keepers.memberVisits.ada[0].directoryId, "dir_home");
+  assert.equal(keepers.memberVisits.cam[1].directoryId, "dir_bea");
+  const pair = applyMinisteringGroups(state, [{
+    members: ["Sample, Mike", "Alone, Bea"],
+    households: ["Keeper, Ada & Bob"],
+  }]);
+  const sample = pair.directory.find((row) => row.id === "dir_home");
+  assert.equal(sample.memberCompanions.mike, "Alone, Bea");
+  assert.equal(sample.memberVisits.mike[0].label, "Keeper, Ada & Bob");
+  assert.equal(sample.memberVisits.mike[0].directoryId, "dir_ada");
+  const bea = pair.directory.find((row) => row.id === "dir_bea");
+  assert.equal(bea.memberCompanions.bea, "Sample, Mike");
+  const added = addDirectoryVisit(pair, { directoryId: "dir_bea", member: "Bea", householdId: "dir_home" });
+  assert.deepEqual(added.directory.find((row) => row.id === "dir_bea").memberVisits.bea.map((item) => item.label), ["Keeper, Ada & Bob", "Sample, Mike & Melinda"]);
+  assert.equal(added.people[0].displayName, "Keep");
 });

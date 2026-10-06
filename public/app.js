@@ -144,13 +144,11 @@ app.addEventListener("change", (event) => {
   }
   if (target instanceof HTMLSelectElement && target.form?.dataset.form === "directory-visit") {
     const householdId = target.value;
-    const entry = directoryFocusedEntry();
-    if (!householdId || !entry) return;
-    const companion = document.querySelector("form[data-form='directory-companion'] [name=companion]")?.value.trim() || "";
-    post("/api/directory/assign", {
-      directoryId: householdId,
-      youth: entry.name,
-      companion,
+    if (!householdId) return;
+    post("/api/directory/visits", {
+      directoryId: target.form.dataset.id,
+      member: target.form.dataset.member,
+      householdId,
     }).then((next) => {
       state = next;
       render();
@@ -1905,39 +1903,61 @@ function directoryPeople() {
   return people.sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
 }
 
-function directoryCompanionFor(fullName) {
-  const key = String(fullName || "").trim().toLowerCase();
-  if (!key) return "";
-  for (const row of state?.directory || []) {
-    for (const member of row.members || []) {
-      if (directoryPersonName(row, member).toLowerCase() !== key) continue;
-      const saved = row.memberCompanions?.[member.trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ")];
-      if (saved) return saved;
-    }
-  }
-  const youth = (state?.people || []).find((person) => (person.group === "priests" || person.group === "teachers") && directoryNameMatches(nameKey(person), fullName));
-  return youth?.sheetColumns?.Companion || "";
+function companionValues(value) {
+  if (Array.isArray(value)) return value.map((item) => String(item || "").trim()).filter(Boolean);
+  const text = String(value || "").trim();
+  return text ? [text] : [];
 }
 
-function pairedCompanionName(fullName) {
-  const direct = directoryCompanionFor(fullName);
-  if (direct) return direct;
+function directoryCompanionNames(fullName) {
+  const names = [];
+  const add = (value) => {
+    const text = String(value || "").trim();
+    if (text && !names.some((item) => directoryNameMatches(item, text))) names.push(text);
+  };
+  const key = String(fullName || "").trim().toLowerCase();
+  if (key) {
+    for (const row of state?.directory || []) {
+      for (const member of row.members || []) {
+        if (directoryPersonName(row, member).toLowerCase() !== key) continue;
+        for (const companion of companionValues(row.memberCompanions?.[member.trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ")])) add(companion);
+      }
+    }
+  }
   for (const row of state?.directory || []) {
     for (const member of row.members || []) {
-      const key = member.trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ");
-      const saved = row.memberCompanions?.[key];
-      if (saved && directoryNameMatches(saved, fullName)) return directoryPersonName(row, member);
+      const memberKey = member.trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ");
+      const saved = companionValues(row.memberCompanions?.[memberKey]);
+      if (saved.some((companion) => directoryNameMatches(companion, fullName))) add(directoryPersonName(row, member));
     }
   }
   for (const person of state?.people || []) {
     const companion = person.sheetColumns?.Companion;
-    if (companion && directoryNameMatches(nameKey(person), fullName)) return companion;
-    if (companion && directoryNameMatches(companion, fullName)) return nameKey(person);
+    if (companion && directoryNameMatches(nameKey(person), fullName)) add(companion);
+    if (companion && directoryNameMatches(companion, fullName)) add(nameKey(person));
     const assigned = person.list === "youth" ? person.assigned || [] : [];
-    if (assigned[0] && assigned[1] && directoryNameMatches(assigned[0], fullName)) return assigned[1];
-    if (assigned[0] && assigned[1] && directoryNameMatches(assigned[1], fullName)) return assigned[0];
+    if (assigned[0] && assigned[1] && directoryNameMatches(assigned[0], fullName)) add(assigned[1]);
+    if (assigned[0] && assigned[1] && directoryNameMatches(assigned[1], fullName)) add(assigned[0]);
   }
-  return "";
+  const youth = (state?.people || []).find((person) => (person.group === "priests" || person.group === "teachers") && directoryNameMatches(nameKey(person), fullName));
+  if (youth?.sheetColumns?.Companion) add(youth.sheetColumns.Companion);
+  return names;
+}
+
+function directoryCompanionFor(fullName) {
+  const names = directoryCompanionNames(fullName);
+  return names.length === 1 ? names[0] : "";
+}
+
+function pairedCompanionName(fullName) {
+  return directoryCompanionNames(fullName)[0] || "";
+}
+
+function directoryAssignedVisits(entry) {
+  const key = String(entry?.member || "").trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ");
+  const saved = entry?.record?.memberVisits?.[key];
+  if (!Array.isArray(saved)) return [];
+  return saved.map((item) => String(item?.label || "").trim()).filter(Boolean);
 }
 
 function directoryVisitHomes(fullName) {
@@ -1979,10 +1999,10 @@ function peopleWithCompanions() {
   for (const row of state?.directory || []) {
     for (const member of row.members || []) {
       const key = member.trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ");
-      const companion = row.memberCompanions?.[key];
-      if (!companion) continue;
+      const companions = companionValues(row.memberCompanions?.[key]);
+      if (!companions.length) continue;
       add(directoryPersonName(row, member));
-      add(companion);
+      for (const companion of companions) add(companion);
     }
   }
   for (const person of state?.people || []) {
@@ -2121,8 +2141,14 @@ function directoryPersonCard(entry) {
   const phone = String(record.phone || "").trim();
   const email = String(record.email || "").trim();
   const address = String(record.address || "").trim();
-  const companion = pairedCompanionName(entry.name);
-  const visits = directoryVisitNames(entry.name);
+  const companions = directoryCompanionNames(entry.name);
+  const companion = companions.length === 1 ? companions[0] : "";
+  const companionNote = companions.length > 1 ? `<p class="muted">Companions ${esc(companions.join(" · "))}</p>` : "";
+  const assignedVisits = directoryAssignedVisits(entry);
+  const visits = [...assignedVisits];
+  for (const name of directoryVisitNames(entry.name)) {
+    if (!visits.some((item) => directoryNameMatches(item, name))) visits.push(name);
+  }
   const visitLine = visits.length ? `<p class="muted">Visiting ${esc(visits.join(" · "))}</p>` : "";
   const status = directoryStatusPills(entry.name);
   return `<h2>${esc(entry.name)}</h2>
@@ -2154,6 +2180,7 @@ function directoryPersonCard(entry) {
       <span>Companion</span>
       <select name="companion" aria-label="Companion">${directoryOptions(companion)}</select>
     </form>
+    ${companionNote}
     <form class="assign-row" data-form="directory-visit" data-id="${esc(record.id)}" data-member="${esc(entry.member)}">
       <span>Household to visit</span>
       <select name="visit" aria-label="Household to visit"><option value="">—</option>${directoryHouseholdOptions("")}</select>
