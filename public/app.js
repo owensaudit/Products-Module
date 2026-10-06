@@ -29,6 +29,14 @@ const STATUS_ORDER = ["replied", "awaiting_reply", "not_contacted", "scheduled",
 
 const CHANNEL_LABELS = { text: "Text", phone: "Call", email: "Email", driveby: "Drive-by", in_person: "In person" };
 
+function completeOutreachDate(value) {
+  const raw = String(value || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return "";
+  const year = Number(raw.slice(0, 4));
+  if (year < 1900 || year > 2100) return "";
+  return raw;
+}
+
 function formatPhone(value) {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
@@ -112,7 +120,8 @@ app.addEventListener("change", (event) => {
   if (editRow) {
     const by = editRow.querySelector("[name=by]").value;
     const channel = editRow.querySelector("[name=channel]").value;
-    const date = editRow.querySelector("[name=date]").value;
+    const date = completeOutreachDate(editRow.querySelector("[name=date]").value);
+    if (target instanceof HTMLInputElement && target.name === "date" && !date) return;
     if (channel && date) {
       post(`/api/outreach/${editRow.dataset.id}`, { by, channel, date }).then((next) => {
         state = next;
@@ -125,19 +134,22 @@ app.addEventListener("change", (event) => {
   if (addRow) {
     const by = addRow.querySelector("[name=by]").value;
     const channel = addRow.querySelector("[name=channel]").value;
-    const date = addRow.querySelector("[name=date]").value;
-    if (channel && date) {
-      post("/api/outreach", {
-        personId: addRow.dataset.personId,
-        by,
-        channel,
-        date,
-        status: "contacted",
-      }).then((next) => {
-        state = next;
-        render();
-      }).catch(showError);
-    }
+    const date = completeOutreachDate(addRow.querySelector("[name=date]").value);
+    if (!channel || !date || addRow.dataset.saving === "1") return;
+    addRow.dataset.saving = "1";
+    post("/api/outreach", {
+      personId: addRow.dataset.personId,
+      by,
+      channel,
+      date,
+      status: "contacted",
+    }).then((next) => {
+      state = next;
+      render();
+    }).catch((error) => {
+      delete addRow.dataset.saving;
+      showError(error);
+    });
     return;
   }
   if (target.closest?.("form[data-form='facts']")) {

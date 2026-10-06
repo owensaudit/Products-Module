@@ -516,6 +516,12 @@ test("an outreach row records a presidency member, how they reached out, and the
   const cleared = updateOutreach(edited, edited.outreachAttempts[0].id, { by: "", channel: "text", date: "9/1/2026" });
   assert.equal(cleared.outreachAttempts[0].sheetColumns.By, undefined);
   assert.equal(cleared.outreachAttempts[0].date, "2026-09-01");
+  assert.throws(() => logOutreach(state, {
+    personId: "per_1",
+    channel: "phone",
+    date: "0002-08-10",
+    status: "contacted",
+  }, deps()), /Outreach date/);
 
   state = setPresidency(state, [
     { name: "Mark Lillenberg", role: "changed" },
