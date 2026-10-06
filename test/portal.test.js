@@ -34,7 +34,7 @@ import {
   setVisitStatus,
   slotsForMonth,
 } from "../lib/model.js";
-import { addDirectoryMember, applyDirectory, assignDirectoryHousehold, findDirectoryRecord, moveDirectoryPerson, parseDirectory, removeDirectoryMember, setDirectoryCompanion, updateDirectoryHousehold } from "../lib/directory.js";
+import { addDirectoryMember, applyDirectory, assignDirectoryHousehold, directoryAddressKey, findDirectoryRecord, mergeDirectoryByAddress, moveDirectoryPerson, parseDirectory, removeDirectoryMember, setDirectoryCompanion, updateDirectoryHousehold } from "../lib/directory.js";
 import { brotherSheetToState, calendarMarks, canonicalRosterStatus, isArchiveStatus, rosterStatusKey } from "../lib/roster.js";
 import { createStore } from "../lib/store.js";
 import { createPortalServer } from "../server.js";
@@ -977,4 +977,137 @@ test("a directory member can be added or removed without touching the roster", (
   const last = removeDirectoryMember(gone, { directoryId: "dir_1", member: "Ben" });
   assert.equal(last.directory.length, 0);
   assert.equal(last.people.length, 1);
+});
+
+test("people at the same address join that household", () => {
+  assert.equal(
+    directoryAddressKey("10 Example St\nSample WA 98607"),
+    directoryAddressKey("10 Example St\nSample WA 98607-2618"),
+  );
+  assert.notEqual(
+    directoryAddressKey("10 Example St\nApt A107\nSample WA 98607"),
+    directoryAddressKey("10 Example St\nApt B-113\nSample WA 98607"),
+  );
+  const people = [{ id: "per_1", displayName: "Keep" }];
+  const state = {
+    ...emptyState(),
+    people,
+    directory: [
+      {
+        id: "dir_home",
+        name: "Sample, Mike & Melinda",
+        members: ["Mike", "Melinda"],
+        address: "10 Example St\nSample WA 98607",
+        phone: "(360) 555-0100",
+        email: "home@example.com",
+        memberCompanions: { mike: "Example, Ana" },
+      },
+      {
+        id: "dir_jacob",
+        name: "Sample, Jacob",
+        members: ["Jacob"],
+        address: "10 Example St\nSample WA 98607-2618",
+        phone: "(360) 555-0199",
+        email: "jacob@example.com",
+        memberCompanions: { jacob: "Example, Ben" },
+      },
+      {
+        id: "dir_other",
+        name: "Other, Cam",
+        members: ["Cam"],
+        address: "10 Example St\nSample WA 98607",
+        phone: "",
+        email: "",
+        memberCompanions: {},
+      },
+      {
+        id: "dir_a",
+        name: "Alone, Ann",
+        members: ["Ann"],
+        address: "20 Other Ave\nSample WA 98607",
+        phone: "(360) 555-0111",
+        email: "",
+        memberCompanions: {},
+      },
+      {
+        id: "dir_b",
+        name: "Alone, Bob",
+        members: ["Bob"],
+        address: "20 Other Ave\nSample WA 98607",
+        phone: "",
+        email: "bob@example.com",
+        memberCompanions: { bob: "Example, Dee" },
+      },
+      {
+        id: "dir_c",
+        name: "Separate, Carl",
+        members: ["Carl"],
+        address: "20 Other Ave\nSample WA 98607",
+        phone: "(360) 555-0122",
+        email: "",
+        memberCompanions: {},
+      },
+      {
+        id: "dir_left",
+        name: "Left, Ada & Ben",
+        members: ["Ada", "Ben"],
+        address: "30 Shared Ct\nSample WA 98607",
+        phone: "(360) 555-0133",
+        email: "",
+        memberCompanions: {},
+      },
+      {
+        id: "dir_right",
+        name: "Right, Cam & Dee",
+        members: ["Cam", "Dee"],
+        address: "30 Shared Ct\nSample WA 98607",
+        phone: "(360) 555-0144",
+        email: "",
+        memberCompanions: {},
+      },
+      {
+        id: "dir_apt",
+        name: "Unit, Amy",
+        members: ["Amy"],
+        address: "40 Unit Rd\nApt A107\nSample WA 98607",
+        phone: "",
+        email: "",
+        memberCompanions: {},
+      },
+      {
+        id: "dir_apt2",
+        name: "Unit, Bea",
+        members: ["Bea"],
+        address: "40 Unit Rd\nApt B-113\nSample WA 98607",
+        phone: "",
+        email: "",
+        memberCompanions: {},
+      },
+    ],
+  };
+  const merged = mergeDirectoryByAddress(state);
+  assert.equal(merged.people, people);
+  const home = merged.directory.find((row) => row.id === "dir_home");
+  assert.deepEqual(home.members, ["Mike", "Melinda", "Jacob", "Other, Cam"]);
+  assert.equal(home.phone, "(360) 555-0100");
+  assert.equal(home.email, "home@example.com");
+  assert.equal(home.address, "10 Example St\nSample WA 98607");
+  assert.equal(home.memberCompanions.mike, "Example, Ana");
+  assert.equal(home.memberCompanions.jacob, "Example, Ben");
+  assert.equal(merged.directory.find((row) => row.id === "dir_jacob"), undefined);
+  assert.equal(merged.directory.find((row) => row.id === "dir_other"), undefined);
+  const alone = merged.directory.find((row) => row.id === "dir_a");
+  assert.equal(alone.name, "Alone, Ann & Bob");
+  assert.deepEqual(alone.members, ["Ann", "Bob"]);
+  assert.equal(alone.phone, "(360) 555-0111");
+  assert.equal(alone.email, "bob@example.com");
+  assert.equal(alone.memberCompanions.bob, "Example, Dee");
+  assert.equal(merged.directory.find((row) => row.id === "dir_b"), undefined);
+  const separate = merged.directory.find((row) => row.id === "dir_c");
+  assert.equal(separate.name, "Separate, Carl");
+  assert.deepEqual(separate.members, ["Carl"]);
+  assert.deepEqual(merged.directory.find((row) => row.id === "dir_left").members, ["Ada", "Ben"]);
+  assert.deepEqual(merged.directory.find((row) => row.id === "dir_right").members, ["Cam", "Dee"]);
+  assert.equal(merged.directory.find((row) => row.id === "dir_apt").members[0], "Amy");
+  assert.equal(merged.directory.find((row) => row.id === "dir_apt2").members[0], "Bea");
 });
