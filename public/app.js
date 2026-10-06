@@ -302,11 +302,13 @@ app.addEventListener("click", (event) => {
     if (current && !personMatchesFilters(current)) selectedPersonId = null;
     render();
   } else if (action === "select-person") {
+    const pageTop = window.scrollY;
     selectedPersonId = button.dataset.id;
     view = "people";
     detailForm = null;
     render();
-    document.querySelector(".layout .card:last-child")?.scrollIntoView({ block: "nearest" });
+    window.scrollTo(0, pageTop);
+    requestAnimationFrame(() => window.scrollTo(0, pageTop));
   } else if (action === "form") {
     detailForm = button.dataset.form;
     render();
@@ -592,38 +594,9 @@ function clearError() {
   notice.textContent = "";
 }
 
-let openedOnToday = false;
-
-function showToday() {
-  const now = new Date();
-  calendarMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const iso = todayIso();
-  const people = peopleForDay(iso);
-  viewAll = false;
-  assigneeFilter = "";
-  dayFilter = iso;
-  archiveChoicesFor = "";
-  statusFilter = "all";
-  officeFilter = "all";
-  search = "";
-  view = "people";
-  detailForm = null;
-  if (people.length) {
-    archiveOpen = people.every((person) => personIsArchived(person));
-    selectedPersonId = people[0].id;
-  } else {
-    archiveOpen = false;
-    selectedPersonId = null;
-  }
-}
-
 async function refresh() {
   const next = await api(`/api/state?month=${encodeURIComponent(monthValue())}&private=${privateOn() ? "1" : "0"}`);
   state = next;
-  if (!openedOnToday) {
-    openedOnToday = true;
-    showToday();
-  }
   if (selectedPersonId && !state.people.some((person) => person.id === selectedPersonId)) selectedPersonId = null;
   render();
 }
@@ -1207,8 +1180,14 @@ function openCalendarDay(iso) {
   detailForm = null;
   selectedPersonId = people[0].id;
   render();
-  document.querySelector(".person[aria-current='true']")?.scrollIntoView({ block: "nearest" });
-  document.querySelector(".layout .card:last-child")?.scrollIntoView({ block: "nearest" });
+  const current = document.querySelector("#person-list .person[aria-current='true']");
+  const list = document.querySelector("#person-list");
+  if (current && list) {
+    const top = current.offsetTop - list.offsetTop;
+    const bottom = top + current.offsetHeight;
+    if (top < list.scrollTop) list.scrollTop = top;
+    else if (bottom > list.scrollTop + list.clientHeight) list.scrollTop = bottom - list.clientHeight;
+  }
 }
 
 function peopleForDay(iso) {
@@ -2128,7 +2107,6 @@ function assignedCountButton(name, people = eldersPeople(), quorum = "") {
 
 function assignmentFields(person) {
   const youthVisit = person.list === "youth";
-  if (!youthVisit && person.rosterStatusKey !== "scheduled") return "";
   const assigned = person.assigned || [];
   const members = leaderNamesFor(person);
   const options = (selected) => {
