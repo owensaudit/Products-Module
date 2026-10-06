@@ -1045,6 +1045,19 @@ article.role-card { cursor: default; }
   cursor: pointer;
 }
 .directory-member.is-open { background: var(--church-deep); color: white; border-color: var(--church-deep); }
+.directory-member.has-companion,
+.directory-member.has-companion.is-open {
+  background: var(--status-reschedule);
+  color: #145c34;
+  border-color: #8fd4a8;
+}
+.directory-member.has-companion.is-open { box-shadow: 0 0 0 2px #145c34; }
+.person.has-companion,
+.role-card.has-companion { box-shadow: inset 0 0 0 3px #8fd4a8; }
+.pill.companion-pair { background: var(--status-reschedule); color: #145c34; }
+.household-edit { display: grid; gap: 8px; margin-top: 12px; }
+.household-edit input,
+.household-edit textarea { width: 100%; }
 .card .assign-row label { color: var(--ink); font-weight: 700; }
 a.address-pill {
   text-decoration: none;
@@ -1303,6 +1316,17 @@ button.mark-visited {
 }
 .person.to-visit small { color: var(--muted); }
 .person.to-visit > .visited-check { color: #14643a; }
+.person.has-companion { box-shadow: inset 0 0 0 3px #8fd4a8; }
+.person.quorum-priests.has-companion { box-shadow: 0 0 0 3px #ffe56a, inset 0 0 0 3px #8fd4a8; }
+.person.quorum-teachers.has-companion { box-shadow: 0 0 0 3px #3caf62, inset 0 0 0 3px #8fd4a8; }
+.person.to-visit.has-companion { box-shadow: 0 0 0 3px var(--status-peach), inset 0 0 0 3px #8fd4a8; }
+.ministering-cards.quorum-priests .role-card.has-companion { box-shadow: 0 0 0 3px #ffe56a, inset 0 0 0 3px #8fd4a8; }
+.ministering-cards.quorum-teachers .role-card.has-companion { box-shadow: 0 0 0 3px #3caf62, inset 0 0 0 3px #8fd4a8; }
+.role-card.role-assignment.has-companion,
+.ministering-cards.quorum-priests .role-card.role-assignment.has-companion,
+.ministering-cards.quorum-teachers .role-card.role-assignment.has-companion {
+  box-shadow: 0 0 0 3px var(--status-peach), inset 0 0 0 3px #8fd4a8;
+}
 .status-line {
   grid-column: 1 / -1;
   display: flex;

@@ -34,7 +34,7 @@ import {
   setVisitStatus,
   slotsForMonth,
 } from "../lib/model.js";
-import { applyDirectory, assignDirectoryHousehold, findDirectoryRecord, parseDirectory, setDirectoryCompanion } from "../lib/directory.js";
+import { applyDirectory, assignDirectoryHousehold, findDirectoryRecord, parseDirectory, setDirectoryCompanion, updateDirectoryHousehold } from "../lib/directory.js";
 import { brotherSheetToState, calendarMarks, canonicalRosterStatus, isArchiveStatus, rosterStatusKey } from "../lib/roster.js";
 import { createStore } from "../lib/store.js";
 import { createPortalServer } from "../server.js";
@@ -848,6 +848,18 @@ Town WA 98607
   assert.equal(still[0].phone, "(360) 555-0100");
   const kept = applyDirectory(withCompanion, [{ name: "Example, Ana & Ben", members: ["Ana"], address: "10 Example St", phone: "(360) 555-0100", email: "ana@example.com" }]);
   assert.equal(kept.directory[0].memberCompanions.ana, "Example, Ben");
+  const edited = updateDirectoryHousehold(withCompanion, {
+    directoryId: "dir_1",
+    name: "Example, Ana & Ben",
+    members: "Example, Ana\nExample, Ben",
+    address: "11 Example St",
+    phone: "(360) 555-0100",
+    email: "ana@example.com",
+  });
+  assert.equal(edited.directory[0].members.join("|"), "Ana|Ben");
+  assert.equal(edited.directory[0].memberCompanions.ana, "Example, Ben");
+  assert.equal(edited.directory[0].address, "11 Example St");
+  assert.equal(edited.people.length, withCompanion.people.length);
 
   const folder = await mkdtemp(path.join(tmpdir(), "portal-directory-"));
   const store = createStore(path.join(folder, "portal.json"));

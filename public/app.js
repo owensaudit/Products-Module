@@ -421,6 +421,20 @@ app.addEventListener("submit", (event) => {
     }).catch(showError);
     return;
   }
+  if (kind === "directory-household") {
+    post("/api/directory/household", {
+      directoryId: form.dataset.id,
+      name: data.get("name"),
+      members: data.get("members"),
+      address: data.get("address"),
+      phone: data.get("phone"),
+      email: data.get("email"),
+    }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
+    return;
+  }
   if (kind === "directory-assign") {
     post("/api/directory/assign", {
       directoryId: form.dataset.id,
@@ -1702,6 +1716,63 @@ function directoryCompanionFor(fullName) {
   return youth?.sheetColumns?.Companion || "";
 }
 
+function nameVariants(value) {
+  const raw = String(value || "").trim();
+  const fold = (item) => String(item || "").trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ");
+  const keys = [];
+  const add = (item) => {
+    const key = fold(item);
+    if (key && !keys.includes(key)) keys.push(key);
+  };
+  add(raw);
+  const comma = raw.indexOf(",");
+  if (comma !== -1) add(`${raw.slice(comma + 1)} ${raw.slice(0, comma)}`);
+  return keys;
+}
+
+let companionMarkState = null;
+let companionMarkSet = null;
+
+function peopleWithCompanions() {
+  if (companionMarkState === state && companionMarkSet) return companionMarkSet;
+  const set = new Set();
+  const add = (value) => {
+    for (const key of nameVariants(value)) set.add(key);
+  };
+  for (const row of state?.directory || []) {
+    for (const member of row.members || []) {
+      const key = member.trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ");
+      const companion = row.memberCompanions?.[key];
+      if (!companion) continue;
+      add(directoryPersonName(row, member));
+      add(companion);
+    }
+  }
+  for (const person of state?.people || []) {
+    const companion = person.sheetColumns?.Companion;
+    if (companion) {
+      add(nameKey(person));
+      add(companion);
+    }
+    if (person.list === "youth" && person.assigned?.[0] && person.assigned?.[1]) {
+      add(person.assigned[0]);
+      add(person.assigned[1]);
+    }
+  }
+  companionMarkState = state;
+  companionMarkSet = set;
+  return set;
+}
+
+function hasCompanionPair(name) {
+  const set = peopleWithCompanions();
+  return nameVariants(name).some((key) => set.has(key));
+}
+
+function companionPill(name) {
+  return hasCompanionPair(name) ? `<span class="pill companion-pair">Companion</span>` : "";
+}
+
 function directoryNameMatches(left, right) {
   const fold = (value) => String(value || "").trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ");
   const variants = (value) => {
@@ -1733,15 +1804,18 @@ function directoryListMarkup(rows) {
   }
   return rows.map((row) => {
     const openHousehold = directoryFocus?.kind === "household" && directoryFocus.id === row.id;
-    const members = (row.members || []).map((member) => {
-      const open = directoryFocus?.kind === "person" && directoryFocus.id === row.id && directoryFocus.member === member;
-      return `<button type="button" class="directory-member${open ? " is-open" : ""}" data-action="open-directory-person" data-id="${esc(row.id)}" data-member="${esc(member)}">${esc(directoryPersonName(row, member))}</button>`;
-    }).join("");
+    const members = (row.members || []).map((member) => directoryMemberButton(row, member)).join("");
     return `<article class="directory-household${openHousehold ? " is-open" : ""}">
       <button type="button" class="directory-household-name" data-action="open-directory-household" data-id="${esc(row.id)}" aria-current="${openHousehold}">${esc(row.name)}</button>
       <div class="directory-members">${members}</div>
     </article>`;
   }).join("");
+}
+
+function directoryMemberButton(row, member) {
+  const open = directoryFocus?.kind === "person" && directoryFocus.id === row.id && directoryFocus.member === member;
+  const paired = hasCompanionPair(directoryPersonName(row, member));
+  return `<button type="button" class="directory-member${open ? " is-open" : ""}${paired ? " has-companion" : ""}" data-action="open-directory-person" data-id="${esc(row.id)}" data-member="${esc(member)}">${esc(directoryPersonName(row, member))}</button>`;
 }
 
 function directoryPersonCard(record) {
@@ -1765,7 +1839,8 @@ function directoryHouseholdCard(record) {
   const phone = String(record.phone || "").trim();
   const email = String(record.email || "").trim();
   const address = String(record.address || "").trim();
-  const members = (record.members || []).map((member) => `<button type="button" class="directory-member" data-action="open-directory-person" data-id="${esc(record.id)}" data-member="${esc(member)}">${esc(directoryPersonName(record, member))}</button>`).join("");
+  const members = (record.members || []).map((member) => directoryMemberButton(record, member)).join("");
+  const memberLines = (record.members || []).map((member) => directoryPersonName(record, member)).join("\n");
   const current = visit ? `<p class="plan-line"><strong>Youth ministry assignment</strong> ${esc(assigned.filter(Boolean).join(" · ") || "Not assigned yet")}</p>
     <button type="button" class="text-button" data-action="open-youth-assignment" data-id="${esc(visit.id)}">Open in Youth ministry</button>` : "";
   return `<h2>${esc(record.name)}</h2>
@@ -1778,6 +1853,15 @@ function directoryHouseholdCard(record) {
       <label>Assigned youth <select name="youth" aria-label="Assigned youth" required>${directoryOptions(youth)}</select></label>
       <label>Companion <select name="companion" aria-label="Companion">${directoryOptions(companion)}</select></label>
       <button class="tiny primary" type="submit">${visit ? "Update assignment" : "Assign"}</button>
+    </form>
+    <form class="household-edit" data-form="directory-household" data-id="${esc(record.id)}">
+      <label class="wide">Household name <input name="name" value="${esc(record.name)}" aria-label="Household name" required></label>
+      <label class="wide">People <textarea name="members" rows="4" aria-label="People in the household">${esc(memberLines)}</textarea></label>
+      <label class="wide">Address <textarea name="address" rows="3" aria-label="Household address">${esc(address)}</textarea></label>
+      <label>Phone <input name="phone" type="tel" value="${esc(phone)}" aria-label="Household phone"></label>
+      <label>Email <input name="email" type="email" value="${esc(email)}" aria-label="Household email"></label>
+      <button class="tiny" type="submit">Save household</button>
+      <p class="muted">Saving updates this household and the youth assignment linked to it. Companions stay when the people listed still match.</p>
     </form>`;
 }
 
@@ -1814,9 +1898,10 @@ function renderDirectoryList() {
 function roleCard(person, kind, fallback = "") {
   const title = person ? nameKey(person) : fallback;
   if (!title) return "";
-  const tone = kind === "Assignment" ? " role-assignment" : "";
+  const paired = hasCompanionPair(title) ? " has-companion" : "";
+  const tone = `${kind === "Assignment" ? " role-assignment" : ""}${paired}`;
   const facts = kind === "Assignment" ? contactLines(person) : "";
-  const body = `<span class="role-kicker">${esc(kind)}</span><strong>${esc(title)}</strong>${facts}`;
+  const body = `<span class="role-kicker">${esc(kind)}</span><strong>${esc(title)}</strong>${companionPill(title)}${facts}`;
   if (!person) return `<article class="role-card${tone}">${body}</article>`;
   if (kind === "Assignment") return `<div class="role-card${tone}" data-action="select-person" data-id="${esc(person.id)}">${body}</div>`;
   return `<button type="button" class="role-card${tone}" data-action="select-person" data-id="${esc(person.id)}">${body}</button>`;
@@ -1917,9 +2002,10 @@ function youthEntryButton(entry, quorum = "") {
   const tone = quorum === "priests" || quorum === "teachers" ? ` quorum-${quorum}` : "";
   if (entry.kind === "person") {
     const person = entry.person;
-    return `<div class="person ${state.rosterMode ? person.rosterStatusKey : person.outreachStatus}${tone}" data-action="select-person" data-id="${esc(person.id)}" aria-current="${person.id === selectedPersonId}">
+    return `<div class="person ${state.rosterMode ? person.rosterStatusKey : person.outreachStatus}${tone}${hasCompanionPair(nameKey(person)) ? " has-companion" : ""}" data-action="select-person" data-id="${esc(person.id)}" aria-current="${person.id === selectedPersonId}">
       ${outreachMarks(person) ? `<span class="card-marks">${outreachMarks(person)}</span>` : ""}
       <strong>${esc(personLabel(person))}</strong>
+      ${companionPill(nameKey(person))}
       ${visitedMark(person)}
       ${state.rosterMode ? statusSelect(person) : `<span class="pill ${person.outreachStatus}">${esc(STATUS_LABELS[person.outreachStatus])}</span>`}
       <small>${state.rosterMode ? rosterLine(person) : esc(latestLine(person))}</small>
@@ -1929,7 +2015,7 @@ function youthEntryButton(entry, quorum = "") {
   const place = entry.quorum === "teachers" ? "Teachers" : "Priests";
   const person = findPersonByName(entry.name);
   const open = person ? ` data-action="select-person" data-id="${esc(person.id)}" aria-current="${person.id === selectedPersonId}"` : "";
-  return `<div class="person leader-row${tone}"${open}><strong>${esc(entry.name)}</strong><small>${esc(entry.role)}${entry.role ? ` · ${place}` : place}</small>${ministeringLines(entry.name)}</div>`;
+  return `<div class="person leader-row${tone}${hasCompanionPair(entry.name) ? " has-companion" : ""}"${open}><strong>${esc(entry.name)}</strong>${companionPill(entry.name)}<small>${esc(entry.role)}${entry.role ? ` · ${place}` : place}</small>${ministeringLines(entry.name)}</div>`;
 }
 
 function ministeringLines(name) {
@@ -1993,9 +2079,10 @@ function personButtons(people = filteredPeople()) {
     const statusControl = state.rosterMode
       ? (confirmVisit ? `<span class="status-line">${statusSelect(person)}${visitCheck(person)}</span>` : statusSelect(person))
       : `<span class="pill ${person.outreachStatus}">${esc(STATUS_LABELS[person.outreachStatus])}</span>`;
-    return `<div class="person ${state.rosterMode ? person.rosterStatusKey : person.outreachStatus}${youthVisit ? " to-visit" : ""}" data-action="select-person" data-id="${esc(person.id)}" aria-current="${person.id === selectedPersonId}">
+    return `<div class="person ${state.rosterMode ? person.rosterStatusKey : person.outreachStatus}${youthVisit ? " to-visit" : ""}${hasCompanionPair(nameKey(person)) ? " has-companion" : ""}" data-action="select-person" data-id="${esc(person.id)}" aria-current="${person.id === selectedPersonId}">
       ${outreachMarks(person) ? `<span class="card-marks">${outreachMarks(person)}</span>` : ""}
       <strong>${esc(personLabel(person))}</strong>
+      ${companionPill(nameKey(person))}
       ${confirmVisit ? "" : visitedMark(person)}
       ${statusControl}
       ${youthVisit ? contactLines(person) : ""}
