@@ -135,15 +135,11 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 600; letter-spacing: -0.02e
 h1 { margin: 0; font-size: 40px; line-height: 1.05; }
 
 body[data-page="elders"] [data-page-header="youth"] .eyebrow,
-body[data-page="elders"] [data-page-header="directory"] .eyebrow,
 body[data-page="youth"] [data-page-header="elders"] .eyebrow,
-body[data-page="youth"] [data-page-header="directory"] .eyebrow,
 body[data-page="directory"] [data-page-header="elders"] .eyebrow,
 body[data-page="directory"] [data-page-header="youth"] .eyebrow { cursor: pointer; }
 body[data-page="elders"] #open-youth-title:hover,
-body[data-page="elders"] #open-directory-title:hover,
 body[data-page="youth"] #open-elders-title:hover,
-body[data-page="youth"] #open-directory-title:hover,
 body[data-page="directory"] #open-elders-title:hover,
 body[data-page="directory"] #open-youth-title:hover { color: var(--church-deep); }
 

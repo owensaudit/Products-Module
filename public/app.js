@@ -794,8 +794,6 @@ document.querySelector("#open-youth")?.addEventListener("click", () => openPage(
 document.querySelector("#open-youth-title")?.addEventListener("click", () => openPage("youth"));
 document.querySelector("[data-page-header='youth'] .eyebrow")?.addEventListener("click", () => openPage("youth"));
 document.querySelector("#open-directory")?.addEventListener("click", () => openPage("directory"));
-document.querySelector("#open-directory-title")?.addEventListener("click", () => openPage("directory"));
-document.querySelector("[data-page-header='directory'] .eyebrow")?.addEventListener("click", () => openPage("directory"));
 
 document.querySelector("#message-inbox")?.addEventListener("click", () => {
   toggleInbox("elders");
