@@ -1678,7 +1678,16 @@ function assignmentListMarkup() {
 }
 
 function youthListTitle() {
+  if (youthList === "none") return "None";
   return YOUTH_LISTS.find(([id]) => id === youthList)?.[1] || "All";
+}
+
+function youthWithoutCompanions(quorum = "all") {
+  const needle = search.trim().toLowerCase();
+  return youthMembers(quorum)
+    .filter((person) => !hasCompanionPair(nameKey(person)))
+    .filter((person) => !needle || nameKey(person).toLowerCase().includes(needle))
+    .sort((a, b) => nameKey(a).localeCompare(nameKey(b), "en", { sensitivity: "base" }));
 }
 
 function youthRosterEntries(quorum, section) {
@@ -2088,6 +2097,7 @@ function youthListSize(id, quorum) {
 }
 
 function youthVisibleEntries() {
+  if (youthList === "none") return [...youthWithoutCompanions("priests"), ...youthWithoutCompanions("teachers")];
   if (youthList === "all") {
     const seen = new Set();
     const rows = [];
@@ -2108,7 +2118,27 @@ function youthVisibleEntries() {
   return ministeringRows(quorum);
 }
 
+function noneListMarkup() {
+  const blocks = [
+    ["priests", "Priests Quorum", "Priest"],
+    ["teachers", "Teachers Quorum", "Teacher"],
+  ].map(([quorum, label, role]) => {
+    const people = youthWithoutCompanions(quorum);
+    if (!people.length) return "";
+    return `<section class="youth-list-block">
+      <h3>${esc(label)}</h3>
+      <div class="ministering-cards quorum-${quorum}">
+        ${people.map((person) => roleCard(person, role)).join("")}
+      </div>
+    </section>`;
+  }).join("");
+  if (blocks) return blocks;
+  const message = search.trim() ? "No priests or teachers without a companion match this search." : "Every priest and teacher has a companion.";
+  return `<p class="empty">${message}</p>`;
+}
+
 function youthListMarkup() {
+  if (youthList === "none") return noneListMarkup();
   const lists = youthVisibleLists();
   const single = lists.length === 1;
   return lists.map(([id, label, quorum]) => {
@@ -2177,11 +2207,14 @@ function youthRosterSummary() {
     return `<button type="button" data-action="youth-list" data-list="${id}" aria-pressed="${pressed}">${esc(label)} ${youthListSize(id, quorum)}</button>`;
   }).join("");
   const allPressed = listsOpen && youthList === "all";
+  const nonePressed = listsOpen && youthList === "none";
+  const noneCount = youthMembers().filter((person) => !hasCompanionPair(nameKey(person))).length;
   const assignmentPressed = showingAssignments();
   const visitPressed = youthList === "visits" && !archiveOpen && !viewAll && !assigneeFilter && !dayFilter && statusFilter === "all";
   return `<div class="summary" aria-label="Youth lists">
     <button type="button" data-action="view-all" aria-pressed="${allPressed}">All ${allCount}</button>
     ${listButtons}
+    <button type="button" data-action="youth-list" data-list="none" aria-pressed="${nonePressed}">None ${noneCount}</button>
     <button type="button" data-action="youth-list" data-list="assignments" aria-pressed="${assignmentPressed}">Assignments ${activeCount}</button>
     <button type="button" data-action="show-people" data-list="to-visit" aria-pressed="${visitPressed}">To Visit ${activeCount}</button>
     <button type="button" class="archive-toggle" data-action="archive" aria-pressed="${archiveOpen}">Archive ${archivedCount}</button>

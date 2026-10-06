@@ -901,6 +901,12 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
 .summary button[data-list="assignments"] { box-shadow: 0 0 0 3px #f7a1c4; }
 .summary button[data-list="priests-quorum"] { box-shadow: 0 0 0 3px #ffe56a; }
 .summary button[data-list="teachers-quorum"] { box-shadow: 0 0 0 3px #3caf62; }
+.summary button[data-list="none"] {
+  background: var(--status-none);
+  color: #3d3200;
+  border-color: #e6c200;
+  box-shadow: 0 0 0 3px #ffe56a;
+}
 .summary button[data-list="leaders"] {
   border: 3px solid transparent;
   background:
