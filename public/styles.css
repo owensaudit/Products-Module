@@ -991,6 +991,7 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
   cursor: pointer;
 }
 article.role-card { cursor: default; }
+.role-card[aria-current="true"] { outline: 2px solid var(--ink); outline-offset: 2px; }
 .role-kicker {
   color: var(--church);
   font-size: 11px;
@@ -1003,14 +1004,29 @@ article.role-card { cursor: default; }
 .role-assignment .contact-line { display: block; }
 
 .household-line {
-  white-space: pre-line;
   margin: 0 0 12px;
 }
-.household-line span {
+.household-line span,
+.name-links span {
   display: block;
   color: var(--muted);
   font-size: 13px;
 }
+.name-link {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--church-deep);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.household-line .name-link,
+.contact-line.name-links .name-link { display: block; }
+.name-link:hover { text-decoration: underline; }
+.name-links { margin: 0 0 12px; }
+.card-back { margin: 0 0 8px; }
 
 .directory-wrap { overflow: auto; max-height: calc(100vh - 220px); }
 .directory {

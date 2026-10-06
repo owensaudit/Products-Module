@@ -64,6 +64,9 @@ let dayFilter = "";
 let viewAll = false;
 let assigneeFilter = "";
 let preserveListScroll = true;
+let cardTrail = [];
+let pendingListScroll = null;
+let pendingWindowScroll = null;
 let blankPlanFor = "";
 let focusReachOutDate = false;
 let inbox = "";
@@ -354,7 +357,17 @@ app.addEventListener("click", (event) => {
     const current = selectedPerson();
     if (current && !personMatchesFilters(current)) selectedPersonId = null;
     render();
+  } else if (action === "open-name") {
+    openLinkedName(button.dataset.name, {
+      personId: button.dataset.person || "",
+      directoryId: button.dataset.directory || "",
+      member: button.dataset.member || "",
+    });
+  } else if (action === "card-back") {
+    const spot = cardTrail.pop();
+    if (spot) restoreCard(spot);
   } else if (action === "select-person") {
+    cardTrail = [];
     const pageTop = window.scrollY;
     selectedPersonId = button.dataset.id;
     view = "people";
@@ -404,6 +417,7 @@ app.addEventListener("click", (event) => {
       render();
     }).catch(showError);
   } else if (action === "open-directory-person") {
+    cardTrail = [];
     const pageTop = window.scrollY;
     directoryAdding = false;
     directoryFocus = { directoryId: button.dataset.id, member: button.dataset.member };
@@ -937,6 +951,7 @@ function inboxMessages(which = inbox) {
 
 function openPage(next) {
   if (page === next) return;
+  cardTrail = [];
   page = next;
   youthList = "all";
   selectedPersonId = null;
@@ -1188,19 +1203,26 @@ function render() {
     return;
   }
   if (page === "directory") {
-    const listScroll = preserveListScroll ? (document.querySelector("#person-list")?.scrollTop ?? 0) : 0;
+    const listScroll = pendingListScroll != null ? pendingListScroll : (preserveListScroll ? (document.querySelector("#person-list")?.scrollTop ?? 0) : 0);
+    const windowScroll = pendingWindowScroll;
+    pendingListScroll = null;
+    pendingWindowScroll = null;
     const directoryDraft = readDirectoryDraft();
     app.innerHTML = directoryView();
     restoreDirectoryDraft(directoryDraft);
     const list = document.querySelector("#person-list");
     if (list) list.scrollTop = listScroll;
+    if (windowScroll != null) requestAnimationFrame(() => window.scrollTo(0, windowScroll));
     return;
   }
   if (page !== "youth" && !eldersPeople().length && view === "people") {
     app.innerHTML = `${tabs()}${rosterNeeded()}`;
     return;
   }
-  const listScroll = preserveListScroll ? (document.querySelector("#person-list")?.scrollTop ?? 0) : 0;
+  const listScroll = pendingListScroll != null ? pendingListScroll : (preserveListScroll ? (document.querySelector("#person-list")?.scrollTop ?? 0) : 0);
+  const windowScroll = pendingWindowScroll;
+  pendingListScroll = null;
+  pendingWindowScroll = null;
   app.innerHTML = `${tabs()}${summary()}${view === "people" ? peopleView() : view === "month" ? monthView() : importView()}`;
   restoreContactDraft(contactDraft);
   const list = document.querySelector("#person-list");
@@ -1211,6 +1233,7 @@ function render() {
       if (current) current.scrollTop = listScroll;
     });
   }
+  if (windowScroll != null) requestAnimationFrame(() => window.scrollTo(0, windowScroll));
   if (focusReachOutDate) {
     focusReachOutDate = false;
     document.querySelector('form[data-form="plan"] input[name="date"]')?.focus();
@@ -1810,21 +1833,150 @@ function addressPill(address) {
 function contactLines(person) {
   if (!person) return "";
   const parts = [];
-  const household = String(person.household || "").trim();
+  const household = linkedNameButtons(person.household, `data-person="${esc(person.id)}"`);
   const address = String(person.sheetColumns?.Address || "").trim();
   const phone = String(person.phone || "").trim();
   const email = String(person.email || "").trim();
-  if (household) parts.push(`<small class="contact-line">${esc(household)}</small>`);
+  if (household) parts.push(`<span class="contact-line name-links">${household}</span>`);
   if (address) parts.push(`<small class="contact-line">${esc(address)}</small>`);
   if (phone) parts.push(`<small class="contact-line">${esc(phone)}</small>`);
   if (email) parts.push(`<small class="contact-line">${esc(email)}</small>`);
   return parts.join("");
 }
 
+function linkedNameButtons(text, hint = "") {
+  return String(text || "").split(/\n/).map((line) => line.trim()).filter(Boolean).map((name) => `<button type="button" class="name-link" data-action="open-name" data-name="${esc(name)}" ${hint}>${esc(name)}</button>`).join("");
+}
+
 function householdLine(person) {
-  const text = String(person?.household || "").trim();
-  if (!text) return "";
-  return `<p class="household-line"><span>Household</span>${esc(text)}</p>`;
+  const names = linkedNameButtons(person?.household, `data-person="${esc(person?.id || "")}"`);
+  if (!names) return "";
+  return `<div class="household-line"><span>Household</span>${names}</div>`;
+}
+
+function cardBackButton() {
+  if (!cardTrail.length) return "";
+  return `<button type="button" class="ghost card-back" data-action="card-back">Back</button>`;
+}
+
+function captureCard(origin = {}) {
+  return {
+    page,
+    personId: origin.personId || selectedPersonId || "",
+    directoryId: origin.directoryId || directoryFocus?.directoryId || "",
+    member: origin.member || directoryFocus?.member || "",
+    youthList,
+    view,
+    scrollY: window.scrollY,
+    listScroll: document.querySelector("#person-list")?.scrollTop || 0,
+  };
+}
+
+function restoreCard(spot) {
+  page = spot.page;
+  selectedPersonId = spot.personId || null;
+  directoryFocus = spot.directoryId ? { directoryId: spot.directoryId, member: spot.member } : null;
+  directoryAdding = false;
+  youthList = spot.youthList;
+  view = spot.view || "people";
+  detailForm = null;
+  inbox = "";
+  pendingListScroll = spot.listScroll || 0;
+  pendingWindowScroll = spot.scrollY || 0;
+  render();
+}
+
+function nameFold(value) {
+  return String(value || "").trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ");
+}
+
+function givenFold(value) {
+  const raw = String(value || "").trim();
+  const comma = raw.indexOf(",");
+  return nameFold(comma === -1 ? raw : raw.slice(comma + 1));
+}
+
+function directoryRecordForPerson(person) {
+  if (!person) return null;
+  const name = nameKey(person);
+  return (state?.directory || []).find((row) => directoryNameMatches(row.name, name) || (row.members || []).some((member) => directoryNameMatches(directoryPersonName(row, member), name))) || null;
+}
+
+function resolveDirectoryEntry(label, hint) {
+  const wanted = nameFold(label);
+  if (!wanted) return null;
+  const entries = directoryEntries();
+  const exact = entries.filter((entry) => nameFold(entry.name) === wanted || nameFold(entry.member) === wanted);
+  if (exact.length === 1) return exact[0];
+  const homes = [];
+  const addHome = (row) => {
+    if (row && !homes.some((item) => item.id === row.id)) homes.push(row);
+  };
+  if (hint?.directoryId) addHome((state?.directory || []).find((row) => row.id === hint.directoryId));
+  if (hint?.personId) addHome(directoryRecordForPerson((state?.people || []).find((person) => person.id === hint.personId)));
+  for (const row of homes) {
+    const matches = (row.members || []).filter((member) => {
+      const full = directoryPersonName(row, member);
+      return nameFold(member) === wanted || nameFold(full) === wanted || givenFold(full) === wanted;
+    });
+    if (matches.length === 1) {
+      return { name: directoryPersonName(row, matches[0]), member: matches[0], directoryId: row.id, household: row.name, record: row };
+    }
+  }
+  const byHousehold = (state?.directory || []).find((row) => nameFold(row.name) === wanted);
+  if (byHousehold?.members?.length === 1) {
+    const member = byHousehold.members[0];
+    return { name: directoryPersonName(byHousehold, member), member, directoryId: byHousehold.id, household: byHousehold.name, record: byHousehold };
+  }
+  if (byHousehold?.members?.length) {
+    const head = String(label || "").split("&")[0].trim();
+    const member = (byHousehold.members || []).find((item) => directoryNameMatches(directoryPersonName(byHousehold, item), head)) || byHousehold.members[0];
+    return { name: directoryPersonName(byHousehold, member), member, directoryId: byHousehold.id, household: byHousehold.name, record: byHousehold };
+  }
+  const given = entries.filter((entry) => givenFold(entry.name) === wanted || nameFold(entry.member) === wanted);
+  return given.length === 1 ? given[0] : (exact[0] || null);
+}
+
+function resolveRosterPerson(label, entry) {
+  const people = state?.people || [];
+  if (entry) {
+    const match = people.find((person) => directoryNameMatches(nameKey(person), entry.name) || directoryNameMatches(person.displayName, entry.name));
+    if (match) return match;
+  }
+  const wanted = nameFold(label);
+  const exact = people.filter((person) => nameFold(nameKey(person)) === wanted || givenFold(nameKey(person)) === wanted);
+  return exact.length === 1 ? exact[0] : null;
+}
+
+function rosterPageFor(person) {
+  return isYouthMember(person) || isYouthVisit(person) ? "youth" : "elders";
+}
+
+function openLinkedName(label, hint) {
+  const entry = resolveDirectoryEntry(label, hint);
+  const roster = resolveRosterPerson(label, entry);
+  let destination = null;
+  if (page !== "directory" && roster) destination = { kind: "person", page: rosterPageFor(roster), personId: roster.id };
+  else if (entry) destination = { kind: "directory", directoryId: entry.directoryId, member: entry.member };
+  else if (roster) destination = { kind: "person", page: rosterPageFor(roster), personId: roster.id };
+  if (!destination) return;
+  const sameDirectory = destination.kind === "directory" && page === "directory" && directoryFocus?.directoryId === destination.directoryId && directoryFocus?.member === destination.member;
+  const samePerson = destination.kind === "person" && page === destination.page && selectedPersonId === destination.personId;
+  if (sameDirectory || samePerson) return;
+  cardTrail.push(captureCard(hint));
+  detailForm = null;
+  directoryAdding = false;
+  inbox = "";
+  if (destination.kind === "directory") {
+    page = "directory";
+    directoryFocus = { directoryId: destination.directoryId, member: destination.member };
+  } else {
+    page = destination.page;
+    selectedPersonId = destination.personId;
+    view = "people";
+  }
+  pendingWindowScroll = 0;
+  render();
 }
 
 function directoryPersonName(record, member) {
@@ -2119,15 +2271,15 @@ function directoryPersonCard(entry) {
   const address = String(record.address || "").trim();
   const companions = directoryCompanionNames(entry.name);
   const companion = companions.length === 1 ? companions[0] : "";
-  const companionNote = companions.length > 1 ? `<p class="muted">Companions ${esc(companions.join(" · "))}</p>` : "";
+  const companionLinks = companions.length ? `<p class="name-links"><span>Companion</span>${directoryNameLinks(companions, entry)}</p>` : "";
   const assignedVisits = directoryAssignedVisits(entry);
   const visits = [...assignedVisits];
   for (const name of directoryVisitNames(entry.name)) {
     if (!visits.some((item) => directoryNameMatches(item, name))) visits.push(name);
   }
-  const visitLine = visits.length ? `<p class="muted">Visiting ${esc(visits.join(" · "))}</p>` : "";
+  const visitLine = visits.length ? `<p class="name-links"><span>Visiting</span>${directoryNameLinks(visits, entry)}</p>` : "";
   const status = directoryStatusPills(entry.name);
-  return `<h2>${esc(entry.name)}</h2>
+  return `${cardBackButton()}<h2>${esc(entry.name)}</h2>
     ${status ? `<p class="status-row">${status}</p>` : ""}
     <form class="assign-row" data-form="directory-home" data-id="${esc(record.id)}" data-member="${esc(entry.member)}">
       <span>Household</span>
@@ -2156,13 +2308,18 @@ function directoryPersonCard(entry) {
       <span>Companion</span>
       <select name="companion" aria-label="Companion">${directoryOptions(companion)}</select>
     </form>
-    ${companionNote}
+    ${companionLinks}
     <form class="assign-row" data-form="directory-visit" data-id="${esc(record.id)}" data-member="${esc(entry.member)}">
       <span>Household to visit</span>
       <select name="visit" aria-label="Household to visit"><option value="">—</option>${directoryHouseholdOptions("")}</select>
     </form>
     ${visitLine}
     <button type="button" class="ghost" data-action="remove-directory-member" data-id="${esc(record.id)}" data-member="${esc(entry.member)}">Remove member</button>`;
+}
+
+function directoryNameLinks(names, entry) {
+  const hint = `data-directory="${esc(entry.directoryId)}" data-member="${esc(entry.member)}"`;
+  return names.map((name) => `<button type="button" class="name-link" data-action="open-name" data-name="${esc(name)}" ${hint}>${esc(name)}</button>`).join("");
 }
 
 function directoryAddForm() {
@@ -2231,8 +2388,9 @@ function roleCard(person, kind, fallback = "") {
   const facts = kind === "Assignment" ? contactLines(person) : "";
   const body = `<span class="role-kicker">${esc(kind)}</span><strong>${esc(title)}</strong>${companionPill(title)}${kind === "Priest" || kind === "Teacher" ? noCompanionPill(title) : ""}${facts}`;
   if (!person) return `<article class="role-card${tone}">${body}</article>`;
-  if (kind === "Assignment") return `<div class="role-card${tone}" data-action="select-person" data-id="${esc(person.id)}">${body}</div>`;
-  return `<button type="button" class="role-card${tone}" data-action="select-person" data-id="${esc(person.id)}">${body}</button>`;
+  const current = ` aria-current="${person.id === selectedPersonId}"`;
+  if (kind === "Assignment") return `<div class="role-card${tone}" data-action="select-person" data-id="${esc(person.id)}"${current}>${body}</div>`;
+  return `<button type="button" class="role-card${tone}" data-action="select-person" data-id="${esc(person.id)}"${current}>${body}</button>`;
 }
 
 function ministeringCards(quorum, membersOnly = false) {
@@ -2616,8 +2774,8 @@ function personDetail() {
     return `<h2>Outreach record</h2><p class="empty">Select a person to see contact history, log a reply, and schedule a visit. Phone numbers and email addresses stay hidden until you turn on contact details.</p>`;
   }
   if (state.rosterMode) return rosterDetail(person);
-  return `${personNameField(person)}
-    ${person.household ? `<p class="muted">${esc(person.household)}</p>` : ""}
+  return `${cardBackButton()}${personNameField(person)}
+    ${householdLine(person)}
     <p><span class="pill ${person.outreachStatus}">${STATUS_LABELS[person.outreachStatus]}</span></p>
     ${stepper(person)}
     <p>${esc(statusSentence(person))}</p>
@@ -2641,7 +2799,8 @@ function youthMemberDetail(person) {
   const companion = ministeringCompanionValue(person, families);
   const meeting = person.sheetColumns?.["Meeting Date"] || "";
   const responded = families.filter((family) => family.sheetColumns?.Response === "Responded").length;
-  return `${personNameField(person)}
+  const companionLink = companion ? `<button type="button" class="name-link" data-action="open-name" data-name="${esc(companion)}" data-person="${esc(person.id)}">${esc(companion)}</button>` : "the companion";
+  return `${cardBackButton()}${personNameField(person)}
     ${specialNotes(person)}
     ${householdLine(person)}
     ${contactFields(person, false, true)}
@@ -2650,8 +2809,8 @@ function youthMemberDetail(person) {
       <label>Companion <input name="companion" value="${esc(companion)}" autocomplete="off" aria-label="Companion"></label>
     </form>
     <h3>Youth ministry meeting</h3>
-    <p class="muted">Meet with ${esc(companion || "the companion")} to see which assignments respond, then give a date and time to visit.</p>
-    ${meeting ? `<p class="plan-line"><strong>Meeting</strong> ${esc(meeting)}${companion ? ` with ${esc(companion)}` : ""}</p>` : ""}
+    <p class="muted">Meet with ${companionLink} to see which assignments respond, then give a date and time to visit.</p>
+    ${meeting ? `<p class="plan-line"><strong>Meeting</strong> ${esc(meeting)}${companion ? ` with ${companionLink}` : ""}</p>` : ""}
     <form class="appointment-row" data-form="youth-meeting">
       <input name="date" type="date" aria-label="Meeting date" required value="${esc(meetingParts(meeting).date)}">
       <input name="time" type="time" aria-label="Meeting time" required value="${esc(meetingParts(meeting).time)}">
@@ -2673,6 +2832,7 @@ function youthAssignmentVisit(family) {
   const parts = meetingParts(visit);
   return `<div class="assignment-visit${responded ? " is-responded" : ""}">
     <input data-assignment-id="${esc(family.id)}" value="${esc(nameKey(family))}" aria-label="Assignment">
+    <button type="button" class="name-link" data-action="open-name" data-name="${esc(nameKey(family))}" data-person="${esc(family.id)}">${esc(nameKey(family))}</button>
     <label class="responded"><input type="checkbox" data-response-id="${esc(family.id)}" ${responded ? "checked" : ""}> Responded</label>
     ${visit ? `<p class="plan-line"><strong>Visit</strong> ${esc(visit)}</p>` : ""}
     <form class="appointment-row" data-form="assignment-visit" data-id="${esc(family.id)}">
@@ -2686,7 +2846,7 @@ function youthAssignmentVisit(family) {
 
 function assignmentDetail(person) {
   const confirm = person.rosterStatusKey === "scheduled" ? visitCheck(person) : "";
-  return `${personNameField(person)}
+  return `${cardBackButton()}${personNameField(person)}
     <p class="muted">Assignment</p>
     <p class="status-row">${statusSelect(person)}${confirm}${missionPill(person)}</p>
     ${contactFields(person, true)}
@@ -2701,7 +2861,7 @@ function assignmentDetail(person) {
 function rosterDetail(person) {
   if (isYouthMember(person)) return youthMemberDetail(person);
   if (isYouthVisit(person)) return assignmentDetail(person);
-  return `${personNameField(person)}
+  return `${cardBackButton()}${personNameField(person)}
     ${specialNotes(person)}
     ${householdLine(person)}
     <p class="status-row">${statusSelect(person)}${archiveControl(person)}${missionPill(person)}${person.rosterStatusKey === "scheduled" ? visitCheck(person) : ""}</p>
@@ -2906,7 +3066,8 @@ function contactFields(person, details = false, withAddress = false) {
   const email = String(person.email || "").trim();
   const household = details ? `<label class="wide">Household
       <textarea name="household" rows="4">${esc(person.household || "")}</textarea>
-    </label>` : "";
+    </label>
+    <span class="name-links">${linkedNameButtons(person.household, `data-person="${esc(person.id)}"`)}</span>` : "";
   const address = details || withAddress ? addressField(person) : "";
   return `<form class="contact-fields" data-form="contact">
     ${household}
