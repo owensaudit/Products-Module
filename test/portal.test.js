@@ -34,7 +34,7 @@ import {
   setVisitStatus,
   slotsForMonth,
 } from "../lib/model.js";
-import { applyDirectory, assignDirectoryHousehold, findDirectoryRecord, moveDirectoryPerson, parseDirectory, setDirectoryCompanion, updateDirectoryHousehold } from "../lib/directory.js";
+import { addDirectoryMember, applyDirectory, assignDirectoryHousehold, findDirectoryRecord, moveDirectoryPerson, parseDirectory, removeDirectoryMember, setDirectoryCompanion, updateDirectoryHousehold } from "../lib/directory.js";
 import { brotherSheetToState, calendarMarks, canonicalRosterStatus, isArchiveStatus, rosterStatusKey } from "../lib/roster.js";
 import { createStore } from "../lib/store.js";
 import { createPortalServer } from "../server.js";
@@ -938,4 +938,39 @@ test("moving a directory person keeps both households and their companions", () 
   assert.equal(moved.people.length, 1);
   assert.equal(moved.people[0].displayName, "Keep");
   assert.throws(() => moveDirectoryPerson(moved, { directoryId: "dir_1", member: "Ana", householdId: "dir_2" }), /at least one person/);
+});
+
+test("a directory member can be added or removed without touching the roster", () => {
+  const state = {
+    ...emptyState(),
+    directory: [{
+      id: "dir_1",
+      name: "Example, Ana & Ben",
+      members: ["Ana", "Ben"],
+      address: "10 Example St",
+      phone: "(360) 555-0100",
+      email: "ana@example.com",
+      memberCompanions: { ana: "Example, Cam" },
+    }],
+    people: [{ id: "per_1", displayName: "Keep" }],
+  };
+  const added = addDirectoryMember(state, { name: "Example, Dee", householdId: "dir_1" }, { id: () => "dir_new" });
+  assert.deepEqual(added.directory[0].members, ["Ana", "Ben", "Dee"]);
+  assert.equal(added.directory[0].address, "10 Example St");
+  assert.equal(added.directory[0].memberCompanions.ana, "Example, Cam");
+  assert.equal(added.people.length, 1);
+  const created = addDirectoryMember(state, { name: "Sample, Cam", householdName: "Sample, Cam" }, { id: () => "dir_new" });
+  assert.equal(created.directory.length, 2);
+  assert.equal(created.directory[1].id, "dir_new");
+  assert.deepEqual(created.directory[1].members, ["Cam"]);
+  assert.equal(created.directory[0].members.join("|"), "Ana|Ben");
+  const removed = removeDirectoryMember(added, { directoryId: "dir_1", member: "Ben" });
+  assert.deepEqual(removed.directory[0].members, ["Ana", "Dee"]);
+  assert.equal(removed.directory[0].phone, "(360) 555-0100");
+  assert.equal(removed.directory[0].memberCompanions.ana, "Example, Cam");
+  assert.equal(removed.people[0].displayName, "Keep");
+  const gone = removeDirectoryMember(state, { directoryId: "dir_1", member: "Ana" });
+  const last = removeDirectoryMember(gone, { directoryId: "dir_1", member: "Ben" });
+  assert.equal(last.directory.length, 0);
+  assert.equal(last.people.length, 1);
 });

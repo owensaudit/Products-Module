@@ -70,6 +70,7 @@ let inbox = "";
 let page = "elders";
 let directoryFocus = null;
 let directoryFilter = "all";
+let directoryAdding = false;
 let youthGroup = "priests";
 let youthList = "all";
 let commentFor = "";
@@ -364,6 +365,7 @@ app.addEventListener("click", (event) => {
     window.scrollTo(0, pageTop);
     requestAnimationFrame(() => window.scrollTo(0, pageTop));
   } else if (action === "form") {
+    if (page === "youth" && button.dataset.form === "add-person") return;
     detailForm = button.dataset.form;
     render();
   } else if (action === "select-slot") {
@@ -405,10 +407,26 @@ app.addEventListener("click", (event) => {
     }).catch(showError);
   } else if (action === "open-directory-person") {
     const pageTop = window.scrollY;
+    directoryAdding = false;
     directoryFocus = { directoryId: button.dataset.id, member: button.dataset.member };
     render();
     window.scrollTo(0, pageTop);
     requestAnimationFrame(() => window.scrollTo(0, pageTop));
+  } else if (action === "directory-add") {
+    directoryAdding = true;
+    directoryFocus = null;
+    render();
+  } else if (action === "remove-directory-member") {
+    if (!confirm("Remove this member from the directory?")) return;
+    post("/api/directory/remove", {
+      directoryId: button.dataset.id,
+      member: button.dataset.member,
+    }).then((next) => {
+      state = next;
+      directoryFocus = null;
+      directoryAdding = false;
+      render();
+    }).catch(showError);
   } else if (action === "directory-filter") {
     const next = button.dataset.filter || "all";
     directoryFilter = directoryFilter === next ? "all" : next;
@@ -461,6 +479,24 @@ app.addEventListener("submit", (event) => {
   }
   if (kind === "directory-contact") {
     saveDirectoryContact();
+    return;
+  }
+  if (kind === "directory-add") {
+    const name = String(data.get("name") || "").trim();
+    const householdId = String(data.get("householdId") || "").trim();
+    const householdName = String(data.get("householdName") || "").trim();
+    post("/api/directory/member", { name, householdId, householdName }).then((next) => {
+      state = next;
+      directoryAdding = false;
+      const record = householdId
+        ? (next.directory || []).find((row) => row.id === householdId)
+        : (next.directory || []).find((row) => String(row.name).toLowerCase() === (householdName || name).toLowerCase());
+      const member = (record?.members || []).find((item) => directoryPersonName(record, item).toLowerCase() === name.toLowerCase())
+        || (record?.members || []).at(-1)
+        || "";
+      directoryFocus = record && member ? { directoryId: record.id, member } : null;
+      render();
+    }).catch(showError);
     return;
   }
   if (kind === "directory-assign") {
@@ -939,7 +975,10 @@ function openPage(next) {
   dayFilter = "";
   view = "people";
   if (next === "youth") officeFilter = "all";
-  if (next !== "directory") directoryFocus = null;
+  if (next !== "directory") {
+    directoryFocus = null;
+    directoryAdding = false;
+  }
   render();
 }
 
@@ -1650,7 +1689,8 @@ function peopleView() {
   const people = youthLists || assignments ? [] : filteredPeople();
   const title = assignments ? "Assignments" : youthLists ? youthListTitle() : listTitle();
   const total = assignments ? visibleAssignments().length : youthLists ? youthVisibleEntries().length : people.length;
-  const showDetail = !state.rosterMode || Boolean(selectedPersonId) || detailForm === "add-person";
+  const addingPerson = detailForm === "add-person" && page !== "youth";
+  const showDetail = !state.rosterMode || Boolean(selectedPersonId) || addingPerson;
   const noun = assignments
     ? (total === 1 ? "assignment" : "assignments")
     : page === "youth" ? (total === 1 ? "person" : "people") : (total === 1 ? "brother" : "brothers");
@@ -1659,13 +1699,13 @@ function peopleView() {
     <div class="card" id="people-card">
       <div class="row">
         <h2>${esc(title)}</h2>
-        <button type="button" class="ghost" data-action="form" data-form="add-person">${page === "youth" ? "Add member" : "Add a person"}</button>
+        ${page === "youth" ? "" : `<button type="button" class="ghost" data-action="form" data-form="add-person">Add a person</button>`}
       </div>
       <p class="muted">${total} ${state.rosterMode ? noun : "in this list"}</p>
       <input id="search" class="search" type="search" placeholder="Search by name" value="${esc(search)}" aria-label="Search by name">
       <div id="person-list" class="person-list">${markup}</div>
     </div>
-    ${showDetail ? `<div class="card">${detailForm === "add-person" ? addPersonForm() : personDetail()}</div>` : ""}
+    ${showDetail ? `<div class="card">${addingPerson ? addPersonForm() : personDetail()}</div>` : ""}
   </section>`;
 }
 
@@ -2078,10 +2118,27 @@ function directoryPersonCard(entry) {
       <span>Household to visit</span>
       <select name="visit" aria-label="Household to visit"><option value="">—</option>${directoryHouseholdOptions("")}</select>
     </form>
-    ${visitLine}`;
+    ${visitLine}
+    <button type="button" class="ghost" data-action="remove-directory-member" data-id="${esc(record.id)}" data-member="${esc(entry.member)}">Remove member</button>`;
+}
+
+function directoryAddForm() {
+  return `<h2>Add member</h2>
+    <form class="stack" data-form="directory-add">
+      <label>Name <input name="name" required autocomplete="off"></label>
+      <label>Household
+        <select name="householdId" aria-label="Household">
+          <option value="">New household</option>
+          ${directoryHouseholdOptions("")}
+        </select>
+      </label>
+      <label>New household <input name="householdName" autocomplete="off" placeholder="Leave blank to use the name"></label>
+      <button class="primary" type="submit">Save member</button>
+    </form>`;
 }
 
 function directoryDetail() {
+  if (directoryAdding) return directoryAddForm();
   const entry = directoryFocusedEntry();
   if (!entry) return `<h2>Directory</h2><p class="empty">Choose a person.</p>`;
   return directoryPersonCard(entry);
@@ -2101,7 +2158,10 @@ function directoryView() {
   const noun = rows.length === 1 ? "person" : "people";
   return `<section class="layout">
     <div class="card">
-      <div class="row"><h2>Member directory</h2></div>
+      <div class="row">
+        <h2>Member directory</h2>
+        <button type="button" class="ghost" data-action="directory-add">Add member</button>
+      </div>
       ${directorySummary()}
       <p class="muted" id="directory-count">${rows.length} ${noun}</p>
       <input id="search" class="search" type="search" placeholder="Search the directory" value="${esc(search)}" aria-label="Search the directory">
@@ -2924,17 +2984,6 @@ function personActions(person) {
 }
 
 function addPersonForm() {
-  if (page === "youth") {
-    return `<h2>Add member</h2>
-      <form class="stack" data-form="add-person">
-        <label>Name <input name="displayName" required></label>
-        <label>Household <input name="household"></label>
-        <label>Phone <span class="private-flag">Private</span><input name="phone" type="tel" autocomplete="off"></label>
-        <label>Email <span class="private-flag">Private</span><input name="email" type="email" autocomplete="off"></label>
-        <label>Notes <textarea name="notes"></textarea></label>
-        <button class="primary" type="submit">Save member</button>
-      </form>`;
-  }
   return `<h2>Add a person</h2>
     <form class="stack" data-form="add-person">
       <label>Name <input name="displayName" required></label>

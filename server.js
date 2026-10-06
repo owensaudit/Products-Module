@@ -27,7 +27,7 @@ import {
   setPersonStatus,
   setVisitStatus,
 } from "./lib/model.js";
-import { applyDirectory, assignDirectoryHousehold, moveDirectoryPerson, parseDirectory, setDirectoryCompanion, updateDirectoryHousehold } from "./lib/directory.js";
+import { addDirectoryMember, applyDirectory, assignDirectoryHousehold, moveDirectoryPerson, parseDirectory, removeDirectoryMember, setDirectoryCompanion, updateDirectoryHousehold } from "./lib/directory.js";
 import { createStore } from "./lib/store.js";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -263,6 +263,18 @@ export function createPortalServer(store) {
 
         if (pathname === "/api/directory/move") {
           const next = await store.update((state) => moveDirectoryPerson(state, body));
+          sendJson(response, 200, presentState(next, month, viewOptions));
+          return;
+        }
+
+        if (pathname === "/api/directory/member") {
+          const next = await store.update((state) => addDirectoryMember(state, body));
+          sendJson(response, 200, presentState(next, month, viewOptions));
+          return;
+        }
+
+        if (pathname === "/api/directory/remove") {
+          const next = await store.update((state) => removeDirectoryMember(state, body));
           sendJson(response, 200, presentState(next, month, viewOptions));
           return;
         }
