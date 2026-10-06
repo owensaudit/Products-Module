@@ -929,6 +929,7 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
 .pill.driveby { background: var(--status-driveby); color: #4a2770; }
 .pill.no_response { background: var(--status-peach); color: #6a3412; }
 .pill.reschedule { background: var(--status-reschedule); color: #145c34; }
+.pill.mission { background: var(--blue-soft); color: var(--blue); }
 .pill.none { background: var(--status-none); color: #3d3200; }
 .pill.open { background: white; border: 1px dashed var(--green); color: var(--green); }
 .pill.taken { background: var(--green); color: white; }

@@ -110,7 +110,8 @@ app.addEventListener("change", (event) => {
     return;
   }
   if (target instanceof HTMLSelectElement && target.classList.contains("status-pill")) {
-    applyStatus(target.dataset.personId, target.value);
+    if (target.value === "Mission") applyMission(target.dataset.personId, true);
+    else applyStatus(target.dataset.personId, target.value);
     return;
   }
   if (target instanceof HTMLSelectElement && target.form?.dataset.form === "directory-companion") {
@@ -311,7 +312,8 @@ app.addEventListener("click", (event) => {
   } else if (action === "mark-visited") {
     applyStatus(button.dataset.personId, "Visited", { keepView: true });
   } else if (action === "set-status") {
-    applyStatus(button.dataset.personId, button.dataset.status);
+    if (button.dataset.status === "Mission") applyMission(button.dataset.personId);
+    else applyStatus(button.dataset.personId, button.dataset.status);
   } else if (action === "filter") {
     viewAll = false;
     statusFilter = button.dataset.status;
@@ -1500,7 +1502,29 @@ function summary() {
 }
 
 function personIsArchived(person) {
-  return ARCHIVE_STATUS_ORDER.includes(person?.rosterStatusKey || "");
+  return ARCHIVE_STATUS_ORDER.includes(person?.rosterStatusKey || "") || Boolean(person?.onMission);
+}
+
+function applyMission(personId, force) {
+  const person = (state?.people || []).find((item) => item.id === personId);
+  const currently = Boolean(person?.onMission || person?.rosterStatusKey === "mission");
+  const on = force === true ? true : force === false ? false : !currently;
+  viewAll = false;
+  assigneeFilter = "";
+  dayFilter = "";
+  search = "";
+  officeFilter = "all";
+  if (on) {
+    archiveOpen = true;
+    statusFilter = "mission";
+  }
+  const status = on ? "Mission" : (person?.rosterStatusKey === "mission" ? "" : (person?.rosterStatus || ""));
+  archiveChoicesFor = "";
+  post(`/api/people/${personId}/status`, { status, mission: on }).then((next) => {
+    state = next;
+    selectedPersonId = personId;
+    render();
+  }).catch(showError);
 }
 
 function applyStatus(personId, status, options = {}) {
@@ -1556,6 +1580,7 @@ function rosterSummary() {
     const key = person.rosterStatusKey || "none";
     counts[key] = (counts[key] || 0) + 1;
   }
+  if (archiveOpen) counts.mission = cohort.filter((person) => person.onMission || person.rosterStatusKey === "mission").length;
   const archivedCount = source.filter((person) => personIsArchived(person)).length;
   const activeCount = source.length - archivedCount;
   const keys = archiveOpen ? ARCHIVE_STATUS_ORDER : ROSTER_STATUS_ORDER.filter((key) => counts[key]);
@@ -2176,6 +2201,7 @@ function personButtons(people = filteredPeople()) {
       ${companionPill(nameKey(person))}
       ${confirmVisit ? "" : visitedMark(person)}
       ${statusControl}
+      ${missionPill(person)}
       ${youthVisit ? contactLines(person) : ""}
       <small>${state.rosterMode ? rosterLine(person) : esc(latestLine(person))}</small>
     </div>`;
@@ -2215,12 +2241,17 @@ function archiveControl(person) {
   const archived = personIsArchived(person);
   return `<span class="archive-control">
     <button type="button" class="tiny archive-card${archived ? " is-archived" : ""}" data-action="toggle-archive" aria-expanded="${open}" aria-pressed="${archived}">Archive</button>
-    ${open ? `<span class="archive-choices">${ARCHIVE_CHOICES.map(([value, label]) => `<button type="button" class="tiny status-choice ${rosterKey(value)}" data-action="set-status" data-person-id="${esc(person.id)}" data-status="${esc(value)}" aria-pressed="${currentStatus(person) === value}">${esc(label)}</button>`).join("")}</span>` : ""}
+    ${open ? `<span class="archive-choices">${ARCHIVE_CHOICES.map(([value, label]) => `<button type="button" class="tiny status-choice ${rosterKey(value)}" data-action="set-status" data-person-id="${esc(person.id)}" data-status="${esc(value)}" aria-pressed="${value === "Mission" ? Boolean(person.onMission) : currentStatus(person) === value}">${esc(label)}</button>`).join("")}</span>` : ""}
   </span>`;
 }
 
 function currentStatus(person) {
   return person.rosterStatus || "";
+}
+
+function missionPill(person) {
+  if (!person?.onMission || person.rosterStatusKey === "mission") return "";
+  return `<span class="pill mission">Mission</span>`;
 }
 
 function rosterKey(label) {
@@ -2285,8 +2316,12 @@ function personMatchesFilters(person) {
   }
   if (state.rosterMode && !dayFilter && personIsArchived(person) !== archiveOpen) return false;
   if (statusFilter !== "all") {
-    const key = state.rosterMode ? person.rosterStatusKey || "none" : person.outreachStatus;
-    if (key !== statusFilter) return false;
+    if (state.rosterMode && statusFilter === "mission") {
+      if (!(person.onMission || person.rosterStatusKey === "mission")) return false;
+    } else {
+      const key = state.rosterMode ? person.rosterStatusKey || "none" : person.outreachStatus;
+      if (key !== statusFilter) return false;
+    }
   }
   if (state.rosterMode && officeFilter !== "all" && person.priesthood !== officeFilter) return false;
   if (assigneeFilter && !(person.assigned || []).includes(assigneeFilter)) return false;
@@ -2416,7 +2451,7 @@ function assignmentDetail(person) {
   const confirm = person.rosterStatusKey === "scheduled" ? visitCheck(person) : "";
   return `${personNameField(person)}
     <p class="muted">Assignment</p>
-    <p class="status-row">${statusSelect(person)}${confirm}</p>
+    <p class="status-row">${statusSelect(person)}${confirm}${missionPill(person)}</p>
     ${contactFields(person, true)}
     ${assignmentFields(person)}
     <h3>Outreach</h3>
@@ -2432,7 +2467,7 @@ function rosterDetail(person) {
   return `${personNameField(person)}
     ${specialNotes(person)}
     ${householdLine(person)}
-    <p class="status-row">${statusSelect(person)}${archiveControl(person)}${person.rosterStatusKey === "scheduled" ? visitCheck(person) : ""}</p>
+    <p class="status-row">${statusSelect(person)}${archiveControl(person)}${missionPill(person)}${person.rosterStatusKey === "scheduled" ? visitCheck(person) : ""}</p>
     ${contactFields(person, false, true)}
     ${factsForm(person)}
     ${planLine(person)}

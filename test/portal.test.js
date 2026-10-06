@@ -256,6 +256,17 @@ test("moved, mission, do not contact, not interested, no contact info, declined,
   state = setPersonStatus(state, "per_1", "Mission");
   assert.equal(state.people[0].sheetColumns.Status, "Mission");
   assert.equal(presentState(state, "2026-09").people[0].rosterStatusKey, "mission");
+  assert.equal(presentState(state, "2026-09").people[0].onMission, true);
+  state = setPersonStatus(state, "per_1", "Visited");
+  assert.equal(state.people[0].sheetColumns.Status, "Visited");
+  assert.equal(state.people[0].sheetColumns["On Mission"], "Yes");
+  const both = presentState(state, "2026-09").people[0];
+  assert.equal(both.rosterStatusKey, "visited");
+  assert.equal(both.onMission, true);
+  state = setPersonStatus(state, "per_1", "Visited", { mission: false });
+  assert.equal(state.people[0].sheetColumns.Status, "Visited");
+  assert.equal(state.people[0].sheetColumns["On Mission"], undefined);
+  assert.equal(presentState(state, "2026-09").people[0].onMission, false);
 });
 
 test("comments attach to a person or a visit", () => {

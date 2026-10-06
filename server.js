@@ -158,7 +158,8 @@ export function createPortalServer(store) {
 
         const personStatus = pathname.match(/^\/api\/people\/([^/]+)\/status$/);
         if (personStatus) {
-          const next = await store.update((state) => setPersonStatus(state, decodeURIComponent(personStatus[1]), body.status));
+          const options = Object.hasOwn(body, "mission") ? { mission: body.mission } : {};
+          const next = await store.update((state) => setPersonStatus(state, decodeURIComponent(personStatus[1]), body.status, options));
           sendJson(response, 200, presentState(next, month, viewOptions));
           return;
         }
