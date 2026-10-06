@@ -98,7 +98,7 @@ async function sendFile(response, file) {
 }
 
 function firebaseWebConfig() {
-  const raw = process.env.FIREBASE_WEB_CONFIG;
+  const raw = process.env.PORTAL_WEB_CONFIG;
   if (!raw) return null;
   try {
     const config = JSON.parse(raw);
