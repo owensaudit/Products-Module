@@ -34,7 +34,7 @@ import {
   setVisitStatus,
   slotsForMonth,
 } from "../lib/model.js";
-import { applyDirectory, findDirectoryRecord, parseDirectory } from "../lib/directory.js";
+import { applyDirectory, assignDirectoryHousehold, findDirectoryRecord, parseDirectory, setDirectoryCompanion } from "../lib/directory.js";
 import { brotherSheetToState, calendarMarks, canonicalRosterStatus, isArchiveStatus, rosterStatusKey } from "../lib/roster.js";
 import { createStore } from "../lib/store.js";
 import { createPortalServer } from "../server.js";
@@ -810,6 +810,44 @@ Town WA 98607
   assert.deepEqual(hidden.directory[0].members, ["Ana", "Ben"]);
   const shown = presentState({ ...emptyState(), directory: state.directory, people: [] }, "2026-10", { includePrivate: true });
   assert.equal(shown.directory[0].phone, "(360) 555-0100");
+
+  const linked = {
+    ...emptyState(),
+    directory: [{
+      id: "dir_1",
+      name: "Example, Ana & Ben",
+      members: ["Ana", "Ben"],
+      address: "10 Example St",
+      phone: "(360) 555-0100",
+      email: "ana@example.com",
+    }],
+    people: [{
+      id: "per_youth",
+      group: "priests",
+      displayName: "Ana Example",
+      phone: "",
+      email: "",
+      household: "",
+      sheetColumns: { Brother: "Example, Ana" },
+    }],
+  };
+  const withCompanion = setDirectoryCompanion(linked, { directoryId: "dir_1", member: "Ana", companion: "Example, Ben" });
+  assert.equal(withCompanion.directory[0].memberCompanions.ana, "Example, Ben");
+  assert.equal(withCompanion.people[0].sheetColumns.Companion, "Example, Ben");
+  const assigned = assignDirectoryHousehold(withCompanion, { directoryId: "dir_1", youth: "Example, Ana", companion: "Example, Ben" }, deps());
+  const visits = assigned.people.filter((person) => person.list === "youth");
+  assert.equal(visits.length, 1);
+  assert.equal(visits[0].sheetColumns.Brother, "Example, Ana & Ben");
+  assert.equal(visits[0].sheetColumns.Assigned, "Example, Ana | Example, Ben");
+  assert.equal(visits[0].phone, "(360) 555-0100");
+  assert.equal(visits[0].sheetColumns.Address, "10 Example St");
+  const again = assignDirectoryHousehold(assigned, { directoryId: "dir_1", youth: "Example, Ana", companion: "Example, Cam" }, deps());
+  const still = again.people.filter((person) => person.list === "youth");
+  assert.equal(still.length, 1);
+  assert.equal(still[0].sheetColumns.Assigned, "Example, Ana | Example, Cam");
+  assert.equal(still[0].phone, "(360) 555-0100");
+  const kept = applyDirectory(withCompanion, [{ name: "Example, Ana & Ben", members: ["Ana"], address: "10 Example St", phone: "(360) 555-0100", email: "ana@example.com" }]);
+  assert.equal(kept.directory[0].memberCompanions.ana, "Example, Ben");
 
   const folder = await mkdtemp(path.join(tmpdir(), "portal-directory-"));
   const store = createStore(path.join(folder, "portal.json"));

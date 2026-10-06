@@ -68,6 +68,7 @@ let blankPlanFor = "";
 let focusReachOutDate = false;
 let inbox = "";
 let page = "elders";
+let directoryFocus = null;
 let youthGroup = "priests";
 let youthList = "all";
 let commentFor = "";
@@ -110,6 +111,23 @@ app.addEventListener("change", (event) => {
   }
   if (target instanceof HTMLSelectElement && target.classList.contains("status-pill")) {
     applyStatus(target.dataset.personId, target.value);
+    return;
+  }
+  if (target instanceof HTMLSelectElement && target.form?.dataset.form === "directory-companion") {
+    post("/api/directory/companion", {
+      directoryId: target.form.dataset.id,
+      member: target.form.dataset.member,
+      companion: target.value,
+    }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
+    return;
+  }
+  if (target instanceof HTMLSelectElement && target.form?.dataset.form === "directory-assign" && target.name === "youth") {
+    const companion = directoryCompanionFor(target.value);
+    const field = target.form.querySelector("[name=companion]");
+    if (field && companion) field.value = companion;
     return;
   }
   if (target instanceof HTMLSelectElement && target.form?.dataset.form === "assign") {
@@ -349,6 +367,27 @@ app.addEventListener("click", (event) => {
       if (editingCommentId === button.dataset.id) editingCommentId = "";
       render();
     }).catch(showError);
+  } else if (action === "open-directory-household" || action === "open-directory-person") {
+    const pageTop = window.scrollY;
+    directoryFocus = action === "open-directory-person"
+      ? { kind: "person", id: button.dataset.id, member: button.dataset.member || "" }
+      : { kind: "household", id: button.dataset.id };
+    render();
+    window.scrollTo(0, pageTop);
+    requestAnimationFrame(() => window.scrollTo(0, pageTop));
+  } else if (action === "open-youth-assignment") {
+    page = "youth";
+    youthList = "assignments";
+    archiveOpen = false;
+    viewAll = false;
+    assigneeFilter = "";
+    dayFilter = "";
+    search = "";
+    statusFilter = "all";
+    selectedPersonId = button.dataset.id;
+    detailForm = null;
+    directoryFocus = null;
+    render();
   } else if (action === "clear-assignment") {
     post(`/api/people/${button.dataset.id}/delete`, {}).then(render).catch(showError);
   } else if (action === "reset") {
@@ -371,6 +410,28 @@ app.addEventListener("submit", (event) => {
   event.preventDefault();
   const data = new FormData(form);
   const kind = form.dataset.form;
+  if (kind === "directory-companion") {
+    post("/api/directory/companion", {
+      directoryId: form.dataset.id,
+      member: form.dataset.member,
+      companion: data.get("companion"),
+    }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
+    return;
+  }
+  if (kind === "directory-assign") {
+    post("/api/directory/assign", {
+      directoryId: form.dataset.id,
+      youth: data.get("youth"),
+      companion: data.get("companion"),
+    }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
+    return;
+  }
   if (kind === "youth-companion") {
     saveYouthCompanion(selectedPersonId, data.get("companion")).catch(showError);
     return;
@@ -824,6 +885,7 @@ function openPage(next) {
   dayFilter = "";
   view = "people";
   if (next === "youth") officeFilter = "all";
+  if (next !== "directory") directoryFocus = null;
   render();
 }
 
@@ -980,7 +1042,10 @@ function render() {
     return;
   }
   if (page === "directory") {
+    const listScroll = preserveListScroll ? (document.querySelector("#person-list")?.scrollTop ?? 0) : 0;
     app.innerHTML = directoryView();
+    const list = document.querySelector("#person-list");
+    if (list) list.scrollTop = listScroll;
     return;
   }
   if (page !== "youth" && !eldersPeople().length && view === "people") {
@@ -1583,60 +1648,165 @@ function householdLine(person) {
   return `<p class="household-line"><span>Household</span>${esc(text)}</p>`;
 }
 
+function directoryPersonName(record, member) {
+  const given = String(member || "").replace(/\s*\(out-of-unit\)\s*/ig, " ").replace(/\s+/g, " ").trim();
+  if (!given) return "";
+  if (given.includes(",")) return given;
+  const last = String(record?.name || "").split(",")[0].trim();
+  if (last && given.toLowerCase().endsWith(` ${last.toLowerCase()}`)) {
+    const first = given.slice(0, given.length - last.length).trim();
+    if (first) return `${last}, ${first}`;
+  }
+  return last ? `${last}, ${given}` : given;
+}
+
 function directoryRecords() {
   const needle = search.trim().toLowerCase();
   return (state?.directory || [])
     .filter((row) => {
       if (!needle) return true;
-      const haystack = [row.name, ...(row.members || []), row.address, row.phone, row.email].join(" ").toLowerCase();
+      const people = (row.members || []).map((member) => directoryPersonName(row, member));
+      const haystack = [row.name, ...(row.members || []), ...people, row.address, row.phone, row.email].join(" ").toLowerCase();
       return haystack.includes(needle);
     })
     .slice()
     .sort((a, b) => String(a.name).localeCompare(String(b.name), "en", { sensitivity: "base" }));
 }
 
-function directoryTableBody(rows) {
+function directoryPeople() {
+  const people = [];
+  const seen = new Set();
+  for (const row of state?.directory || []) {
+    for (const member of row.members || []) {
+      const name = directoryPersonName(row, member);
+      const key = name.toLowerCase();
+      if (!name || seen.has(key)) continue;
+      seen.add(key);
+      people.push({ name, directoryId: row.id, member, companion: directoryCompanionFor(name) });
+    }
+  }
+  return people.sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
+}
+
+function directoryCompanionFor(fullName) {
+  const key = String(fullName || "").trim().toLowerCase();
+  if (!key) return "";
+  for (const row of state?.directory || []) {
+    for (const member of row.members || []) {
+      if (directoryPersonName(row, member).toLowerCase() !== key) continue;
+      const saved = row.memberCompanions?.[member.trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ")];
+      if (saved) return saved;
+    }
+  }
+  const youth = (state?.people || []).find((person) => (person.group === "priests" || person.group === "teachers") && directoryNameMatches(nameKey(person), fullName));
+  return youth?.sheetColumns?.Companion || "";
+}
+
+function directoryNameMatches(left, right) {
+  const fold = (value) => String(value || "").trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ");
+  const variants = (value) => {
+    const raw = String(value || "").trim();
+    const keys = [fold(raw)];
+    const comma = raw.indexOf(",");
+    if (comma !== -1) keys.push(fold(`${raw.slice(comma + 1)} ${raw.slice(0, comma)}`));
+    return keys;
+  };
+  const rightKeys = new Set(variants(right));
+  return variants(left).some((key) => key && rightKeys.has(key));
+}
+
+function directoryAssignment(record) {
+  return (state?.people || []).find((person) => person.list === "youth" && directoryNameMatches(nameKey(person), record?.name));
+}
+
+function directoryOptions(selected) {
+  const names = directoryPeople().map((person) => person.name);
+  if (selected && !names.some((name) => name.toLowerCase() === String(selected).toLowerCase())) names.push(selected);
+  names.sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
+  return [`<option value="">—</option>`, ...names.map((name) => `<option value="${esc(name)}" ${name === selected ? "selected" : ""}>${esc(name)}</option>`)].join("");
+}
+
+function directoryListMarkup(rows) {
   if (!rows.length) {
     const message = (state?.directory || []).length ? "No households match this search." : "The directory has not been loaded.";
-    return `<tr><td class="empty" colspan="5">${message}</td></tr>`;
+    return `<p class="empty">${message}</p>`;
   }
   return rows.map((row) => {
-    const phone = String(row.phone || "").trim();
-    const email = String(row.email || "").trim();
-    const address = String(row.address || "").trim();
-    return `<tr>
-      <th scope="row">${esc(row.name)}</th>
-      <td>${esc((row.members || []).join("\n"))}</td>
-      <td>${address ? `${esc(address)}<div>${addressPill(address)}</div>` : ""}</td>
-      <td>${phone ? `<a href="tel:${esc(phone)}">${esc(phone)}</a>` : ""}</td>
-      <td>${email ? `<a href="mailto:${esc(email)}">${esc(email)}</a>` : ""}</td>
-    </tr>`;
+    const openHousehold = directoryFocus?.kind === "household" && directoryFocus.id === row.id;
+    const members = (row.members || []).map((member) => {
+      const open = directoryFocus?.kind === "person" && directoryFocus.id === row.id && directoryFocus.member === member;
+      return `<button type="button" class="directory-member${open ? " is-open" : ""}" data-action="open-directory-person" data-id="${esc(row.id)}" data-member="${esc(member)}">${esc(directoryPersonName(row, member))}</button>`;
+    }).join("");
+    return `<article class="directory-household${openHousehold ? " is-open" : ""}">
+      <button type="button" class="directory-household-name" data-action="open-directory-household" data-id="${esc(row.id)}" aria-current="${openHousehold}">${esc(row.name)}</button>
+      <div class="directory-members">${members}</div>
+    </article>`;
   }).join("");
+}
+
+function directoryPersonCard(record) {
+  const member = directoryFocus?.member || "";
+  const name = directoryPersonName(record, member);
+  const companion = record.memberCompanions?.[member.trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ")] || directoryCompanionFor(name);
+  return `<h2>${esc(name)}</h2>
+    <p class="muted">Household</p>
+    <p><button type="button" class="text-button" data-action="open-directory-household" data-id="${esc(record.id)}">${esc(record.name)}</button></p>
+    <form class="assign-row" data-form="directory-companion" data-id="${esc(record.id)}" data-member="${esc(member)}">
+      <label>Companion <select name="companion" aria-label="Companion">${directoryOptions(companion)}</select></label>
+    </form>
+    <p class="muted">Choose the companion, then open a household and assign that household to this pair.</p>`;
+}
+
+function directoryHouseholdCard(record) {
+  const visit = directoryAssignment(record);
+  const assigned = visit?.assigned || [];
+  const youth = assigned[0] || "";
+  const companion = assigned[1] || (youth ? directoryCompanionFor(youth) : "");
+  const phone = String(record.phone || "").trim();
+  const email = String(record.email || "").trim();
+  const address = String(record.address || "").trim();
+  const members = (record.members || []).map((member) => `<button type="button" class="directory-member" data-action="open-directory-person" data-id="${esc(record.id)}" data-member="${esc(member)}">${esc(directoryPersonName(record, member))}</button>`).join("");
+  const current = visit ? `<p class="plan-line"><strong>Youth ministry assignment</strong> ${esc(assigned.filter(Boolean).join(" · ") || "Not assigned yet")}</p>
+    <button type="button" class="text-button" data-action="open-youth-assignment" data-id="${esc(visit.id)}">Open in Youth ministry</button>` : "";
+  return `<h2>${esc(record.name)}</h2>
+    <div class="directory-members">${members}</div>
+    ${address ? `<p class="household-line">${esc(address)}</p>${addressPill(address)}` : ""}
+    ${phone ? `<p><a href="tel:${esc(phone)}">${esc(phone)}</a></p>` : ""}
+    ${email ? `<p><a href="mailto:${esc(email)}">${esc(email)}</a></p>` : ""}
+    ${current}
+    <form class="assign-row" data-form="directory-assign" data-id="${esc(record.id)}">
+      <label>Assigned youth <select name="youth" aria-label="Assigned youth" required>${directoryOptions(youth)}</select></label>
+      <label>Companion <select name="companion" aria-label="Companion">${directoryOptions(companion)}</select></label>
+      <button class="tiny primary" type="submit">${visit ? "Update assignment" : "Assign"}</button>
+    </form>`;
+}
+
+function directoryDetail() {
+  const record = (state?.directory || []).find((row) => row.id === directoryFocus?.id);
+  if (!record) return `<h2>Directory</h2><p class="empty">Choose a household, or a person in a household. On a person, set the companion. On a household, assign that household to the pair.</p>`;
+  if (directoryFocus.kind === "person") return directoryPersonCard(record);
+  return directoryHouseholdCard(record);
 }
 
 function directoryView() {
   const rows = directoryRecords();
   const noun = rows.length === 1 ? "household" : "households";
-  return `<section class="card directory-card">
-    <div class="row"><h2>Member directory</h2></div>
-    <p class="muted" id="directory-count">${rows.length} ${noun}</p>
-    <input id="search" class="search" type="search" placeholder="Search the directory" value="${esc(search)}" aria-label="Search the directory">
-    <div class="directory-wrap">
-      <table class="directory">
-        <thead>
-          <tr><th>Name</th><th>Household Members</th><th>Address</th><th>Phone Number</th><th>E-mail</th></tr>
-        </thead>
-        <tbody id="directory-body">${directoryTableBody(rows)}</tbody>
-      </table>
+  return `<section class="layout">
+    <div class="card">
+      <div class="row"><h2>Member directory</h2></div>
+      <p class="muted" id="directory-count">${rows.length} ${noun}</p>
+      <input id="search" class="search" type="search" placeholder="Search the directory" value="${esc(search)}" aria-label="Search the directory">
+      <div id="person-list" class="person-list directory-list">${directoryListMarkup(rows)}</div>
     </div>
+    <div class="card">${directoryDetail()}</div>
   </section>`;
 }
 
 function renderDirectoryList() {
-  const body = document.querySelector("#directory-body");
-  if (!body) return;
+  const list = document.querySelector("#person-list");
+  if (!list) return;
   const rows = directoryRecords();
-  body.innerHTML = directoryTableBody(rows);
+  list.innerHTML = directoryListMarkup(rows);
   const count = document.querySelector("#directory-count");
   if (count) count.textContent = `${rows.length} ${rows.length === 1 ? "household" : "households"}`;
 }
