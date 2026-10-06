@@ -2036,9 +2036,40 @@ function directoryOptions(selected) {
   return [`<option value="">—</option>`, ...names.map((name) => `<option value="${esc(name)}" ${name === selected ? "selected" : ""}>${esc(name)}</option>`)].join("");
 }
 
+function directoryMinister(name) {
+  return (state?.people || []).find((person) => {
+    if (isYouthVisit(person) || isYouthMember(person)) return false;
+    return directoryNameMatches(nameKey(person), name) || directoryNameMatches(person.displayName, name);
+  });
+}
+
+function directoryCompanionNotRequired(name) {
+  const person = directoryMinister(name);
+  if (!person) return false;
+  return Boolean(person.onMission || person.rosterStatusKey === "mission" || person.rosterStatusKey === "do_not_contact");
+}
+
+function directoryStatusPills(name) {
+  const person = directoryMinister(name);
+  if (!person) return "";
+  const pills = [];
+  if (person.onMission || person.rosterStatusKey === "mission") pills.push(`<span class="pill mission">Mission</span>`);
+  if (person.rosterStatusKey === "do_not_contact") pills.push(`<span class="pill do-not-contact">Do Not Contact</span>`);
+  return pills.join("");
+}
+
+function directoryMissingCompanion(entry) {
+  if (directoryCompanionNotRequired(entry.name)) return false;
+  return !pairedCompanionName(entry.name);
+}
+
+function directoryMissingHousehold(entry) {
+  return !String(entry.household || "").trim();
+}
+
 function directoryEntryVisible(entry, needle) {
-  if (directoryFilter === "companion" && pairedCompanionName(entry.name)) return false;
-  if (directoryFilter === "household" && directoryVisitHomes(entry.name).length) return false;
+  if (directoryFilter === "companion" && !directoryMissingCompanion(entry)) return false;
+  if (directoryFilter === "household" && !directoryMissingHousehold(entry)) return false;
   if (!needle) return true;
   const haystack = [entry.name, entry.household, entry.record.address, entry.record.phone, entry.record.email, pairedCompanionName(entry.name)].join(" ").toLowerCase();
   return haystack.includes(needle);
@@ -2050,7 +2081,7 @@ function directoryVisibleEntries() {
 }
 
 function directoryGapCount(kind) {
-  return directoryEntries().filter((entry) => (kind === "companion" ? !pairedCompanionName(entry.name) : directoryVisitHomes(entry.name).length === 0)).length;
+  return directoryEntries().filter((entry) => (kind === "companion" ? directoryMissingCompanion(entry) : directoryMissingHousehold(entry))).length;
 }
 
 function directoryHouseholdOptions(selectedId) {
@@ -2066,13 +2097,14 @@ function directoryListMarkup(rows) {
     if (!(state?.directory || []).length) return `<p class="empty">The directory has not been loaded.</p>`;
     if (search.trim()) return `<p class="empty">No people match this search.</p>`;
     if (directoryFilter === "companion") return `<p class="empty">Everyone in the directory has a companion.</p>`;
-    if (directoryFilter === "household") return `<p class="empty">Everyone in the directory has a household to visit.</p>`;
+    if (directoryFilter === "household") return `<p class="empty">Everyone in the directory belongs to a household.</p>`;
     return `<p class="empty">No people are in the directory.</p>`;
   }
   return rows.map((entry) => {
     const open = directoryFocus?.directoryId === entry.directoryId && directoryFocus?.member === entry.member;
     return `<div class="person" data-action="open-directory-person" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}" aria-current="${open ? "true" : "false"}">
       <strong>${esc(entry.name)}</strong>
+      ${directoryStatusPills(entry.name)}
       <small>${esc(entry.household)}</small>
     </div>`;
   }).join("");
@@ -2086,7 +2118,9 @@ function directoryPersonCard(entry) {
   const companion = pairedCompanionName(entry.name);
   const visits = directoryVisitNames(entry.name);
   const visitLine = visits.length ? `<p class="muted">Visiting ${esc(visits.join(" · "))}</p>` : "";
+  const status = directoryStatusPills(entry.name);
   return `<h2>${esc(entry.name)}</h2>
+    ${status ? `<p class="status-row">${status}</p>` : ""}
     <form class="assign-row" data-form="directory-home" data-id="${esc(record.id)}" data-member="${esc(entry.member)}">
       <span>Household</span>
       <select name="household" aria-label="Household">${directoryHouseholdOptions(record.id)}</select>
