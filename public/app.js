@@ -363,7 +363,7 @@ app.addEventListener("click", (event) => {
     window.scrollTo(0, pageTop);
     requestAnimationFrame(() => window.scrollTo(0, pageTop));
   } else if (action === "form") {
-    if (page === "youth" && button.dataset.form === "add-person") return;
+    if (button.dataset.form === "add-person") return;
     detailForm = button.dataset.form;
     render();
   } else if (action === "select-slot") {
@@ -524,29 +524,7 @@ app.addEventListener("submit", (event) => {
     }).then(render).catch(showError);
     return;
   }
-  if (kind === "add-person") {
-    const known = new Set((state?.people || []).map((person) => person.id));
-    const payload = {
-      displayName: data.get("displayName"),
-      household: data.get("household"),
-      phone: formatPhone(data.get("phone")),
-      email: data.get("email"),
-      notes: data.get("notes"),
-    };
-    if (page === "youth") {
-      payload.list = "youth";
-      payload.sheetColumns = { Brother: String(data.get("displayName") || "").trim() };
-      youthList = "visits";
-      viewAll = false;
-      archiveOpen = false;
-    }
-    post("/api/people", payload).then((next) => {
-      state = next;
-      selectedPersonId = next.people.find((person) => !known.has(person.id))?.id || selectedPersonId;
-      detailForm = null;
-      render();
-    }).catch(showError);
-  } else if (kind === "outreach") {
+  if (kind === "outreach") {
     post("/api/outreach", {
       personId: selectedPersonId,
       channel: data.get("channel"),
@@ -1687,8 +1665,7 @@ function peopleView() {
   const people = youthLists || assignments ? [] : filteredPeople();
   const title = assignments ? "Assignments" : youthLists ? youthListTitle() : listTitle();
   const total = assignments ? visibleAssignments().length : youthLists ? youthVisibleEntries().length : people.length;
-  const addingPerson = detailForm === "add-person" && page !== "youth";
-  const showDetail = !state.rosterMode || Boolean(selectedPersonId) || addingPerson;
+  const showDetail = !state.rosterMode || Boolean(selectedPersonId);
   const noun = assignments
     ? (total === 1 ? "assignment" : "assignments")
     : page === "youth" ? (total === 1 ? "person" : "people") : (total === 1 ? "brother" : "brothers");
@@ -1697,13 +1674,12 @@ function peopleView() {
     <div class="card" id="people-card">
       <div class="row">
         <h2>${esc(title)}</h2>
-        ${page === "youth" ? "" : `<button type="button" class="ghost" data-action="form" data-form="add-person">Add a person</button>`}
       </div>
       <p class="muted">${total} ${state.rosterMode ? noun : "in this list"}</p>
       <input id="search" class="search" type="search" placeholder="Search by name" value="${esc(search)}" aria-label="Search by name">
       <div id="person-list" class="person-list">${markup}</div>
     </div>
-    ${showDetail ? `<div class="card">${addingPerson ? addPersonForm() : personDetail()}</div>` : ""}
+    ${showDetail ? `<div class="card">${personDetail()}</div>` : ""}
   </section>`;
 }
 
@@ -3048,18 +3024,6 @@ function personActions(person) {
   }
   return `<button type="button" class="primary" data-action="form" data-form="outreach">Log outreach</button>
     <button type="button" class="ghost" data-action="form" data-form="schedule">They replied — schedule the visit</button>`;
-}
-
-function addPersonForm() {
-  return `<h2>Add a person</h2>
-    <form class="stack" data-form="add-person">
-      <label>Name <input name="displayName" required></label>
-      <label>Household <input name="household"></label>
-      <label>Phone <span class="private-flag">Private</span><input name="phone" type="tel" autocomplete="off"></label>
-      <label>Email <span class="private-flag">Private</span><input name="email" type="email" autocomplete="off"></label>
-      <label>Notes <textarea name="notes"></textarea></label>
-      <button class="primary" type="submit">Save person</button>
-    </form>`;
 }
 
 function outreachForm() {
