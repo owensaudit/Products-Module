@@ -34,6 +34,7 @@ import {
   setVisitStatus,
   slotsForMonth,
 } from "../lib/model.js";
+import { applyDirectory, findDirectoryRecord, parseDirectory } from "../lib/directory.js";
 import { brotherSheetToState, calendarMarks, canonicalRosterStatus, isArchiveStatus, rosterStatusKey } from "../lib/roster.js";
 import { createStore } from "../lib/store.js";
 import { createPortalServer } from "../server.js";
@@ -728,6 +729,112 @@ test("http api schedules a visit and hides contact details by default", async ()
     assert.match(await page.text(), /Ministering visits/);
     const favicon = await fetch(`${base}/favicon.ico`);
     assert.equal(favicon.status, 204);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("a member directory list fills an assignment card and keeps a brother phone", async () => {
+  const text = `Name
+Household Members\tAddress\tPhone Number\tE-mail
+
+Example, Ana & Ben\t
+Ana
+Ben
+10 Example St
+Town WA 98607
+(360) 555-0100\tana@example.com
+
+Sample, Cam\t
+Cam
+Out-of-Unit
+20 Other Ave
+Apt 2
+Town WA 98607
+555-0199\t
+
+Child, Dee\t
+Dee
+10 Example St
+Town WA 98607
+`;
+  const records = parseDirectory(text);
+  assert.equal(records.length, 3);
+  assert.deepEqual(records[0].members, ["Ana", "Ben"]);
+  assert.equal(records[0].address, "10 Example St\nTown WA 98607");
+  assert.equal(records[0].phone, "(360) 555-0100");
+  assert.equal(records[0].email, "ana@example.com");
+  assert.deepEqual(records[1].members, ["Cam (Out-of-Unit)"]);
+  assert.equal(records[1].phone, "555-0199");
+  assert.equal(records[1].address.includes("Apt 2"), true);
+  assert.equal(findDirectoryRecord("Example, Ana", records).name, "Example, Ana & Ben");
+  assert.equal(findDirectoryRecord("Dee", records), null);
+
+  const state = applyDirectory({
+    people: [
+      {
+        id: "per_assignment",
+        list: "youth",
+        displayName: "Ana Example",
+        phone: "",
+        email: "",
+        household: "",
+        sheetColumns: { Brother: "Example, Ana & Ben" },
+      },
+      {
+        id: "per_brother",
+        displayName: "Ana Example",
+        phone: "(360) 555-2222",
+        email: "kept@example.com",
+        household: "",
+        sheetColumns: { Brother: "Example, Ana", Address: "Sheet address" },
+      },
+    ],
+  }, records);
+  const assignment = state.people.find((person) => person.id === "per_assignment");
+  const brother = state.people.find((person) => person.id === "per_brother");
+  assert.equal(assignment.household, "Ana\nBen");
+  assert.equal(assignment.sheetColumns.Address, "10 Example St\nTown WA 98607");
+  assert.equal(assignment.phone, "(360) 555-0100");
+  assert.equal(assignment.email, "ana@example.com");
+  assert.equal(brother.household, "Ana\nBen");
+  assert.equal(brother.phone, "(360) 555-2222");
+  assert.equal(brother.email, "kept@example.com");
+  assert.equal(brother.sheetColumns.Address, "Sheet address");
+  assert.equal(state.directory.length, 3);
+
+  const hidden = presentState({ ...emptyState(), directory: state.directory, people: [] }, "2026-10", { includePrivate: false });
+  assert.equal(hidden.directory[0].phone, "");
+  assert.equal(hidden.directory[0].email, "");
+  assert.equal(hidden.directory[0].address, "");
+  assert.deepEqual(hidden.directory[0].members, ["Ana", "Ben"]);
+  const shown = presentState({ ...emptyState(), directory: state.directory, people: [] }, "2026-10", { includePrivate: true });
+  assert.equal(shown.directory[0].phone, "(360) 555-0100");
+
+  const folder = await mkdtemp(path.join(tmpdir(), "portal-directory-"));
+  const store = createStore(path.join(folder, "portal.json"));
+  await store.update(() => ({ ...emptyState(), ...state }));
+  const saved = await store.read();
+  assert.equal(saved.directory.length, 3);
+  assert.equal(saved.people.find((person) => person.id === "per_brother").phone, "(360) 555-2222");
+
+  const server = createPortalServer(store);
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const { port } = server.address();
+    const response = await fetch(`http://127.0.0.1:${port}/api/directory`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text, includePrivate: true, month: "2026-10" }),
+    });
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.directory.length, 3);
+    assert.equal(body.directory[0].phone, "(360) 555-0100");
+    const brother = body.people.find((person) => person.id === "per_brother");
+    assert.equal(brother.phone, "(360) 555-2222");
+    assert.equal(brother.household, "Ana\nBen");
+    assert.equal(brother.sheetColumns.Address, "Sheet address");
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

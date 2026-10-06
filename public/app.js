@@ -517,7 +517,8 @@ app.addEventListener("submit", (event) => {
 app.addEventListener("input", (event) => {
   if (event.target.id === "search") {
     search = event.target.value;
-    renderPeopleList();
+    if (page === "directory") renderDirectoryList();
+    else renderPeopleList();
   }
   if (event.target.closest?.("form[data-form='contact'], form[data-form='facts'], .special-notes, .person-name")) {
     const contact = event.target.closest("form[data-form='contact']");
@@ -792,6 +793,9 @@ document.querySelector("[data-page-header='elders'] .eyebrow")?.addEventListener
 document.querySelector("#open-youth")?.addEventListener("click", () => openPage("youth"));
 document.querySelector("#open-youth-title")?.addEventListener("click", () => openPage("youth"));
 document.querySelector("[data-page-header='youth'] .eyebrow")?.addEventListener("click", () => openPage("youth"));
+document.querySelector("#open-directory")?.addEventListener("click", () => openPage("directory"));
+document.querySelector("#open-directory-title")?.addEventListener("click", () => openPage("directory"));
+document.querySelector("[data-page-header='directory'] .eyebrow")?.addEventListener("click", () => openPage("directory"));
 
 document.querySelector("#message-inbox")?.addEventListener("click", () => {
   toggleInbox("elders");
@@ -975,6 +979,10 @@ function render() {
   }
   if (inbox) {
     app.innerHTML = commentsView();
+    return;
+  }
+  if (page === "directory") {
+    app.innerHTML = directoryView();
     return;
   }
   if (page !== "youth" && !eldersPeople().length && view === "people") {
@@ -1165,8 +1173,13 @@ function youthSectionBoard(quorum, label, rows, members) {
 }
 
 function openCalendarDay(iso) {
+  const fromDirectory = page === "directory";
+  if (fromDirectory) page = "elders";
   const people = peopleForDay(iso);
-  if (!people.length) return;
+  if (!people.length) {
+    if (fromDirectory) page = "directory";
+    return;
+  }
   inbox = "";
   viewAll = false;
   assigneeFilter = "";
@@ -1556,12 +1569,78 @@ function contactLines(person) {
   if (!person) return "";
   const parts = [];
   const household = String(person.household || "").trim();
+  const address = String(person.sheetColumns?.Address || "").trim();
   const phone = String(person.phone || "").trim();
   const email = String(person.email || "").trim();
   if (household) parts.push(`<small class="contact-line">${esc(household)}</small>`);
+  if (address) parts.push(`<small class="contact-line">${esc(address)}</small>`);
   if (phone) parts.push(`<small class="contact-line">${esc(phone)}</small>`);
   if (email) parts.push(`<small class="contact-line">${esc(email)}</small>`);
   return parts.join("");
+}
+
+function householdLine(person) {
+  const text = String(person?.household || "").trim();
+  if (!text) return "";
+  return `<p class="household-line"><span>Household</span>${esc(text)}</p>`;
+}
+
+function directoryRecords() {
+  const needle = search.trim().toLowerCase();
+  return (state?.directory || [])
+    .filter((row) => {
+      if (!needle) return true;
+      const haystack = [row.name, ...(row.members || []), row.address, row.phone, row.email].join(" ").toLowerCase();
+      return haystack.includes(needle);
+    })
+    .slice()
+    .sort((a, b) => String(a.name).localeCompare(String(b.name), "en", { sensitivity: "base" }));
+}
+
+function directoryTableBody(rows) {
+  if (!rows.length) {
+    const message = (state?.directory || []).length ? "No households match this search." : "The directory has not been loaded.";
+    return `<tr><td class="empty" colspan="5">${message}</td></tr>`;
+  }
+  return rows.map((row) => {
+    const phone = String(row.phone || "").trim();
+    const email = String(row.email || "").trim();
+    const address = String(row.address || "").trim();
+    return `<tr>
+      <th scope="row">${esc(row.name)}</th>
+      <td>${esc((row.members || []).join("\n"))}</td>
+      <td>${address ? `${esc(address)}<div>${addressPill(address)}</div>` : ""}</td>
+      <td>${phone ? `<a href="tel:${esc(phone)}">${esc(phone)}</a>` : ""}</td>
+      <td>${email ? `<a href="mailto:${esc(email)}">${esc(email)}</a>` : ""}</td>
+    </tr>`;
+  }).join("");
+}
+
+function directoryView() {
+  const rows = directoryRecords();
+  const noun = rows.length === 1 ? "household" : "households";
+  return `<section class="card directory-card">
+    <div class="row"><h2>Member directory</h2></div>
+    <p class="muted" id="directory-count">${rows.length} ${noun}</p>
+    <input id="search" class="search" type="search" placeholder="Search the directory" value="${esc(search)}" aria-label="Search the directory">
+    <div class="directory-wrap">
+      <table class="directory">
+        <thead>
+          <tr><th>Name</th><th>Household Members</th><th>Address</th><th>Phone Number</th><th>E-mail</th></tr>
+        </thead>
+        <tbody id="directory-body">${directoryTableBody(rows)}</tbody>
+      </table>
+    </div>
+  </section>`;
+}
+
+function renderDirectoryList() {
+  const body = document.querySelector("#directory-body");
+  if (!body) return;
+  const rows = directoryRecords();
+  body.innerHTML = directoryTableBody(rows);
+  const count = document.querySelector("#directory-count");
+  if (count) count.textContent = `${rows.length} ${rows.length === 1 ? "household" : "households"}`;
 }
 
 function roleCard(person, kind, fallback = "") {
@@ -1946,6 +2025,7 @@ function youthMemberDetail(person) {
   const responded = families.filter((family) => family.sheetColumns?.Response === "Responded").length;
   return `${personNameField(person)}
     ${specialNotes(person)}
+    ${householdLine(person)}
     ${contactFields(person, false, true)}
     ${factsForm(person)}
     <form class="companion-row" data-form="youth-companion">
@@ -2005,6 +2085,7 @@ function rosterDetail(person) {
   if (isYouthVisit(person)) return assignmentDetail(person);
   return `${personNameField(person)}
     ${specialNotes(person)}
+    ${householdLine(person)}
     <p class="status-row">${statusSelect(person)}${archiveControl(person)}${person.rosterStatusKey === "scheduled" ? visitCheck(person) : ""}</p>
     ${contactFields(person, false, true)}
     ${factsForm(person)}

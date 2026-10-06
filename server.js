@@ -27,6 +27,7 @@ import {
   setPersonStatus,
   setVisitStatus,
 } from "./lib/model.js";
+import { applyDirectory, parseDirectory } from "./lib/directory.js";
 import { createStore } from "./lib/store.js";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -237,6 +238,14 @@ export function createPortalServer(store) {
         if (complete) {
           const status = complete[2] === "complete" ? "completed" : "cancelled";
           const next = await store.update((state) => setVisitStatus(state, decodeURIComponent(complete[1]), status));
+          sendJson(response, 200, presentState(next, month, viewOptions));
+          return;
+        }
+
+        if (pathname === "/api/directory") {
+          const records = parseDirectory(body.text || "");
+          if (!records.length) throw new PortalError("Directory text has no households");
+          const next = await store.update((state) => applyDirectory(state, records));
           sendJson(response, 200, presentState(next, month, viewOptions));
           return;
         }

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ministering Visit Portal</title>
-    <link rel="stylesheet" href="/styles.css?v=85">
+    <link rel="stylesheet" href="/styles.css?v=87">
   </head>
   <body>
     <a class="skip" href="#app">Skip to the portal</a>
@@ -27,6 +27,7 @@
         <nav class="quorum-nav" aria-label="Quorum">
           <button type="button" id="open-elders" data-page-link="elders" aria-pressed="true">Ministering visits</button>
           <button type="button" id="open-youth" data-page-link="youth" aria-pressed="false">Youth ministry</button>
+          <button type="button" id="open-directory" data-page-link="directory" aria-pressed="false">Directory</button>
         </nav>
       </div>
     </div>
@@ -57,12 +58,18 @@
             </button>
           </div>
         </div>
+        <div class="title-block" data-page-header="directory">
+          <p class="eyebrow">Member directory</p>
+          <div class="title-row">
+            <button type="button" class="title-link" id="open-directory-title">Directory</button>
+          </div>
+        </div>
       </div>
       <section id="month-calendar" class="month-cal" aria-label="Current calendar"></section>
       <aside id="presidency" aria-label="EQ Presidency"></aside>
     </header>
     <p id="notice" class="notice" role="status" hidden></p>
     <main id="app" tabindex="-1"></main>
-    <script src="/app.js?v=98" type="module"></script>
+    <script src="/app.js?v=100" type="module"></script>
   </body>
 </html>

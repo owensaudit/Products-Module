@@ -135,9 +135,17 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 600; letter-spacing: -0.02e
 h1 { margin: 0; font-size: 40px; line-height: 1.05; }
 
 body[data-page="elders"] [data-page-header="youth"] .eyebrow,
-body[data-page="youth"] [data-page-header="elders"] .eyebrow { cursor: pointer; }
+body[data-page="elders"] [data-page-header="directory"] .eyebrow,
+body[data-page="youth"] [data-page-header="elders"] .eyebrow,
+body[data-page="youth"] [data-page-header="directory"] .eyebrow,
+body[data-page="directory"] [data-page-header="elders"] .eyebrow,
+body[data-page="directory"] [data-page-header="youth"] .eyebrow { cursor: pointer; }
 body[data-page="elders"] #open-youth-title:hover,
-body[data-page="youth"] #open-elders-title:hover { color: var(--church-deep); }
+body[data-page="elders"] #open-directory-title:hover,
+body[data-page="youth"] #open-elders-title:hover,
+body[data-page="youth"] #open-directory-title:hover,
+body[data-page="directory"] #open-elders-title:hover,
+body[data-page="directory"] #open-youth-title:hover { color: var(--church-deep); }
 
 button.title-link {
   margin: 0;
@@ -980,6 +988,44 @@ article.role-card { cursor: default; }
 }
 .role-card small { color: var(--muted); }
 .contact-line { white-space: pre-line; }
+.role-assignment .contact-line { display: block; }
+
+.household-line {
+  white-space: pre-line;
+  margin: 0 0 12px;
+}
+.household-line span {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.directory-wrap { overflow: auto; max-height: calc(100vh - 220px); }
+.directory {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.directory th,
+.directory td {
+  text-align: left;
+  vertical-align: top;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  white-space: pre-line;
+}
+.directory thead th {
+  position: sticky;
+  top: 0;
+  background: var(--card);
+  font-family: var(--sans);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.directory tbody th { font-weight: 650; }
+.directory a { color: var(--church-deep); font-weight: 650; text-decoration: none; }
+.directory .address-pill { margin-top: 4px; }
 a.address-pill {
   text-decoration: none;
   color: var(--church-deep);
