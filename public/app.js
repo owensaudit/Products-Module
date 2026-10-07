@@ -506,6 +506,17 @@ app.addEventListener("click", (event) => {
       if (editingCommentId === button.dataset.id) editingCommentId = "";
       render();
     }).catch(showError);
+  } else if (action === "open-scheduled-adult") {
+    cardTrail.push(captureCard());
+    page = "directory";
+    directoryAdding = false;
+    directoryFocus = { directoryId: button.dataset.id, member: button.dataset.member };
+    inbox = "";
+    render();
+    if (window.matchMedia("(max-width: 800px)").matches) {
+      const current = document.querySelector(`#person-list .person[data-id="${CSS.escape(button.dataset.id)}"][data-member="${CSS.escape(button.dataset.member)}"]`);
+      current?.scrollIntoView({ block: "start" });
+    }
   } else if (action === "open-directory-person") {
     cardTrail = [];
     page = "directory";
@@ -1676,33 +1687,13 @@ function youthSectionBoard(quorum, label, rows, members) {
 }
 
 function openCalendarDay(iso) {
-  const temporary = (state?.temporaryVisits || []).filter((row) => !row.done && row.meetingDate === iso);
-  if (temporary.length) {
-    const [year, month] = iso.split("-").map(Number);
-    page = "youth";
-    youthList = "scheduled";
-    inbox = "";
-    viewAll = false;
-    assigneeFilter = "";
-    dayFilter = "";
-    archiveOpen = false;
-    archiveChoicesFor = "";
-    statusFilter = "all";
-    officeFilter = "all";
-    search = "";
-    view = "people";
-    detailForm = null;
-    selectedPersonId = null;
-    calendarMonth = new Date(year, month - 1, 1);
-    render();
-    return;
-  }
   const volunteers = youthHelpForDay(iso);
   const fromDirectory = page === "directory";
+  const temporary = temporaryVisitsOn(iso);
   if (volunteers.length) page = "youth";
   else if (fromDirectory) page = "elders";
   const people = peopleForDay(iso);
-  if (!people.length && !volunteers.length) {
+  if (!people.length && !volunteers.length && !temporary.length) {
     if (fromDirectory) page = "directory";
     return;
   }
@@ -1985,9 +1976,11 @@ function peopleView() {
   const people = scheduled || temporary || youthLists || assignments ? [] : filteredPeople();
   const title = scheduled ? (archiveOpen ? "Archive" : "Scheduled") : temporary ? (archiveOpen ? "Archive" : formatMonth(viewedMonth())) : assignments ? "Assignments" : youthLists ? youthListTitle() : listTitle();
   const helpCount = page === "youth" && dayFilter ? youthHelpForDay(dayFilter).length : 0;
-  const total = (scheduled ? scheduledRows().length : temporary ? temporaryRows().length : assignments ? visibleAssignments().length : youthLists ? youthVisibleEntries().length : people.length) + helpCount;
+  const dayCount = !scheduled && !temporary && !youthLists && !assignments && dayFilter ? temporaryVisitsOn(dayFilter).length : 0;
+  const total = (scheduled ? scheduledRows().length : temporary ? temporaryRows().length : assignments ? visibleAssignments().length : youthLists ? youthVisibleEntries().length : people.length) + helpCount + dayCount;
   const showDetail = !scheduled && !temporary && (!state.rosterMode || Boolean(selectedPersonId));
-  const noun = scheduled
+  const onlyDayVisits = !scheduled && !temporary && !youthLists && !assignments && people.length === 0 && dayCount > 0;
+  const noun = onlyDayVisits || scheduled
     ? (total === 1 ? "appointment" : "appointments")
     : temporary
     ? (total === 1 ? "visit" : "visits")
@@ -2134,29 +2127,51 @@ function scheduledArchiveCount() {
   return (state?.temporaryVisits || []).filter((row) => row.familyName && row.meetingDate && (row.done || row.month < month)).length;
 }
 
+function temporaryVisitsOn(iso) {
+  return (state?.temporaryVisits || []).filter((row) => !row.done && row.familyName && row.meetingDate === iso);
+}
+
+function visitConflicts(row) {
+  if (!row || row.done || !row.meetingDate || !row.familyDirectoryId) return false;
+  return (state?.temporaryVisits || []).some((other) => other.id !== row.id && !other.done && other.familyDirectoryId === row.familyDirectoryId && other.meetingDate === row.meetingDate);
+}
+
 function scheduledCard(rows) {
   const first = rows[0];
-  const appointments = rows.map((row) => {
-    const when = row.meeting ? `<p class="muted">${esc(row.meeting)}</p>` : "";
-    const who = `<p class="muted">${esc(row.adultName)} with ${esc(row.youthName || "a temporary companion")}</p>`;
-    if (archiveOpen || row.done) {
-      return `<article class="role-card"><span class="role-kicker">Visited</span><strong>${esc(row.familyName)}</strong>${when}${who}</article>`;
-    }
-    return `<article class="role-card"><span class="role-kicker">Appointment</span><strong>${esc(row.familyName)}</strong>${when}
-      <div class="temporary-done"><button type="button" class="tiny" data-action="complete-temporary" data-id="${esc(row.id)}">Visited</button></div>
-    </article>`;
+  const finished = (showingScheduled() && archiveOpen) || rows.every((row) => row.done);
+  const stops = rows.map((row) => {
+    const conflict = visitConflicts(row) ? ` · Conflict` : "";
+    const mark = finished || row.done
+      ? `<span class="visited-check" aria-label="Visited">✓</span>`
+      : `<button type="button" class="mark-visited" data-action="complete-temporary" data-id="${esc(row.id)}" aria-label="Confirm visit">✓</button>`;
+    return `<div class="scheduled-stop"><small>${esc(row.familyName)}${row.meeting ? ` · ${esc(row.meeting)}` : ""}${conflict}</small>${mark}</div>`;
   }).join("");
-  return `<section class="ministering-set" data-scheduled="${esc(first.adultDirectoryId)}:${esc(first.adultMember)}">
-    <article class="role-card"><span class="role-kicker">Adult</span><strong>${esc(first.adultName)}</strong></article>
-    <article class="role-card"><span class="role-kicker">Temporary companion</span><strong>${esc(first.youthName || "")}</strong></article>
-    ${appointments}
-  </section>`;
+  return `<div class="person ${finished ? "visited" : "scheduled"}" data-action="open-scheduled-adult" data-id="${esc(first.adultDirectoryId)}" data-member="${esc(first.adultMember)}">
+    <strong>${esc(first.adultName)}</strong>
+    <span class="pill companion-pair">Companion</span>
+    <small class="companion-who">${esc(first.youthName || "")}</small>
+    ${stops}
+  </div>`;
 }
 
 function scheduledListMarkup() {
   const groups = scheduledGroups();
   if (!groups.length) {
     return `<p class="empty">${search.trim() ? "No scheduled visits match this search." : archiveOpen ? "No finished temporary visits." : "No visits are scheduled."}</p>`;
+  }
+  return groups.map((group) => scheduledCard(group.rows)).join("");
+}
+
+function temporaryDayMarkup(iso) {
+  const groups = [];
+  for (const row of temporaryVisitsOn(iso)) {
+    const key = `${row.adultDirectoryId}|${row.adultMember}|${String(row.youthName || "").trim().toLowerCase()}`;
+    let group = groups.find((item) => item.key === key);
+    if (!group) {
+      group = { key, rows: [] };
+      groups.push(group);
+    }
+    group.rows.push(row);
   }
   return groups.map((group) => scheduledCard(group.rows)).join("");
 }
@@ -3187,13 +3202,16 @@ function youthRosterSummary() {
 function personButtons(people = filteredPeople()) {
   const loaded = page === "youth" ? youthVisits() : eldersPeople();
   if (!loaded.length) {
-    if (page === "youth" && dayFilter && !search.trim()) return youthHelpCards(youthHelpForDay(dayFilter));
+    const days = dayFilter ? temporaryDayMarkup(dayFilter) : "";
+    if (page === "youth" && dayFilter && !search.trim()) return `${youthHelpCards(youthHelpForDay(dayFilter))}${days}`;
+    if (days) return days;
     if (page === "youth") return "";
     return `<p class="empty">No one is loaded yet. The outreach spreadsheet is not readable from here, so this list starts empty. Import a CSV or add a person. No sample members are included.</p>`;
   }
   if (!people.length) {
-    if (page === "youth" && dayFilter && !search.trim()) return youthHelpCards(youthHelpForDay(dayFilter));
-    if (dayFilter && statusFilter === "all" && !search.trim()) return "";
+    const days = dayFilter ? temporaryDayMarkup(dayFilter) : "";
+    if (page === "youth" && dayFilter && !search.trim()) return `${youthHelpCards(youthHelpForDay(dayFilter))}${days}`;
+    if (dayFilter && statusFilter === "all" && !search.trim()) return days;
     if (archiveOpen && statusFilter === "all" && !search.trim()) return `<p class="empty">No one is in the archive.</p>`;
     const label = statusFilter === "all" ? "this search" : STATUS_LABELS[statusFilter];
     return `<p class="empty">No one is in ${esc(label)}.${archiveOpen ? "" : " Choose Everyone to see the full roster."}</p>`;
@@ -3213,8 +3231,9 @@ function personButtons(people = filteredPeople()) {
       ${missionPill(person)}
       ${youthVisit ? contactLines(person) : ""}
       <small>${state.rosterMode ? rosterLine(person) : esc(latestLine(person))}</small>
+      ${temporaryDutyLines(person)}
     </div>`;
-  }).join("") + (page === "youth" && dayFilter ? youthHelpCards(youthHelpForDay(dayFilter)) : "");
+  }).join("") + (page === "youth" && dayFilter ? youthHelpCards(youthHelpForDay(dayFilter)) : "") + (dayFilter ? temporaryDayMarkup(dayFilter) : "");
 }
 
 function youthHelpCards(rows) {
@@ -3319,6 +3338,24 @@ function phoneIcon() {
 
 function visitCheck(person) {
   return `<button type="button" class="mark-visited" data-action="mark-visited" data-person-id="${esc(person.id)}" aria-label="Confirm visit">✓</button>`;
+}
+
+function temporaryVisitsForPerson(person) {
+  const name = nameKey(person);
+  return (state?.temporaryVisits || []).filter((row) => !row.done && row.familyName && directoryNameMatches(row.adultName, name));
+}
+
+function temporaryDutyLines(person) {
+  return temporaryVisitsForPerson(person).map((row) => `<small>${esc([row.youthName, row.familyName, row.meeting].filter(Boolean).join(" · "))}${visitConflicts(row) ? " · Conflict" : ""}</small>`).join("");
+}
+
+function temporaryDutyBlock(person) {
+  const rows = temporaryVisitsForPerson(person);
+  if (!rows.length) return "";
+  return `<h3>With youth</h3>${rows.map((row) => `<div class="scheduled-stop">
+    <p class="plan-line"><strong>${esc(row.familyName)}</strong> ${esc(row.meeting || "")}${row.youthName ? ` with ${esc(row.youthName)}` : ""}${visitConflicts(row) ? " · Conflict" : ""}</p>
+    ${row.meetingDate ? `<button type="button" class="mark-visited" data-action="complete-temporary" data-id="${esc(row.id)}" aria-label="Confirm visit">✓</button>` : ""}
+  </div>`).join("")}`;
 }
 
 function rosterLine(person) {
@@ -3497,6 +3534,7 @@ function rosterDetail(person) {
     ${contactFields(person, false, true)}
     ${factsForm(person)}
     ${planLine(person)}
+    ${temporaryDutyBlock(person)}
     ${assignmentFields(person)}
     ${planForm(person)}
     <h3>Outreach</h3>

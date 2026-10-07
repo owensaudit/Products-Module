@@ -1565,6 +1565,55 @@ test("a temporary youth visit is monthly and leaves the standing companion alone
   assert.throws(() => scheduleTemporaryVisit(state, { id: "missing", date: "2026-11-02", time: "18:00" }), /Temporary visit not found/);
 });
 
+test("a household cannot be scheduled twice on the same day", () => {
+  let state = {
+    ...emptyState(),
+    directory: [{
+      id: "dir_home",
+      name: "Sample, Ben",
+      members: ["Ben"],
+      address: "",
+      phone: "",
+      email: "",
+      memberCompanions: { ben: "Keeper, Anthony" },
+      memberVisits: { ben: [{ directoryId: "dir_keep", label: "Standing house" }] },
+    }, {
+      id: "dir_other",
+      name: "Other, Cam",
+      members: ["Cam"],
+      address: "",
+      phone: "",
+      email: "",
+      memberCompanions: {},
+      memberVisits: {},
+      memberYouthHome: { cam: true },
+    }, {
+      id: "dir_second",
+      name: "Second, Drew",
+      members: ["Drew"],
+      address: "",
+      phone: "",
+      email: "",
+      memberCompanions: { drew: "Keeper, Anthony" },
+      memberVisits: { drew: [{ directoryId: "dir_keep", label: "Standing house" }] },
+    }],
+  };
+  state = setTemporaryCompanion(state, { adultDirectoryId: "dir_home", adultMember: "Ben", youthName: "Youth, Pat", month: "2026-10" });
+  state = assignTemporaryHousehold(state, { adultDirectoryId: "dir_home", adultMember: "Ben", householdId: "dir_other", month: "2026-10" });
+  state = setTemporaryCompanion(state, { adultDirectoryId: "dir_second", adultMember: "Drew", youthName: "Youth, Ada", month: "2026-10" });
+  state = assignTemporaryHousehold(state, { adultDirectoryId: "dir_second", adultMember: "Drew", householdId: "dir_other", month: "2026-10" });
+  const first = state.temporaryVisits.find((row) => row.adultMember === "Ben" && row.familyDirectoryId === "dir_other");
+  const second = state.temporaryVisits.find((row) => row.adultMember === "Drew" && row.familyDirectoryId === "dir_other");
+  state = scheduleTemporaryVisit(state, { id: first.id, date: "2026-10-14", time: "19:30" });
+  assert.throws(() => scheduleTemporaryVisit(state, { id: second.id, date: "2026-10-14", time: "19:30" }), /already scheduled that day/);
+  assert.equal(state.temporaryVisits.find((row) => row.id === second.id).meetingDate, "");
+  state = scheduleTemporaryVisit(state, { id: second.id, date: "2026-10-21", time: "19:30" });
+  assert.equal(state.temporaryVisits.find((row) => row.id === second.id).meetingDate, "2026-10-21");
+  assert.equal(state.directory[0].memberCompanions.ben, "Keeper, Anthony");
+  assert.deepEqual(state.directory[0].memberVisits.ben, [{ directoryId: "dir_keep", label: "Standing house" }]);
+  assert.equal(state.directory[1].memberYouthHome.cam, true);
+});
+
 test("a temporary youth companion sits beside the standing companion", () => {
   let state = {
     ...emptyState(),

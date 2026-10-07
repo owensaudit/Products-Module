@@ -1319,6 +1319,18 @@ button.mark-visited {
   right: 12px;
 }
 
+.scheduled-stop {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.scheduled-stop small { color: inherit; }
+.scheduled-stop .mark-visited,
+.scheduled-stop .visited-check { position: static; flex: none; }
+.scheduled-stop .plan-line { margin: 0; }
+
 .visited-check {
   color: white;
   font-size: 22px;
