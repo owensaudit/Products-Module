@@ -662,6 +662,7 @@ button.cal-day.is-open {
 .cal-dot.reschedule { background: #7dcea0; }
 .cal-dot.with_youth { background: #d98a2b; }
 .cal-dot.temporary { background: #1f7a8c; }
+.cal-dot.notify { background: #c47b12; }
 
 .cal-num {
   font-size: 13px;
@@ -1052,7 +1053,22 @@ article.role-card { cursor: default; }
   border-radius: 999px;
   padding: 2px 8px;
 }
-.temporary-household { flex-wrap: wrap; align-items: center; }
+.companion-row.temporary-listed {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 7.6rem auto;
+  column-gap: 8px;
+}
+.companion-row.temporary-listed .muted {
+  text-align: right;
+  white-space: nowrap;
+}
+.companion-row.temporary-listed .listed-actions {
+  display: flex;
+  gap: 8px;
+  justify-self: end;
+  align-items: center;
+}
+.companion-row.temporary-listed .tiny { justify-self: end; }
 .temporary-household .temporary-meeting { flex: 1 1 14rem; margin: 0; }
 .temporary-household .temporary-meeting input[type="date"],
 .temporary-household .temporary-meeting input[type="time"] { width: auto; min-width: 0; }
@@ -1336,7 +1352,27 @@ button.mark-visited {
 }
 .scheduled-stop small { color: inherit; }
 .scheduled-stop .mark-visited,
-.scheduled-stop .visited-check { position: static; flex: none; }
+.scheduled-stop .visited-check,
+.scheduled-stop .notify,
+.scheduled-stop .notified { position: static; flex: none; }
+.notify-day { display: grid; gap: 8px; margin-bottom: 10px; }
+.notify-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #e4d3b0;
+  border-radius: 12px;
+  background: #fff8ec;
+}
+.notify-row small { margin-left: auto; color: #6b5a3e; }
+button.tiny.notify {
+  border-color: #c47b12;
+  color: #8a5408;
+  background: #fff;
+}
+.notified { font-size: 12px; font-weight: 700; color: #2f6b45; }
+.notify-line { margin-top: 4px; }
 .scheduled-stop .plan-line { margin: 0; }
 
 .visited-check {

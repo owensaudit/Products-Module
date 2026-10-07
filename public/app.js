@@ -423,6 +423,11 @@ app.addEventListener("click", (event) => {
       state = next;
       render();
     }).catch(showError);
+  } else if (action === "notify-family") {
+    post("/api/notify", { kind: button.dataset.kind, id: button.dataset.id }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
   } else if (action === "set-status") {
     if (button.dataset.status === "Mission") applyMission(button.dataset.personId);
     else applyStatus(button.dataset.personId, button.dataset.status);
@@ -1613,10 +1618,12 @@ function renderCalendar() {
   for (let day = 1; day <= daysInMonth; day += 1) {
     const iso = `${monthKey}-${String(day).padStart(2, "0")}`;
     const mark = marks[iso] || {};
-    const kinds = mark.kinds || [];
+    const notices = state?.notifyMarks?.[iso] || [];
+    const kinds = [...(mark.kinds || [])];
+    if (notices.length && !kinds.includes("notify")) kinds.push("notify");
     const people = mark.people || [];
     const dots = kinds.map((kind) => {
-      const label = kind === "scheduled" ? "Scheduled" : kind === "reschedule" ? "Re-Schedule" : kind === "driveby" ? "Drive by" : kind === "with_youth" ? "With youth" : kind === "temporary" ? "Temporary visit" : "Reach out";
+      const label = kind === "scheduled" ? "Scheduled" : kind === "reschedule" ? "Re-Schedule" : kind === "driveby" ? "Drive by" : kind === "with_youth" ? "With youth" : kind === "temporary" ? "Temporary visit" : kind === "notify" ? "Notify families" : "Reach out";
       return `<span class="cal-dot ${kind}" title="${label}"></span>`;
     }).join("");
     const described = [`${title} ${day}`];
@@ -1626,10 +1633,11 @@ function renderCalendar() {
     if (kinds.includes("driveby")) described.push("drive by");
     if (kinds.includes("with_youth")) described.push("with youth");
     if (kinds.includes("temporary")) described.push("temporary visit");
+    if (kinds.includes("notify")) described.push("notify families");
     const today = viewingNow && day === now.getDate() ? " is-today" : "";
     const open = dayFilter === iso ? " is-open" : "";
     const inner = `<span class="cal-marks">${dots}</span><span class="cal-num">${day}</span>`;
-    if (people.length || kinds.includes("with_youth") || kinds.includes("temporary")) {
+    if (people.length || kinds.includes("with_youth") || kinds.includes("temporary") || kinds.includes("notify")) {
       described.push("show the brothers for this day");
       cells.push(`<button type="button" class="cal-day${today}${open}" data-action="open-day" data-date="${iso}" data-marks="${esc(kinds.join(" "))}" aria-pressed="${dayFilter === iso}" aria-label="${esc(described.join(", "))}">${inner}</button>`);
     } else {
@@ -1706,10 +1714,11 @@ function openCalendarDay(iso) {
   const volunteers = youthHelpForDay(iso);
   const fromDirectory = page === "directory";
   const temporary = temporaryVisitsOn(iso);
+  const notices = noticesOn(iso);
   if (volunteers.length) page = "youth";
   else if (fromDirectory) page = "elders";
   const people = peopleForDay(iso);
-  if (!people.length && !volunteers.length && !temporary.length) {
+  if (!people.length && !volunteers.length && !temporary.length && !notices.length) {
     if (fromDirectory) page = "directory";
     return;
   }
@@ -1993,10 +2002,14 @@ function peopleView() {
   const title = scheduled ? (archiveOpen ? "Archive" : "Scheduled") : temporary ? (archiveOpen ? "Archive" : formatMonth(viewedMonth())) : assignments ? "Assignments" : youthLists ? youthListTitle() : listTitle();
   const helpCount = page === "youth" && dayFilter ? youthHelpForDay(dayFilter).length : 0;
   const dayCount = !scheduled && !temporary && !youthLists && !assignments && dayFilter ? temporaryVisitsOn(dayFilter).length : 0;
-  const total = (scheduled ? scheduledRows().length : temporary ? temporaryRows().length : assignments ? visibleAssignments().length : youthLists ? youthVisibleEntries().length : people.length) + helpCount + dayCount;
+  const noticeCount = !scheduled && !temporary && !youthLists && !assignments && dayFilter ? noticesOn(dayFilter).length : 0;
+  const total = (scheduled ? scheduledRows().length : temporary ? temporaryRows().length : assignments ? visibleAssignments().length : youthLists ? youthVisibleEntries().length : people.length) + helpCount + dayCount + noticeCount;
   const showDetail = !scheduled && !temporary && (!state.rosterMode || Boolean(selectedPersonId));
-  const onlyDayVisits = !scheduled && !temporary && !youthLists && !assignments && people.length === 0 && dayCount > 0;
-  const noun = onlyDayVisits || scheduled
+  const onlyDayVisits = !scheduled && !temporary && !youthLists && !assignments && people.length === 0 && dayCount > 0 && noticeCount === 0;
+  const onlyNotices = !scheduled && !temporary && !youthLists && !assignments && people.length === 0 && dayCount === 0 && noticeCount > 0;
+  const noun = onlyNotices
+    ? (total === 1 ? "family to notify" : "families to notify")
+    : onlyDayVisits || scheduled
     ? (total === 1 ? "appointment" : "appointments")
     : temporary
     ? (total === 1 ? "visit" : "visits")
@@ -2087,7 +2100,7 @@ function temporaryCard(visit) {
       </form>
       ${visit.meeting ? `<p class="muted">${esc(visit.meeting)}</p>` : ""}`;
   const check = !finished && visit.meetingDate
-    ? `<div class="temporary-done"><button type="button" class="mark-visited" data-action="complete-temporary" data-id="${esc(visit.id)}" aria-label="Confirm visit">✓</button></div>`
+    ? `<div class="temporary-done">${temporaryNotify(visit)}<button type="button" class="mark-visited" data-action="complete-temporary" data-id="${esc(visit.id)}" aria-label="Confirm visit">✓</button></div>`
     : "";
   return `<section class="ministering-set" data-temporary="${esc(visit.id)}">
     <article class="role-card"><span class="role-kicker">Adult</span><strong>${esc(visit.adultName)}</strong></article>
@@ -2147,6 +2160,64 @@ function temporaryVisitsOn(iso) {
   return (state?.temporaryVisits || []).filter((row) => !row.done && row.familyName && row.meetingDate === iso);
 }
 
+function noticesOn(iso) {
+  return state?.notifyMarks?.[iso] || [];
+}
+
+function localToday() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
+function daysUntil(iso) {
+  const match = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  const today = localToday().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const target = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  const start = Date.UTC(Number(today[1]), Number(today[2]) - 1, Number(today[3]));
+  return Math.round((target - start) / 86400000);
+}
+
+function notifyWindow(iso) {
+  const days = daysUntil(iso);
+  return days === 1 || days === 2;
+}
+
+function notifyControl(row) {
+  if (!row) return "";
+  if (row.notified) return `<span class="notified">Notified</span>`;
+  return `<button type="button" class="tiny notify" data-action="notify-family" data-kind="${esc(row.kind)}" data-id="${esc(row.id)}">Notify</button>`;
+}
+
+function notifyDayMarkup(iso) {
+  const rows = noticesOn(iso);
+  if (!rows.length) return "";
+  return `<section class="notify-day">${rows.map((row) => `<div class="notify-row">
+    <strong>${esc(row.family)}</strong>
+    <small>${esc([row.who, row.visitLabel].filter(Boolean).join(" · "))}</small>
+    ${notifyControl(row)}
+  </div>`).join("")}</section>`;
+}
+
+function appointmentNotify(person) {
+  const key = person?.rosterStatusKey;
+  if (key !== "scheduled" && key !== "reschedule" && key !== "driveby") return "";
+  const iso = appointmentParts(person.appointment || "").date;
+  if (!notifyWindow(iso)) return "";
+  return notifyControl({ kind: "appointment", id: person.id, notified: person.sheetColumns?.["Apt Notified"] === "Yes" });
+}
+
+function youthVisitNotify(family) {
+  const iso = meetingParts(family.sheetColumns?.["Visit Date"] || "").date;
+  if (!notifyWindow(iso)) return "";
+  return notifyControl({ kind: "youth-visit", id: family.id, notified: family.sheetColumns?.["Visit Notified"] === "Yes" });
+}
+
+function temporaryNotify(row) {
+  if (!row?.meetingDate || row.done || !notifyWindow(row.meetingDate)) return "";
+  return notifyControl({ kind: "temporary", id: row.id, notified: Boolean(row.notified) });
+}
+
 function visitConflicts(row) {
   if (!row || row.done || !row.meetingDate || !row.familyDirectoryId) return false;
   return (state?.temporaryVisits || []).some((other) => other.id !== row.id && !other.done && other.familyDirectoryId === row.familyDirectoryId && other.meetingDate === row.meetingDate);
@@ -2160,7 +2231,7 @@ function scheduledCard(rows) {
     const mark = finished || row.done
       ? `<span class="visited-check" aria-label="Visited">✓</span>`
       : `<button type="button" class="mark-visited" data-action="complete-temporary" data-id="${esc(row.id)}" aria-label="Confirm visit">✓</button>`;
-    return `<div class="scheduled-stop"><small>${esc(row.familyName)}${row.meeting ? ` · ${esc(row.meeting)}` : ""}${conflict}</small>${mark}</div>`;
+    return `<div class="scheduled-stop"><small>${esc(row.familyName)}${row.meeting ? ` · ${esc(row.meeting)}` : ""}${conflict}</small>${finished || row.done ? "" : temporaryNotify(row)}${mark}</div>`;
   }).join("");
   return `<div class="person ${finished ? "visited" : "scheduled"}" data-action="open-scheduled-adult" data-id="${esc(first.adultDirectoryId)}" data-member="${esc(first.adultMember)}">
     <strong>${esc(first.adultName)}</strong>
@@ -2603,10 +2674,10 @@ function scheduledTemporaryHouseholds(entry) {
 function temporaryHouseholdLineFor(entry) {
   const rows = scheduledTemporaryHouseholds(entry);
   if (!rows.length) return "";
-  return `<div class="companion-saved">${rows.map((row) => `<div class="companion-row">
+  return `<div class="companion-saved">${rows.map((row) => `<div class="companion-row temporary-listed">
     <span class="name-link">${esc(row.familyName)}</span>
-    ${row.meeting ? `<span class="muted">${esc(row.meeting)}</span>` : ""}
-    <button type="button" class="tiny" data-action="remove-temporary-household" data-id="${esc(row.id)}">Remove</button>
+    <span class="muted">${esc(row.meeting || "")}</span>
+    <span class="listed-actions">${temporaryNotify(row)}<button type="button" class="tiny" data-action="remove-temporary-household" data-id="${esc(row.id)}">Remove</button></span>
   </div>`).join("")}</div>`;
 }
 
@@ -3222,14 +3293,14 @@ function youthRosterSummary() {
 function personButtons(people = filteredPeople()) {
   const loaded = page === "youth" ? youthVisits() : eldersPeople();
   if (!loaded.length) {
-    const days = dayFilter ? temporaryDayMarkup(dayFilter) : "";
+    const days = dayFilter ? `${notifyDayMarkup(dayFilter)}${temporaryDayMarkup(dayFilter)}` : "";
     if (page === "youth" && dayFilter && !search.trim()) return `${youthHelpCards(youthHelpForDay(dayFilter))}${days}`;
     if (days) return days;
     if (page === "youth") return "";
     return `<p class="empty">No one is loaded yet. The outreach spreadsheet is not readable from here, so this list starts empty. Import a CSV or add a person. No sample members are included.</p>`;
   }
   if (!people.length) {
-    const days = dayFilter ? temporaryDayMarkup(dayFilter) : "";
+    const days = dayFilter ? `${notifyDayMarkup(dayFilter)}${temporaryDayMarkup(dayFilter)}` : "";
     if (page === "youth" && dayFilter && !search.trim()) return `${youthHelpCards(youthHelpForDay(dayFilter))}${days}`;
     if (dayFilter && statusFilter === "all" && !search.trim()) return days;
     if (archiveOpen && statusFilter === "all" && !search.trim()) return `<p class="empty">No one is in the archive.</p>`;
@@ -3252,8 +3323,9 @@ function personButtons(people = filteredPeople()) {
       ${youthVisit ? contactLines(person) : ""}
       <small>${state.rosterMode ? rosterLine(person) : esc(latestLine(person))}</small>
       ${temporaryDutyLines(person)}
+      ${appointmentNotify(person)}
     </div>`;
-  }).join("") + (page === "youth" && dayFilter ? youthHelpCards(youthHelpForDay(dayFilter)) : "") + (dayFilter ? temporaryDayMarkup(dayFilter) : "");
+  }).join("") + (dayFilter ? notifyDayMarkup(dayFilter) : "") + (page === "youth" && dayFilter ? youthHelpCards(youthHelpForDay(dayFilter)) : "") + (dayFilter ? temporaryDayMarkup(dayFilter) : "");
 }
 
 function youthHelpCards(rows) {
@@ -3366,7 +3438,7 @@ function temporaryVisitsForPerson(person) {
 }
 
 function temporaryDutyLines(person) {
-  return temporaryVisitsForPerson(person).map((row) => `<small>${esc([row.youthName, row.familyName, row.meeting].filter(Boolean).join(" · "))}${visitConflicts(row) ? " · Conflict" : ""}</small>`).join("");
+  return temporaryVisitsForPerson(person).map((row) => `<small>${esc([row.youthName, row.familyName, row.meeting].filter(Boolean).join(" · "))}${visitConflicts(row) ? " · Conflict" : ""}</small>${temporaryNotify(row)}`).join("");
 }
 
 function temporaryDutyBlock(person) {
@@ -3374,6 +3446,7 @@ function temporaryDutyBlock(person) {
   if (!rows.length) return "";
   return `<h3>With youth</h3>${rows.map((row) => `<div class="scheduled-stop">
     <p class="plan-line"><strong>${esc(row.familyName)}</strong> ${esc(row.meeting || "")}${row.youthName ? ` with ${esc(row.youthName)}` : ""}${visitConflicts(row) ? " · Conflict" : ""}</p>
+    ${temporaryNotify(row)}
     ${row.meetingDate ? `<button type="button" class="mark-visited" data-action="complete-temporary" data-id="${esc(row.id)}" aria-label="Confirm visit">✓</button>` : ""}
   </div>`).join("")}`;
 }
@@ -3519,7 +3592,7 @@ function youthAssignmentVisit(family) {
     <input data-assignment-id="${esc(family.id)}" value="${esc(nameKey(family))}" aria-label="Assignment">
     <button type="button" class="name-link" data-action="open-name" data-name="${esc(nameKey(family))}" data-person="${esc(family.id)}">${esc(nameKey(family))}</button>
     <label class="responded"><input type="checkbox" data-response-id="${esc(family.id)}" ${responded ? "checked" : ""}> Responded</label>
-    ${visit ? `<p class="plan-line"><strong>Visit</strong> ${esc(visit)}</p>` : ""}
+    ${visit ? `<p class="plan-line"><strong>Visit</strong> ${esc(visit)} ${youthVisitNotify(family)}</p>` : ""}
     <form class="appointment-row" data-form="assignment-visit" data-id="${esc(family.id)}">
       <input name="date" type="date" aria-label="Visit date" required value="${esc(parts.date)}">
       <input name="time" type="time" aria-label="Visit time" required value="${esc(parts.time)}">
@@ -3600,11 +3673,12 @@ function placeChoice(place) {
 function planLine(person) {
   const key = person.rosterStatusKey;
   const where = placeMark(person.appointmentPlace);
+  const notice = appointmentNotify(person);
   if (key === "reach_out" && person.reachOutDate) return `<p><strong>Reach out</strong> ${esc(person.reachOutDate)}</p>`;
-  if (key === "scheduled" && person.appointment) return `<p class="plan-line"><strong>Scheduled Appt</strong> ${esc(person.appointment)}${where}</p>`;
-  if (key === "reschedule" && person.appointment) return `<p class="plan-line"><strong>Re-Schedule</strong> ${esc(person.appointment)}${where}</p>`;
-  if (key === "driveby" && person.appointment) return `<p class="plan-line"><strong>Drive by</strong> ${esc(person.appointment)}${where}</p>`;
-  if (person.appointment) return `<p class="plan-line"><strong>Scheduled Appt</strong> ${esc(person.appointment)}${where}</p>`;
+  if (key === "scheduled" && person.appointment) return `<p class="plan-line"><strong>Scheduled Appt</strong> ${esc(person.appointment)}${where} ${notice}</p>`;
+  if (key === "reschedule" && person.appointment) return `<p class="plan-line"><strong>Re-Schedule</strong> ${esc(person.appointment)}${where} ${notice}</p>`;
+  if (key === "driveby" && person.appointment) return `<p class="plan-line"><strong>Drive by</strong> ${esc(person.appointment)}${where} ${notice}</p>`;
+  if (person.appointment) return `<p class="plan-line"><strong>Scheduled Appt</strong> ${esc(person.appointment)}${where} ${notice}</p>`;
   if (person.reachOutDate) return `<p><strong>Reach out</strong> ${esc(person.reachOutDate)}</p>`;
   return "";
 }

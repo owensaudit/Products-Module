@@ -27,6 +27,7 @@ import {
   scheduleVisit,
   setPersonStatus,
   setVisitStatus,
+  markVisitNotified,
 } from "./lib/model.js";
 import { emailAllowed, parseAllowlist } from "./lib/allowlist.js";
 import { addDirectoryMember, addDirectoryVisit, addTemporaryVisit, applyDirectory, assignDirectoryHousehold, assignTemporaryHousehold, completeTemporaryVisit, moveDirectoryPerson, parseDirectory, removeDirectoryMember, removeDirectoryVisit, removeTemporaryHousehold, scheduleDirectoryTemporaryVisit, scheduleTemporaryVisit, setDirectoryCompanion, setTemporaryCompanion, setTemporaryFamily, setYouthDay, setYouthHome, updateDirectoryHousehold } from "./lib/directory.js";
@@ -451,6 +452,12 @@ export function createPortalHandler(store, options = {}) {
 
         if (pathname === "/api/youth/temporary/complete") {
           const next = await store.update((state) => completeTemporaryVisit(state, body));
+          sendJson(response, 200, presentState(next, month, viewOptions));
+          return;
+        }
+
+        if (pathname === "/api/notify") {
+          const next = await store.update((state) => markVisitNotified(state, body));
           sendJson(response, 200, presentState(next, month, viewOptions));
           return;
         }

@@ -32,6 +32,7 @@ import {
   personOutreachStatus,
   previewImport,
   presentState,
+  markVisitNotified,
   scheduleVisit,
   setVisitStatus,
   slotsForMonth,
@@ -1809,4 +1810,61 @@ test("a temporary household can be removed without touching the standing assignm
   state = removeDirectoryVisit(state, { directoryId: "dir_home", member: "Ben", householdId: "dir_extra" });
   assert.deepEqual(state.directory[0].memberVisits.ben.map((item) => item.label), ["Standing house"]);
   assert.equal(state.directory[0].memberCompanions.ben, "Keeper, Anthony");
+});
+
+test("every scheduled visit asks for a family notice two days before and the day before", () => {
+  let state = {
+    ...emptyState(),
+    people: [{ id: "per_1", displayName: "Ada Example", phone: "", email: "", household: "", notes: "", sheetColumns: { Brother: "Example, Ada" }, createdAt: "2026-09-29T12:00:00.000Z", updatedAt: "2026-09-29T12:00:00.000Z" }],
+    directory: [{
+      id: "dir_home",
+      name: "Sample, Ben",
+      members: ["Ben"],
+      address: "",
+      phone: "",
+      email: "",
+      memberCompanions: { ben: "Keeper, Anthony" },
+      memberVisits: { ben: [{ directoryId: "dir_keep", label: "Standing house" }] },
+    }, {
+      id: "dir_other",
+      name: "Other, Cam",
+      members: ["Cam"],
+      address: "",
+      phone: "",
+      email: "",
+      memberCompanions: {},
+      memberVisits: {},
+      memberYouthHome: { cam: true },
+    }],
+  };
+  state = setAppointment(state, "per_1", { date: "2026-10-14", time: "19:00", kind: "scheduled", place: "home" });
+  state = setPersonContact(state, "per_1", { visitDate: { date: "2026-10-16", time: "18:30" } });
+  state = setTemporaryCompanion(state, { adultDirectoryId: "dir_home", adultMember: "Ben", youthName: "Youth, Pat", month: "2026-10" });
+  state = assignTemporaryHousehold(state, { adultDirectoryId: "dir_home", adultMember: "Ben", householdId: "dir_other", month: "2026-10" });
+  state = scheduleTemporaryVisit(state, { id: state.temporaryVisits[0].id, date: "2026-10-21", time: "19:30" });
+  let view = presentState(state, "2026-10");
+  assert.equal(view.notifyMarks["2026-10-12"][0].kind, "appointment");
+  assert.equal(view.notifyMarks["2026-10-12"][0].notified, false);
+  assert.equal(view.notifyMarks["2026-10-13"][0].visitDate, "2026-10-14");
+  assert.equal(view.notifyMarks["2026-10-14"].some((row) => row.kind === "appointment"), false);
+  assert.equal(view.notifyMarks["2026-10-15"][0].kind, "youth-visit");
+  assert.equal(view.notifyMarks["2026-10-19"][0].kind, "temporary");
+  assert.equal(view.notifyMarks["2026-10-20"][0].family, "Other, Cam");
+  assert.equal(view.calendarMarks["2026-10-14"].kinds.includes("scheduled"), true);
+  state = markVisitNotified(state, { kind: "appointment", id: "per_1" });
+  state = markVisitNotified(state, { kind: "youth-visit", id: "per_1" });
+  state = markVisitNotified(state, { kind: "temporary", id: state.temporaryVisits[0].id });
+  view = presentState(state, "2026-10");
+  assert.equal(view.notifyMarks["2026-10-12"][0].notified, true);
+  assert.equal(view.notifyMarks["2026-10-15"][0].notified, true);
+  assert.equal(view.notifyMarks["2026-10-19"][0].notified, true);
+  assert.equal(view.temporaryVisits[0].notified, true);
+  state = setAppointment(state, "per_1", { date: "2026-10-22", time: "19:00", kind: "scheduled", place: "home" });
+  view = presentState(state, "2026-10");
+  assert.equal(view.notifyMarks["2026-10-20"].some((row) => row.kind === "appointment" && row.notified), false);
+  assert.equal(view.notifyMarks["2026-10-12"], undefined);
+  state = scheduleTemporaryVisit(state, { id: state.temporaryVisits[0].id, date: "2026-10-28", time: "19:30" });
+  assert.equal(state.temporaryVisits[0].notified, false);
+  assert.equal(state.directory[0].memberCompanions.ben, "Keeper, Anthony");
+  assert.deepEqual(state.directory[0].memberVisits.ben, [{ directoryId: "dir_keep", label: "Standing house" }]);
 });
