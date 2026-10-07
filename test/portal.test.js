@@ -36,7 +36,7 @@ import {
   setVisitStatus,
   slotsForMonth,
 } from "../lib/model.js";
-import { addDirectoryMember, addDirectoryVisit, addTemporaryVisit, applyDirectory, applyMinisteringGroups, assignDirectoryHousehold, completeTemporaryVisit, directoryAddressKey, findDirectoryRecord, mergeDirectoryByAddress, moveDirectoryPerson, parseDirectory, removeDirectoryMember, scheduleTemporaryVisit, setDirectoryCompanion, setYouthDay, setYouthHome, updateDirectoryHousehold } from "../lib/directory.js";
+import { addDirectoryMember, addDirectoryVisit, addTemporaryVisit, applyDirectory, applyMinisteringGroups, assignDirectoryHousehold, completeTemporaryVisit, directoryAddressKey, findDirectoryRecord, mergeDirectoryByAddress, moveDirectoryPerson, parseDirectory, removeDirectoryMember, scheduleTemporaryVisit, setDirectoryCompanion, setTemporaryCompanion, setTemporaryFamily, setYouthDay, setYouthHome, updateDirectoryHousehold } from "../lib/directory.js";
 import { brotherSheetToState, calendarMarks, canonicalRosterStatus, isArchiveStatus, rosterStatusKey } from "../lib/roster.js";
 import { emailAllowed, parseAllowlist } from "../lib/allowlist.js";
 import { createStore } from "../lib/store.js";
@@ -1547,4 +1547,61 @@ test("a temporary youth visit is monthly and leaves the standing companion alone
   assert.equal(saved.temporaryVisits[1].month, "2026-11");
   assert.equal(saved.directory[0].memberCompanions.ben, "Keeper, Anthony");
   assert.throws(() => scheduleTemporaryVisit(state, { id: "missing", date: "2026-11-02", time: "18:00" }), /Temporary visit not found/);
+});
+
+test("a temporary youth companion sits beside the standing companion", () => {
+  let state = {
+    ...emptyState(),
+    directory: [{
+      id: "dir_home",
+      name: "Sample, Ben",
+      members: ["Ben"],
+      address: "",
+      phone: "",
+      email: "",
+      memberCompanions: { ben: "Keeper, Anthony" },
+      memberVisits: { ben: [{ directoryId: "dir_keep", label: "Standing house" }] },
+    }, {
+      id: "dir_other",
+      name: "Other, Cam",
+      members: ["Cam"],
+      address: "",
+      phone: "",
+      email: "",
+      memberCompanions: {},
+      memberVisits: {},
+    }],
+  };
+  state = setTemporaryCompanion(state, {
+    adultDirectoryId: "dir_home",
+    adultMember: "Ben",
+    youthName: "Youth, Pat",
+    month: "2026-10",
+  });
+  assert.equal(state.directory[0].memberCompanions.ben, "Keeper, Anthony");
+  assert.deepEqual(state.directory[0].memberVisits.ben, [{ directoryId: "dir_keep", label: "Standing house" }]);
+  assert.equal(state.temporaryVisits[0].youthName, "Youth, Pat");
+  assert.equal(state.temporaryVisits[0].familyDirectoryId, "");
+  state = setTemporaryCompanion(state, {
+    adultDirectoryId: "dir_home",
+    adultMember: "Ben",
+    youthName: "Youth, Ada",
+    month: "2026-10",
+  });
+  assert.equal(state.temporaryVisits.length, 1);
+  assert.equal(state.temporaryVisits[0].youthName, "Youth, Ada");
+  assert.equal(state.directory[0].memberCompanions.ben, "Keeper, Anthony");
+  state = setTemporaryFamily(state, { id: state.temporaryVisits[0].id, familyDirectoryId: "dir_other" });
+  assert.equal(state.temporaryVisits[0].familyName, "Other, Cam");
+  assert.equal(state.directory[0].memberCompanions.ben, "Keeper, Anthony");
+  assert.deepEqual(state.directory[0].memberVisits.ben, [{ directoryId: "dir_keep", label: "Standing house" }]);
+  state = setTemporaryCompanion(state, {
+    adultDirectoryId: "dir_home",
+    adultMember: "Ben",
+    youthName: "Youth, Ada",
+    month: "2026-10",
+    remove: true,
+  });
+  assert.equal(state.temporaryVisits.length, 0);
+  assert.equal(state.directory[0].memberCompanions.ben, "Keeper, Anthony");
 });

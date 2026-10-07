@@ -135,6 +135,29 @@ app.addEventListener("change", (event) => {
     syncContactLinks(form);
     return;
   }
+  if (target instanceof HTMLSelectElement && target.form?.dataset.form === "temporary-youth") {
+    post("/api/youth/temporary/companion", {
+      adultDirectoryId: target.form.dataset.id,
+      adultMember: target.form.dataset.member,
+      youthName: target.value,
+      month: currentMonth(),
+    }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
+    return;
+  }
+  if (target instanceof HTMLSelectElement && target.form?.dataset.form === "temporary-family") {
+    if (!target.value) return;
+    post("/api/youth/temporary/family", {
+      id: target.form.dataset.id,
+      familyDirectoryId: target.value,
+    }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
+    return;
+  }
   if (target instanceof HTMLSelectElement && target.form?.dataset.form === "directory-companion") {
     post("/api/directory/companion", {
       directoryId: target.form.dataset.id,
@@ -495,6 +518,17 @@ app.addEventListener("click", (event) => {
     directoryAdding = true;
     directoryFocus = null;
     render();
+  } else if (action === "remove-temporary-youth") {
+    post("/api/youth/temporary/companion", {
+      adultDirectoryId: button.dataset.id,
+      adultMember: button.dataset.member,
+      youthName: button.dataset.name,
+      month: currentMonth(),
+      remove: true,
+    }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
   } else if (action === "remove-companion") {
     post("/api/directory/companion", {
       directoryId: button.dataset.id,
@@ -2011,7 +2045,9 @@ function temporaryCard(visit) {
   return `<section class="ministering-set" data-temporary="${esc(visit.id)}">
     <article class="role-card"><span class="role-kicker">Adult</span><strong>${esc(visit.adultName)}</strong></article>
     <article class="role-card"><span class="role-kicker">Temporary companion</span><strong>${esc(visit.youthName)}</strong></article>
-    <article class="role-card"><span class="role-kicker">Family</span><strong>${esc(visit.familyName)}</strong></article>
+    ${visit.familyDirectoryId
+      ? `<article class="role-card"><span class="role-kicker">Family</span><strong>${esc(visit.familyName)}</strong></article>`
+      : `<form class="assign-row" data-form="temporary-family" data-id="${esc(visit.id)}"><span>Family</span><select name="family" aria-label="Family"><option value="">—</option>${youthDayHouseOptions("")}</select></form>`}
     ${meeting}
     ${check}
   </section>`;
@@ -2648,6 +2684,7 @@ function directoryPersonCard(entry) {
       <select name="companion" aria-label="Companion">${directoryOptions(companion)}</select>
     </form>
     ${companionLinks}
+    ${directoryTemporaryYouth(entry)}
     <form class="assign-row" data-form="directory-visit" data-id="${esc(record.id)}" data-member="${esc(entry.member)}">
       <span>Household to visit</span>
       <select name="visit" aria-label="Household to visit"><option value="">—</option>${directoryHouseholdOptions("")}</select>
@@ -2655,6 +2692,44 @@ function directoryPersonCard(entry) {
     ${visitLine}
     ${directoryYouthSection(entry)}
     <button type="button" class="ghost" data-action="remove-directory-member" data-id="${esc(record.id)}" data-member="${esc(entry.member)}">Remove member</button>`;
+}
+
+function temporaryYouthNames(entry) {
+  const month = currentMonth();
+  const names = [];
+  for (const row of state?.temporaryVisits || []) {
+    if (row.done || row.month !== month || row.adultDirectoryId !== entry.directoryId || row.adultMember !== entry.member) continue;
+    const name = String(row.youthName || "").trim();
+    if (name && !names.some((item) => item.toLowerCase() === name.toLowerCase())) names.push(name);
+  }
+  return names;
+}
+
+function directoryTemporaryYouth(entry) {
+  const names = temporaryYouthNames(entry);
+  const selected = names.length === 1 ? names[0] : "";
+  const rows = names.map((name) => `<div class="companion-row"><span class="name-link">${esc(name)}</span><button type="button" class="tiny" data-action="remove-temporary-youth" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}" data-name="${esc(name)}">Remove</button></div>`).join("");
+  return `<form class="assign-row" data-form="temporary-youth" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}">
+      <span>Temporary youth companion</span>
+      <select name="youth" aria-label="Temporary youth companion">${youthCompanionOptions(selected)}</select>
+    </form>
+    ${rows ? `<div class="companion-saved"><span>Temporary youth companion</span>${rows}</div>` : ""}`;
+}
+
+function youthCompanionOptions(selected) {
+  const rows = [];
+  for (const person of [...youthMembers("priests"), ...youthMembers("teachers")]) {
+    const name = nameKey(person);
+    if (!name || rows.some((row) => row.name === name)) continue;
+    rows.push({ name, office: person.group === "teachers" ? "Teacher" : "Priest" });
+  }
+  if (selected && !rows.some((row) => row.name === selected)) rows.push({ name: selected, office: "" });
+  const options = [`<option value="">—</option>`];
+  for (const row of rows) {
+    const label = row.office ? `${row.name} · ${row.office}` : row.name;
+    options.push(`<option value="${esc(row.name)}" ${row.name === selected ? "selected" : ""}>${esc(label)}</option>`);
+  }
+  return options.join("");
 }
 
 function youthNameOptions(selected) {
