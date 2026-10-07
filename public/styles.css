@@ -661,6 +661,7 @@ button.cal-day.is-open {
 .cal-dot.scheduled { background: var(--status-scheduled); }
 .cal-dot.reschedule { background: #7dcea0; }
 .cal-dot.with_youth { background: #d98a2b; }
+.cal-dot.temporary { background: #1f7a8c; }
 
 .cal-num {
   font-size: 13px;
@@ -978,6 +979,8 @@ textarea { min-height: 72px; width: 100%; resize: vertical; }
 
 .ministering-cards { display: grid; gap: 18px; min-width: 18rem; }
 .ministering-set { display: grid; gap: 8px; }
+.temporary-add { margin-bottom: 16px; }
+.temporary-done { display: flex; justify-content: flex-end; }
 .role-card {
   display: grid;
   gap: 2px;

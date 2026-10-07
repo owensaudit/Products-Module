@@ -382,7 +382,7 @@ app.addEventListener("click", (event) => {
     view = "people";
     render();
   } else if (action === "archive") {
-    if (page === "youth") youthList = "visits";
+    if (page === "youth" && youthList !== "temporary") youthList = "visits";
     viewAll = false;
     archiveOpen = !archiveOpen;
     statusFilter = "all";
@@ -399,6 +399,11 @@ app.addEventListener("click", (event) => {
     render();
   } else if (action === "mark-visited") {
     applyStatus(button.dataset.personId, "Visited", { keepView: true });
+  } else if (action === "complete-temporary") {
+    post("/api/youth/temporary/complete", { id: button.dataset.id }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
   } else if (action === "set-status") {
     if (button.dataset.status === "Mission") applyMission(button.dataset.personId);
     else applyStatus(button.dataset.personId, button.dataset.status);
@@ -575,6 +580,32 @@ app.addEventListener("submit", (event) => {
   event.preventDefault();
   const data = new FormData(form);
   const kind = form.dataset.form;
+  if (kind === "temporary-visit") {
+    const adult = String(data.get("adult") || "");
+    const split = adult.indexOf("::");
+    post("/api/youth/temporary", {
+      adultDirectoryId: split === -1 ? "" : adult.slice(0, split),
+      adultMember: split === -1 ? "" : adult.slice(split + 2),
+      youthName: data.get("youth"),
+      familyDirectoryId: data.get("family"),
+      month: viewedMonth(),
+    }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
+    return;
+  }
+  if (kind === "temporary-meeting") {
+    post("/api/youth/temporary/schedule", {
+      id: form.dataset.id,
+      date: data.get("date"),
+      time: data.get("time"),
+    }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
+    return;
+  }
   if (kind === "youth-day") {
     post("/api/directory/youth-day", {
       directoryId: form.dataset.id,
@@ -1157,7 +1188,8 @@ document.querySelector("#month-calendar")?.addEventListener("click", (event) => 
   if (!control) return;
   if (control.dataset.action === "shift-month") {
     calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + Number(control.dataset.delta), 1);
-    renderCalendar();
+    if (page === "youth" && youthList === "temporary") render();
+    else renderCalendar();
     return;
   }
   if (control.dataset.action === "open-day") openCalendarDay(control.dataset.date);
@@ -1493,7 +1525,7 @@ function renderCalendar() {
     const kinds = mark.kinds || [];
     const people = mark.people || [];
     const dots = kinds.map((kind) => {
-      const label = kind === "scheduled" ? "Scheduled" : kind === "reschedule" ? "Re-Schedule" : kind === "driveby" ? "Drive by" : kind === "with_youth" ? "With youth" : "Reach out";
+      const label = kind === "scheduled" ? "Scheduled" : kind === "reschedule" ? "Re-Schedule" : kind === "driveby" ? "Drive by" : kind === "with_youth" ? "With youth" : kind === "temporary" ? "Temporary visit" : "Reach out";
       return `<span class="cal-dot ${kind}" title="${label}"></span>`;
     }).join("");
     const described = [`${title} ${day}`];
@@ -1502,10 +1534,11 @@ function renderCalendar() {
     if (kinds.includes("reach_out")) described.push("reach out");
     if (kinds.includes("driveby")) described.push("drive by");
     if (kinds.includes("with_youth")) described.push("with youth");
+    if (kinds.includes("temporary")) described.push("temporary visit");
     const today = viewingNow && day === now.getDate() ? " is-today" : "";
     const open = dayFilter === iso ? " is-open" : "";
     const inner = `<span class="cal-marks">${dots}</span><span class="cal-num">${day}</span>`;
-    if (people.length || kinds.includes("with_youth")) {
+    if (people.length || kinds.includes("with_youth") || kinds.includes("temporary")) {
       described.push("show the brothers for this day");
       cells.push(`<button type="button" class="cal-day${today}${open}" data-action="open-day" data-date="${iso}" data-marks="${esc(kinds.join(" "))}" aria-pressed="${dayFilter === iso}" aria-label="${esc(described.join(", "))}">${inner}</button>`);
     } else {
@@ -1579,6 +1612,27 @@ function youthSectionBoard(quorum, label, rows, members) {
 }
 
 function openCalendarDay(iso) {
+  const temporary = (state?.temporaryVisits || []).filter((row) => !row.done && row.meetingDate === iso);
+  if (temporary.length) {
+    const [year, month] = iso.split("-").map(Number);
+    page = "youth";
+    youthList = "temporary";
+    inbox = "";
+    viewAll = false;
+    assigneeFilter = "";
+    dayFilter = "";
+    archiveOpen = false;
+    archiveChoicesFor = "";
+    statusFilter = "all";
+    officeFilter = "all";
+    search = "";
+    view = "people";
+    detailForm = null;
+    selectedPersonId = null;
+    calendarMonth = new Date(year, month - 1, 1);
+    render();
+    return;
+  }
   const volunteers = youthHelpForDay(iso);
   const fromDirectory = page === "directory";
   if (volunteers.length) page = "youth";
@@ -1680,13 +1734,14 @@ function rosterNeeded() {
 function renderPeopleList() {
   const list = document.querySelector("#person-list");
   if (!list) return;
+  const temporary = showingTemporary();
   const assignments = showingAssignments();
   const youthLists = showingYouthLists();
-  list.innerHTML = youthLists ? youthListMarkup() : assignments ? assignmentListMarkup() : personButtons();
+  list.innerHTML = temporary ? temporaryListMarkup() : youthLists ? youthListMarkup() : assignments ? assignmentListMarkup() : personButtons();
   const count = document.querySelector("#people-card .muted");
-  if (count && (youthLists || assignments)) {
-    const total = assignments ? visibleAssignments().length : youthVisibleEntries().length;
-    const noun = assignments ? (total === 1 ? "assignment" : "assignments") : (total === 1 ? "person" : "people");
+  if (count && (temporary || youthLists || assignments)) {
+    const total = temporary ? temporaryRows().length : assignments ? visibleAssignments().length : youthVisibleEntries().length;
+    const noun = temporary ? (total === 1 ? "visit" : "visits") : assignments ? (total === 1 ? "assignment" : "assignments") : (total === 1 ? "person" : "people");
     count.textContent = `${total} ${noun}`;
   }
 }
@@ -1858,17 +1913,20 @@ function listTitle() {
 }
 
 function peopleView() {
+  const temporary = showingTemporary();
   const youthLists = showingYouthLists();
   const assignments = showingAssignments();
-  const people = youthLists || assignments ? [] : filteredPeople();
-  const title = assignments ? "Assignments" : youthLists ? youthListTitle() : listTitle();
+  const people = temporary || youthLists || assignments ? [] : filteredPeople();
+  const title = temporary ? (archiveOpen ? "Archive" : formatMonth(viewedMonth())) : assignments ? "Assignments" : youthLists ? youthListTitle() : listTitle();
   const helpCount = page === "youth" && dayFilter ? youthHelpForDay(dayFilter).length : 0;
-  const total = (assignments ? visibleAssignments().length : youthLists ? youthVisibleEntries().length : people.length) + helpCount;
-  const showDetail = !state.rosterMode || Boolean(selectedPersonId);
-  const noun = assignments
+  const total = (temporary ? temporaryRows().length : assignments ? visibleAssignments().length : youthLists ? youthVisibleEntries().length : people.length) + helpCount;
+  const showDetail = !temporary && (!state.rosterMode || Boolean(selectedPersonId));
+  const noun = temporary
+    ? (total === 1 ? "visit" : "visits")
+    : assignments
     ? (total === 1 ? "assignment" : "assignments")
     : page === "youth" ? (total === 1 ? "person" : "people") : (total === 1 ? "brother" : "brothers");
-  const markup = youthLists ? youthListMarkup() : assignments ? assignmentListMarkup() : personButtons(people);
+  const markup = temporary ? temporaryListMarkup() : youthLists ? youthListMarkup() : assignments ? assignmentListMarkup() : personButtons(people);
   return `<section class="layout${showDetail ? "" : " layout-single"}">
     <div class="card" id="people-card">
       <div class="row">
@@ -1887,7 +1945,85 @@ function showingAssignments() {
 }
 
 function showingYouthLists() {
-  return page === "youth" && youthList !== "visits" && youthList !== "assignments" && !archiveOpen && !assigneeFilter && !dayFilter;
+  return page === "youth" && youthList !== "visits" && youthList !== "assignments" && youthList !== "temporary" && !archiveOpen && !assigneeFilter && !dayFilter;
+}
+
+function showingTemporary() {
+  return page === "youth" && youthList === "temporary" && !dayFilter && !assigneeFilter;
+}
+
+function viewedMonth() {
+  return `${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function temporaryActiveCount() {
+  const month = viewedMonth();
+  return (state?.temporaryVisits || []).filter((row) => row.month === month && !row.done).length;
+}
+
+function temporaryArchiveCount() {
+  const month = viewedMonth();
+  return (state?.temporaryVisits || []).filter((row) => row.done || row.month < month).length;
+}
+
+function temporaryRows() {
+  const month = viewedMonth();
+  const needle = search.trim().toLowerCase();
+  return (state?.temporaryVisits || [])
+    .filter((row) => (archiveOpen ? row.done || row.month < month : row.month === month && !row.done))
+    .filter((row) => !needle || `${row.adultName} ${row.youthName} ${row.familyName}`.toLowerCase().includes(needle))
+    .sort((a, b) => String(a.meetingDate || "9999").localeCompare(String(b.meetingDate || "9999")) || String(a.adultName).localeCompare(String(b.adultName), "en", { sensitivity: "base" }));
+}
+
+function temporaryAddForm() {
+  const adults = directoryEntries().map((entry) => `<option value="${esc(entry.directoryId)}::${esc(entry.member)}">${esc(entry.name)}</option>`).join("");
+  return `<form class="stack temporary-add" data-form="temporary-visit">
+    <div class="assign-row">
+      <span>Adult</span>
+      <select name="adult" required aria-label="Adult"><option value="">—</option>${adults}</select>
+    </div>
+    <div class="assign-row">
+      <span>Temporary companion</span>
+      <select name="youth" required aria-label="Temporary companion">${youthNameOptions("")}</select>
+    </div>
+    <div class="assign-row">
+      <span>Family</span>
+      <select name="family" required aria-label="Family"><option value="">—</option>${youthDayHouseOptions("")}</select>
+    </div>
+    <button class="primary" type="submit">Add visit</button>
+  </form>`;
+}
+
+function temporaryCard(visit) {
+  const finished = Boolean(visit.done);
+  const meeting = finished
+    ? `<p class="muted">${esc(visit.meeting || "")}</p>`
+    : `<form class="assign-row temporary-meeting" data-form="temporary-meeting" data-id="${esc(visit.id)}">
+        <span>Meeting</span>
+        <input name="date" type="date" required aria-label="Meeting date" value="${esc(visit.meetingDate || "")}">
+        <input name="time" type="time" required aria-label="Meeting time">
+        <button class="tiny primary" type="submit">Schedule</button>
+      </form>
+      ${visit.meeting ? `<p class="muted">${esc(visit.meeting)}</p>` : ""}`;
+  const check = !finished && visit.meetingDate
+    ? `<div class="temporary-done"><button type="button" class="mark-visited" data-action="complete-temporary" data-id="${esc(visit.id)}" aria-label="Confirm visit">✓</button></div>`
+    : "";
+  return `<section class="ministering-set" data-temporary="${esc(visit.id)}">
+    <article class="role-card"><span class="role-kicker">Adult</span><strong>${esc(visit.adultName)}</strong></article>
+    <article class="role-card"><span class="role-kicker">Temporary companion</span><strong>${esc(visit.youthName)}</strong></article>
+    <article class="role-card"><span class="role-kicker">Family</span><strong>${esc(visit.familyName)}</strong></article>
+    ${meeting}
+    ${check}
+  </section>`;
+}
+
+function temporaryListMarkup() {
+  const rows = temporaryRows();
+  const form = archiveOpen ? "" : temporaryAddForm();
+  const empty = rows.length
+    ? ""
+    : `<p class="empty">${search.trim() ? "No temporary visits match this search." : archiveOpen ? "No finished temporary visits." : "No temporary visits this month."}</p>`;
+  return `${form}${rows.map((visit) => temporaryCard(visit)).join("")}${empty}`;
 }
 
 function visibleAssignments() {
@@ -2549,48 +2685,11 @@ function directoryYouthSection(entry) {
   const wanted = directoryWantsYouth(record, entry.member);
   const visit = (state?.people || []).find((person) => person.list === "youth" && person.directoryId === record.id);
   const open = visit ? `<button type="button" class="tiny" data-action="open-youth-assignment" data-id="${esc(visit.id)}">Assign companionship</button>` : "";
-  const days = directoryYouthDays(record, entry.member).map((day) => {
-    const houses = (day.visits || []).map((item) => {
-      const label = youthDayVisitLabel(item);
-      const household = (state?.directory || []).find((row) => row.id === item.directoryId);
-      const member = household?.members?.[0] || "";
-      const link = member
-        ? `<button type="button" class="name-link" data-action="open-directory-person" data-id="${esc(item.directoryId)}" data-member="${esc(member)}">${esc(label)}</button>`
-        : esc(label);
-      return `<span class="youth-day-house">${link}<button type="button" class="tiny" data-action="remove-youth-visit" data-id="${esc(record.id)}" data-member="${esc(entry.member)}" data-date="${esc(day.date)}" data-household="${esc(item.directoryId)}">Remove</button></span>`;
-    }).join("");
-    return `<div class="youth-day" data-youth-day="1" data-id="${esc(record.id)}" data-member="${esc(entry.member)}" data-date="${esc(day.date)}">
-      <div class="youth-day-head">
-        <strong>${esc(formatDate(day.date))}</strong>
-        <button type="button" class="tiny" data-action="remove-youth-day" data-id="${esc(record.id)}" data-member="${esc(entry.member)}" data-date="${esc(day.date)}">Remove day</button>
-      </div>
-      <div class="youth-day-row">
-        <span>Youth going</span>
-        <select data-youth-slot="1" aria-label="Youth going on ${esc(formatDate(day.date))}">${youthNameOptions(day.youth?.[0] || "")}</select>
-        <select data-youth-slot="2" aria-label="Second youth on ${esc(formatDate(day.date))}, optional">${youthNameOptions(day.youth?.[1] || "")}</select>
-      </div>
-      ${houses ? `<div class="youth-day-houses">${houses}</div>` : ""}
-      <form class="assign-row" data-form="youth-day-house" data-id="${esc(record.id)}" data-member="${esc(entry.member)}" data-date="${esc(day.date)}">
-        <span>House this day</span>
-        <select aria-label="House to visit on ${esc(formatDate(day.date))}"><option value="">—</option>${youthDayHouseOptions(record.id)}</select>
-      </form>
-    </div>`;
-  }).join("");
   return `<label class="youth-home">
       <input type="checkbox" data-youth-home="1" data-id="${esc(record.id)}" data-member="${esc(entry.member)}" ${wanted ? "checked" : ""}>
       Would like the youth to visit
     </label>
-    ${open}
-    <div class="youth-outing">
-      <p class="youth-outing-title">Available to take youth</p>
-      <p class="muted">For one day. Their companion stays the same.</p>
-      <form class="youth-day-add" data-form="youth-day" data-id="${esc(record.id)}" data-member="${esc(entry.member)}">
-        <span>Date</span>
-        <input name="date" type="date" required aria-label="Date available to take a youth">
-        <button class="tiny primary" type="submit">Add day</button>
-      </form>
-      ${days}
-    </div>`;
+    ${open}`;
 }
 
 function directoryNameLinks(names, entry) {
@@ -2869,13 +2968,16 @@ function youthRosterSummary() {
   const noneCount = youthMembers().filter((person) => !hasCompanionPair(nameKey(person))).length;
   const assignmentPressed = showingAssignments();
   const visitPressed = youthList === "visits" && !archiveOpen && !viewAll && !assigneeFilter && !dayFilter && statusFilter === "all";
+  const monthPressed = showingTemporary() && !archiveOpen;
+  const archiveCount = youthList === "temporary" ? temporaryArchiveCount() : archivedCount;
   return `<div class="summary" aria-label="Youth lists">
     <button type="button" data-action="view-all" aria-pressed="${allPressed}">All ${allCount}</button>
     ${listButtons}
     <button type="button" data-action="youth-list" data-list="none" aria-pressed="${nonePressed}">None ${noneCount}</button>
+    <button type="button" data-action="youth-list" data-list="temporary" aria-pressed="${monthPressed}">This month ${temporaryActiveCount()}</button>
     <button type="button" data-action="youth-list" data-list="assignments" aria-pressed="${assignmentPressed}">Assignments ${activeCount}</button>
     <button type="button" data-action="show-people" data-list="to-visit" aria-pressed="${visitPressed}">To Visit ${activeCount}</button>
-    <button type="button" class="archive-toggle" data-action="archive" aria-pressed="${archiveOpen}">Archive ${archivedCount}</button>
+    <button type="button" class="archive-toggle" data-action="archive" aria-pressed="${archiveOpen}">Archive ${archiveCount}</button>
   </div>`;
 }
 

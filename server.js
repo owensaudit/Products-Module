@@ -29,7 +29,7 @@ import {
   setVisitStatus,
 } from "./lib/model.js";
 import { emailAllowed, parseAllowlist } from "./lib/allowlist.js";
-import { addDirectoryMember, addDirectoryVisit, applyDirectory, assignDirectoryHousehold, moveDirectoryPerson, parseDirectory, removeDirectoryMember, setDirectoryCompanion, setYouthDay, setYouthHome, updateDirectoryHousehold } from "./lib/directory.js";
+import { addDirectoryMember, addDirectoryVisit, addTemporaryVisit, applyDirectory, assignDirectoryHousehold, completeTemporaryVisit, moveDirectoryPerson, parseDirectory, removeDirectoryMember, scheduleTemporaryVisit, setDirectoryCompanion, setYouthDay, setYouthHome, updateDirectoryHousehold } from "./lib/directory.js";
 import { createStore } from "./lib/store.js";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -397,6 +397,24 @@ export function createPortalHandler(store, options = {}) {
 
         if (pathname === "/api/directory/youth-day") {
           const next = await store.update((state) => setYouthDay(state, body));
+          sendJson(response, 200, presentState(next, month, viewOptions));
+          return;
+        }
+
+        if (pathname === "/api/youth/temporary") {
+          const next = await store.update((state) => addTemporaryVisit(state, body));
+          sendJson(response, 201, presentState(next, month, viewOptions));
+          return;
+        }
+
+        if (pathname === "/api/youth/temporary/schedule") {
+          const next = await store.update((state) => scheduleTemporaryVisit(state, body));
+          sendJson(response, 200, presentState(next, month, viewOptions));
+          return;
+        }
+
+        if (pathname === "/api/youth/temporary/complete") {
+          const next = await store.update((state) => completeTemporaryVisit(state, body));
           sendJson(response, 200, presentState(next, month, viewOptions));
           return;
         }
