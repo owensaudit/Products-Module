@@ -1359,18 +1359,22 @@ button.mark-visited {
 .notify-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 8px 10px;
   width: 100%;
   padding: 8px 10px;
   border: 1px solid #e4d3b0;
   border-radius: 12px;
   background: #fff8ec;
   color: inherit;
-  font: inherit;
   text-align: left;
-  cursor: pointer;
 }
-.notify-row small { margin-left: auto; color: #6b5a3e; }
+.notify-copy { display: grid; gap: 2px; min-width: 0; flex: 1 1 12rem; }
+.notify-copy small,
+.notify-row small { margin-left: 0; color: #6b5a3e; }
+.notify-actions { display: flex; align-items: center; gap: 6px; flex: none; margin-left: auto; }
+.notify-actions a.tiny { color: inherit; text-decoration: none; }
+.notify-actions .mark-visited { position: static; }
 .reminder { margin: 6px 0 10px; }
 .reminder-script { margin: 0 0 6px; }
 .reminder-actions { display: flex; gap: 8px; }

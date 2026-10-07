@@ -64,6 +64,7 @@ let officeFilter = "all";
 let search = "";
 let dayFilter = "";
 let viewAll = false;
+let notifyList = false;
 let assigneeFilter = "";
 let preserveListScroll = true;
 let cardTrail = [];
@@ -291,6 +292,7 @@ app.addEventListener("change", (event) => {
   if (!(target instanceof HTMLSelectElement)) return;
   if (target.dataset.action === "office") {
     officeFilter = target.value;
+    notifyList = false;
     dayFilter = "";
     view = "people";
     const current = selectedPerson();
@@ -320,9 +322,16 @@ app.addEventListener("input", (event) => {
 
 app.addEventListener("click", (event) => {
   if (event.target.closest("select, input, textarea, a.address-pill")) return;
+  const reminderLink = event.target.closest("a[data-reminder]");
+  if (reminderLink) {
+    const href = reminderLink.getAttribute("href") || "";
+    if (!href || href === "#") event.preventDefault();
+    return;
+  }
   const button = event.target.closest("[data-action]");
   if (!button) return;
   const action = button.dataset.action;
+  if (action !== "show-notify" && action !== "confirm-notified") notifyList = false;
   if (action === "mention") {
     const area = button.closest("form")?.querySelector("textarea[name=body]");
     if (!area) return;
@@ -425,8 +434,25 @@ app.addEventListener("click", (event) => {
       state = next;
       render();
     }).catch(showError);
-  } else if (action === "open-notify") {
-    openNotify(button.dataset.kind, button.dataset.id);
+  } else if (action === "show-notify") {
+    notifyList = true;
+    viewAll = false;
+    archiveOpen = false;
+    archiveChoicesFor = "";
+    dayFilter = "";
+    statusFilter = "all";
+    assigneeFilter = "";
+    officeFilter = "all";
+    search = "";
+    selectedPersonId = null;
+    detailForm = null;
+    view = "people";
+    render();
+  } else if (action === "confirm-notified") {
+    post("/api/notify", { kind: button.dataset.kind, id: button.dataset.id }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
   } else if (action === "set-status") {
     if (button.dataset.status === "Mission") applyMission(button.dataset.personId);
     else applyStatus(button.dataset.personId, button.dataset.status);
@@ -1203,6 +1229,7 @@ presidencyHost?.addEventListener("click", (event) => {
     youthGroup = button.dataset.quorum;
   }
   assigneeFilter = assigneeFilter === name ? "" : name;
+  notifyList = false;
   viewAll = false;
   archiveOpen = false;
   inbox = "";
@@ -1259,6 +1286,7 @@ function openPage(next) {
   statusFilter = "all";
   archiveOpen = false;
   viewAll = false;
+  notifyList = false;
   assigneeFilter = "";
   dayFilter = "";
   view = "people";
@@ -1813,6 +1841,16 @@ function rosterNeeded() {
 function renderPeopleList() {
   const list = document.querySelector("#person-list");
   if (!list) return;
+  const reminding = page !== "youth" && notifyList && !dayFilter;
+  if (reminding) {
+    list.innerHTML = notifyListMarkup();
+    const reminderCount = document.querySelector("#people-card .muted");
+    if (reminderCount) {
+      const total = visibleReminders().length;
+      reminderCount.textContent = `${total} ${total === 1 ? "family to notify" : "families to notify"}`;
+    }
+    return;
+  }
   const scheduled = showingScheduled();
   const temporary = showingTemporary();
   const assignments = showingAssignments();
@@ -1953,15 +1991,17 @@ function rosterSummary() {
   const activeCount = source.length - archivedCount;
   const keys = archiveOpen ? ARCHIVE_STATUS_ORDER : ROSTER_STATUS_ORDER.filter((key) => counts[key]);
   const offices = [...new Set(cohort.map((person) => person.priesthood).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-  const archiveButton = `<button type="button" class="archive-toggle" data-action="archive" aria-pressed="${!viewAll && archiveOpen}">Archive ${archivedCount}</button>`;
+  const archiveButton = `<button type="button" class="archive-toggle" data-action="archive" aria-pressed="${!notifyList && !viewAll && archiveOpen}">Archive ${archivedCount}</button>`;
   const visitButton = archiveOpen && !viewAll
     ? `<button type="button" data-action="show-people">To Visit ${activeCount}</button>`
     : filterButton("all", activeCount, "To Visit");
   const statusButtons = keys.map((key) => filterButton(key, counts[key] || 0, STATUS_LABELS[key] || key)).join("");
   const allButton = `<button type="button" data-action="view-all" aria-pressed="${viewAll}">All ${source.length}</button>`;
+  const notifyButton = `<button type="button" data-action="show-notify" aria-pressed="${notifyList}">Notify ${pendingReminders().length}</button>`;
   return `<div class="summary" aria-label="${page === "youth" ? "Youth filters" : "Brother filters"}">
     ${allButton}
     ${visitButton}
+    ${notifyButton}
     ${archiveOpen ? `${archiveButton}${statusButtons}` : `${statusButtons}${archiveButton}`}
     <label class="inline-filter">Priesthood
       <select data-action="office" aria-label="Filter by priesthood">
@@ -1973,7 +2013,7 @@ function rosterSummary() {
 }
 
 function filterButton(status, count, label = STATUS_LABELS[status]) {
-  const pressed = !viewAll && !dayFilter && statusFilter === status && (status === "all" ? !archiveOpen : true);
+  const pressed = !notifyList && !viewAll && !dayFilter && statusFilter === status && (status === "all" ? !archiveOpen : true);
   return `<button type="button" data-action="filter" data-status="${status}" aria-pressed="${pressed}">${esc(label)} ${count}</button>`;
 }
 
@@ -1993,20 +2033,22 @@ function listTitle() {
 }
 
 function peopleView() {
-  const scheduled = showingScheduled();
-  const temporary = showingTemporary();
-  const youthLists = showingYouthLists();
-  const assignments = showingAssignments();
-  const people = scheduled || temporary || youthLists || assignments ? [] : filteredPeople();
-  const title = scheduled ? (archiveOpen ? "Archive" : "Scheduled") : temporary ? (archiveOpen ? "Archive" : formatMonth(viewedMonth())) : assignments ? "Assignments" : youthLists ? youthListTitle() : listTitle();
-  const helpCount = page === "youth" && dayFilter ? youthHelpForDay(dayFilter).length : 0;
-  const dayCount = !scheduled && !temporary && !youthLists && !assignments && dayFilter ? temporaryVisitsOn(dayFilter).length : 0;
-  const noticeCount = !scheduled && !temporary && !youthLists && !assignments && dayFilter ? noticesOn(dayFilter).length : 0;
-  const total = (scheduled ? scheduledRows().length : temporary ? temporaryRows().length : assignments ? visibleAssignments().length : youthLists ? youthVisibleEntries().length : people.length) + helpCount + dayCount + noticeCount;
-  const showDetail = !scheduled && !temporary && (!state.rosterMode || Boolean(selectedPersonId));
-  const onlyDayVisits = !scheduled && !temporary && !youthLists && !assignments && people.length === 0 && dayCount > 0 && noticeCount === 0;
-  const onlyNotices = !scheduled && !temporary && !youthLists && !assignments && people.length === 0 && dayCount === 0 && noticeCount > 0;
-  const noun = onlyNotices
+  const reminding = page !== "youth" && notifyList && !dayFilter;
+  const scheduled = !reminding && showingScheduled();
+  const temporary = !reminding && showingTemporary();
+  const youthLists = !reminding && showingYouthLists();
+  const assignments = !reminding && showingAssignments();
+  const people = reminding || scheduled || temporary || youthLists || assignments ? [] : filteredPeople();
+  const title = reminding ? "Notify" : scheduled ? (archiveOpen ? "Archive" : "Scheduled") : temporary ? (archiveOpen ? "Archive" : formatMonth(viewedMonth())) : assignments ? "Assignments" : youthLists ? youthListTitle() : listTitle();
+  const helpCount = !reminding && page === "youth" && dayFilter ? youthHelpForDay(dayFilter).length : 0;
+  const dayCount = !reminding && !scheduled && !temporary && !youthLists && !assignments && dayFilter ? temporaryVisitsOn(dayFilter).length : 0;
+  const noticeCount = !reminding && !scheduled && !temporary && !youthLists && !assignments && dayFilter ? noticesOn(dayFilter).length : 0;
+  const reminderCount = reminding ? visibleReminders().length : 0;
+  const total = reminderCount + (scheduled ? scheduledRows().length : temporary ? temporaryRows().length : assignments ? visibleAssignments().length : youthLists ? youthVisibleEntries().length : people.length) + helpCount + dayCount + noticeCount;
+  const showDetail = !reminding && !scheduled && !temporary && (!state.rosterMode || Boolean(selectedPersonId));
+  const onlyDayVisits = !reminding && !scheduled && !temporary && !youthLists && !assignments && people.length === 0 && dayCount > 0 && noticeCount === 0;
+  const onlyNotices = !reminding && !scheduled && !temporary && !youthLists && !assignments && people.length === 0 && dayCount === 0 && noticeCount > 0;
+  const noun = reminding || onlyNotices
     ? (total === 1 ? "family to notify" : "families to notify")
     : onlyDayVisits || scheduled
     ? (total === 1 ? "appointment" : "appointments")
@@ -2015,7 +2057,7 @@ function peopleView() {
     : assignments
     ? (total === 1 ? "assignment" : "assignments")
     : page === "youth" ? (total === 1 ? "person" : "people") : (total === 1 ? "brother" : "brothers");
-  const markup = scheduled ? scheduledListMarkup() : temporary ? temporaryListMarkup() : youthLists ? youthListMarkup() : assignments ? assignmentListMarkup() : personButtons(people);
+  const markup = reminding ? notifyListMarkup() : scheduled ? scheduledListMarkup() : temporary ? temporaryListMarkup() : youthLists ? youthListMarkup() : assignments ? assignmentListMarkup() : personButtons(people);
   return `<section class="layout${showDetail ? "" : " layout-single"}">
     <div class="card" id="people-card">
       <div class="row">
@@ -2099,7 +2141,7 @@ function temporaryCard(visit) {
       </form>
       ${visit.meeting ? `<p class="muted">${esc(visit.meeting)}</p>` : ""}`;
   const check = !finished && visit.meetingDate
-    ? `<div class="temporary-done">${temporaryReminder(visit)}<button type="button" class="mark-visited" data-action="complete-temporary" data-id="${esc(visit.id)}" aria-label="Confirm visit">✓</button></div>`
+    ? `<div class="temporary-done">${visit.notified ? `<p class="notified">Notified</p>` : ""}<button type="button" class="mark-visited" data-action="complete-temporary" data-id="${esc(visit.id)}" aria-label="Confirm visit">✓</button></div>`
     : "";
   return `<section class="ministering-set" data-temporary="${esc(visit.id)}">
     <article class="role-card"><span class="role-kicker">Adult</span><strong>${esc(visit.adultName)}</strong></article>
@@ -2163,27 +2205,82 @@ function noticesOn(iso) {
   return state?.notifyMarks?.[iso] || [];
 }
 
-function localToday() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+function pendingReminders() {
+  const seen = new Set();
+  const rows = [];
+  for (const list of Object.values(state?.notifyMarks || {})) {
+    for (const row of list || []) {
+      if (row.notified) continue;
+      const key = `${row.kind}|${row.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rows.push(row);
+    }
+  }
+  return rows.sort((a, b) => String(a.visitDate).localeCompare(String(b.visitDate)) || String(a.family).localeCompare(String(b.family), "en", { sensitivity: "base" }));
 }
 
-function daysUntil(iso) {
-  const match = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) return null;
-  const today = localToday().match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  const target = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-  const start = Date.UTC(Number(today[1]), Number(today[2]) - 1, Number(today[3]));
-  return Math.round((target - start) / 86400000);
+function visibleReminders() {
+  const needle = search.trim().toLowerCase();
+  return pendingReminders().filter((row) => !needle || `${row.family} ${row.who} ${row.adultName || ""} ${row.companion || ""} ${row.visitLabel || ""}`.toLowerCase().includes(needle));
 }
 
 function notifyDayMarkup(iso) {
-  const rows = noticesOn(iso);
+  const rows = noticesOn(iso).filter((row) => !row.notified);
   if (!rows.length) return "";
-  return `<section class="notify-day">${rows.map((row) => `<button type="button" class="notify-row" data-action="open-notify" data-kind="${esc(row.kind)}" data-id="${esc(row.id)}">
-    <strong>${esc(row.family)}</strong>
-    <small>${esc([row.who, row.visitLabel].filter(Boolean).join(" · "))}</small>
-  </button>`).join("")}</section>`;
+  return `<section class="notify-day">${rows.map((row) => notifyCard(row)).join("")}</section>`;
+}
+
+function notifyListMarkup() {
+  const rows = visibleReminders();
+  if (!rows.length) return `<p class="empty">${search.trim() ? "No families match this search." : "No families to notify."}</p>`;
+  return `<section class="notify-day">${rows.map((row) => notifyCard(row)).join("")}</section>`;
+}
+
+function noticeBrother(row) {
+  if (!row) return null;
+  if (row.kind === "temporary") return personByName(row.adultName) || personByName(String(row.who || "").split(" · ")[0]);
+  if (row.kind === "visit") {
+    const visit = (state?.visits || []).find((item) => item.id === row.id);
+    return (state?.people || []).find((item) => item.id === visit?.personId) || null;
+  }
+  const person = (state?.people || []).find((item) => item.id === row.id);
+  if (row.kind === "youth-visit" && person?.assigned?.length) {
+    const adult = personByName(person.assigned[0]);
+    if (adult) return adult;
+  }
+  return person || null;
+}
+
+function notifyCard(row) {
+  const brother = noticeBrother(row);
+  const adultName = row.kind === "temporary" ? (row.adultName || nameKey(brother) || "") : (nameKey(brother) || row.family || "");
+  const youth = row.kind === "temporary" || row.kind === "youth-visit";
+  const companion = row.kind === "temporary" ? (row.companion || "") : directoryCompanionNames(adultName).join(" and ");
+  const script = reminderMessage({
+    name: brotherGivenName(adultName),
+    kind: youth ? "Youth Ministry" : "Ministering Visit",
+    when: row.visitLabel || "",
+    household: row.kind === "temporary" ? row.family : directoryHouseholdFor(adultName),
+    individual: row.kind === "temporary" ? "" : adultName,
+    companion,
+  });
+  const phone = String(brother?.phone || "").trim();
+  const email = String(brother?.email || "").trim();
+  const textHref = phone ? `sms:${phone}?&body=${encodeURIComponent(script)}` : "";
+  const line = [row.who, row.visitLabel].filter(Boolean).join(" · ");
+  return `<article class="notify-row">
+    <span class="notify-copy">
+      <strong>${esc(row.family)}</strong>
+      ${line ? `<small>${esc(line)}</small>` : ""}
+    </span>
+    <span class="notify-actions">
+      <a class="tiny" data-reminder="email" target="_blank" rel="noopener" href="${esc(gmailHref(email, script))}">Email</a>
+      <a class="tiny" data-reminder="call" href="${phone ? esc(`tel:${phone}`) : "#"}">Call</a>
+      <a class="tiny" data-reminder="text" href="${textHref ? esc(textHref) : "#"}">Text</a>
+      <button type="button" class="mark-visited" data-action="confirm-notified" data-kind="${esc(row.kind)}" data-id="${esc(row.id)}" aria-label="Record that he was notified">✓</button>
+    </span>
+  </article>`;
 }
 
 function brotherGivenName(full) {
@@ -2207,11 +2304,6 @@ function personByName(name) {
   return matches.find((person) => !isYouthMember(person) && !isYouthVisit(person)) || matches[0] || null;
 }
 
-function visitStillAhead(iso) {
-  const days = daysUntil(iso);
-  return days !== null && days >= 0;
-}
-
 function gmailHref(email, script) {
   const params = new URLSearchParams({
     view: "cm",
@@ -2221,93 +2313,6 @@ function gmailHref(email, script) {
     body: script,
   });
   return `https://mail.google.com/mail/?${params.toString()}`;
-}
-
-function reminderBlock(options) {
-  const script = reminderMessage(options);
-  const phone = String(options.phone || "").trim();
-  const email = String(options.email || "").trim();
-  const textHref = phone ? `sms:${phone}?&body=${encodeURIComponent(script)}` : "";
-  return `<div class="reminder">
-    <p class="reminder-script">${esc(script)}</p>
-    <span class="reminder-actions">
-      <a class="tiny" data-reminder="email" target="_blank" rel="noopener" data-script="${esc(script)}" href="${esc(gmailHref(email, script))}">Email</a>
-      <a class="tiny" data-reminder="call" data-script="${esc(script)}" href="${phone ? esc(`tel:${phone}`) : ""}" ${phone ? "" : "hidden"}>Call</a>
-      <a class="tiny" data-reminder="text" data-script="${esc(script)}" href="${textHref ? esc(textHref) : ""}" ${phone ? "" : "hidden"}>Text</a>
-    </span>
-  </div>`;
-}
-
-function appointmentReminder(person) {
-  const key = person?.rosterStatusKey;
-  if (key !== "scheduled" && key !== "reschedule" && key !== "driveby") return "";
-  const when = person.appointment || "";
-  const iso = appointmentParts(when).date;
-  if (!visitStillAhead(iso)) return "";
-  const name = nameKey(person);
-  return reminderBlock({
-    name: brotherGivenName(name),
-    kind: "Ministering Visit",
-    when,
-    household: directoryHouseholdFor(name),
-    individual: name,
-    companion: directoryCompanionNames(name).join(" and "),
-    phone: person.phone,
-    email: person.email,
-  });
-}
-
-function youthVisitReminder(family) {
-  const when = family.sheetColumns?.["Visit Date"] || "";
-  const iso = meetingParts(when).date;
-  if (!visitStillAhead(iso)) return "";
-  const name = nameKey(family);
-  const assigned = family.assigned || [];
-  return reminderBlock({
-    name: brotherGivenName(name),
-    kind: "Youth Ministry",
-    when,
-    household: directoryHouseholdFor(name),
-    individual: name,
-    companion: assigned.slice(1).filter(Boolean).join(" and ") || assigned[0] || "",
-    phone: family.phone,
-    email: family.email,
-  });
-}
-
-function temporaryReminder(row, person) {
-  if (!row?.meetingDate || row.done || !visitStillAhead(row.meetingDate)) return "";
-  const adult = person || personByName(row.adultName);
-  return reminderBlock({
-    name: brotherGivenName(row.adultName || nameKey(adult)),
-    kind: "Youth Ministry",
-    when: row.meeting || row.meetingDate,
-    household: row.familyName,
-    individual: "",
-    companion: row.youthName,
-    phone: adult?.phone || "",
-    email: adult?.email || "",
-  });
-}
-
-function openNotify(kind, id) {
-  let person = null;
-  if (kind === "temporary") {
-    const visit = (state?.temporaryVisits || []).find((row) => row.id === id);
-    person = visit ? personByName(visit.adultName) : null;
-  } else if (kind === "visit") {
-    const visit = (state?.visits || []).find((row) => row.id === id);
-    person = visit ? (state?.people || []).find((item) => item.id === visit.personId) : null;
-  } else {
-    person = (state?.people || []).find((item) => item.id === id);
-  }
-  if (!person) return;
-  page = rosterPageFor(person);
-  selectedPersonId = person.id;
-  view = "people";
-  detailForm = null;
-  render();
-  requestAnimationFrame(() => document.querySelector(".layout .card:last-child")?.scrollIntoView({ block: "nearest" }));
 }
 
 function visitConflicts(row) {
@@ -3537,7 +3542,7 @@ function temporaryDutyBlock(person) {
   if (!rows.length) return "";
   return `<h3>With youth</h3>${rows.map((row) => `<div class="scheduled-stop">
     <p class="plan-line"><strong>${esc(row.familyName)}</strong> ${esc(row.meeting || "")}${row.youthName ? ` with ${esc(row.youthName)}` : ""}${visitConflicts(row) ? " · Conflict" : ""}</p>
-    ${temporaryReminder(row, person)}
+    ${row.notified ? `<p class="notified">Notified</p>` : ""}
     ${row.meetingDate ? `<button type="button" class="mark-visited" data-action="complete-temporary" data-id="${esc(row.id)}" aria-label="Confirm visit">✓</button>` : ""}
   </div>`).join("")}`;
 }
@@ -3683,7 +3688,7 @@ function youthAssignmentVisit(family) {
     <input data-assignment-id="${esc(family.id)}" value="${esc(nameKey(family))}" aria-label="Assignment">
     <button type="button" class="name-link" data-action="open-name" data-name="${esc(nameKey(family))}" data-person="${esc(family.id)}">${esc(nameKey(family))}</button>
     <label class="responded"><input type="checkbox" data-response-id="${esc(family.id)}" ${responded ? "checked" : ""}> Responded</label>
-    ${visit ? `<p class="plan-line"><strong>Visit</strong> ${esc(visit)}</p>${youthVisitReminder(family)}` : ""}
+    ${visit ? `<p class="plan-line"><strong>Visit</strong> ${esc(visit)}</p>${family.sheetColumns?.["Visit Notified"] === "Yes" ? `<p class="notified">Notified</p>` : ""}` : ""}
     <form class="appointment-row" data-form="assignment-visit" data-id="${esc(family.id)}">
       <input name="date" type="date" aria-label="Visit date" required value="${esc(parts.date)}">
       <input name="time" type="time" aria-label="Visit time" required value="${esc(parts.time)}">
@@ -3764,12 +3769,12 @@ function placeChoice(place) {
 function planLine(person) {
   const key = person.rosterStatusKey;
   const where = placeMark(person.appointmentPlace);
-  const notice = appointmentReminder(person);
+  const told = person.sheetColumns?.["Apt Notified"] === "Yes" ? `<p class="notified">Notified</p>` : "";
   if (key === "reach_out" && person.reachOutDate) return `<p><strong>Reach out</strong> ${esc(person.reachOutDate)}</p>`;
-  if (key === "scheduled" && person.appointment) return `<p class="plan-line"><strong>Scheduled Appt</strong> ${esc(person.appointment)}${where}</p>${notice}`;
-  if (key === "reschedule" && person.appointment) return `<p class="plan-line"><strong>Re-Schedule</strong> ${esc(person.appointment)}${where}</p>${notice}`;
-  if (key === "driveby" && person.appointment) return `<p class="plan-line"><strong>Drive by</strong> ${esc(person.appointment)}${where}</p>${notice}`;
-  if (person.appointment) return `<p class="plan-line"><strong>Scheduled Appt</strong> ${esc(person.appointment)}${where}</p>${notice}`;
+  if (key === "scheduled" && person.appointment) return `<p class="plan-line"><strong>Scheduled Appt</strong> ${esc(person.appointment)}${where}</p>${told}`;
+  if (key === "reschedule" && person.appointment) return `<p class="plan-line"><strong>Re-Schedule</strong> ${esc(person.appointment)}${where}</p>${told}`;
+  if (key === "driveby" && person.appointment) return `<p class="plan-line"><strong>Drive by</strong> ${esc(person.appointment)}${where}</p>${told}`;
+  if (person.appointment) return `<p class="plan-line"><strong>Scheduled Appt</strong> ${esc(person.appointment)}${where}</p>${told}`;
   if (person.reachOutDate) return `<p><strong>Reach out</strong> ${esc(person.reachOutDate)}</p>`;
   return "";
 }
