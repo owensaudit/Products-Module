@@ -2693,7 +2693,7 @@ function directoryPersonCard(entry) {
     </form>
     <form class="contact-fields" data-form="directory-contact" data-id="${esc(record.id)}">
       <label class="wide">Address
-        <textarea name="address" rows="3" aria-label="Address">${esc(address)}</textarea>
+        <textarea name="address" rows="2" aria-label="Address">${esc(address)}</textarea>
         <span class="contact-actions">${addressPill(address)}</span>
       </label>
       <div>
@@ -2821,7 +2821,7 @@ function directoryAddForm() {
       </div>
       <div class="contact-fields">
         <label class="wide">Address
-          <textarea name="address" rows="3" aria-label="Address"></textarea>
+          <textarea name="address" rows="2" aria-label="Address"></textarea>
           <span class="contact-actions"><a class="tiny address-pill" href="#" target="_blank" rel="noopener noreferrer" hidden>Map</a></span>
         </label>
         <div>
@@ -3594,7 +3594,7 @@ function specialNotes(person) {
 function addressField(person) {
   const address = String(person.sheetColumns?.Address || "").trim();
   return `<label class="wide">Address
-      <textarea name="address" rows="3">${esc(address)}</textarea>
+      <textarea name="address" rows="2">${esc(address)}</textarea>
       <span class="contact-actions">${addressPill(address)}</span>
     </label>`;
 }
