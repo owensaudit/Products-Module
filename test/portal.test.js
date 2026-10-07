@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -40,7 +41,7 @@ import { brotherSheetToState, calendarMarks, canonicalRosterStatus, isArchiveSta
 import { emailAllowed, parseAllowlist } from "../lib/allowlist.js";
 import { createStore } from "../lib/store.js";
 import { PortalError } from "../lib/model.js";
-import { createPortalServer } from "../server.js";
+import { createPortalHandler, createPortalServer } from "../server.js";
 
 function deps() {
   let n = 0;
@@ -1257,4 +1258,92 @@ test("the shared portal requires an invited Google account", async () => {
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
+});
+
+function scheduledPerson() {
+  return {
+    id: "per_1",
+    displayName: "Ada Example",
+    phone: "",
+    email: "",
+    household: "",
+    notes: "",
+    sheetColumns: { Status: "Scheduled" },
+    createdAt: "2026-09-29T12:00:00.000Z",
+    updatedAt: "2026-09-29T12:00:00.000Z",
+  };
+}
+
+function mockResponse() {
+  return {
+    headersSent: false,
+    statusCode: 0,
+    body: "",
+    writeHead(status) {
+      this.statusCode = status;
+      this.headersSent = true;
+    },
+    end(payload = "") {
+      this.body = payload;
+      this.headersSent = true;
+    },
+  };
+}
+
+test("a scheduled check marks visited when the body arrives during sign-in", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "portal-check-"));
+  const store = createStore(path.join(directory, "portal.json"));
+  await store.write({ ...emptyState(), people: [scheduledPerson()] });
+  const request = new EventEmitter();
+  request.method = "POST";
+  request.url = "/api/people/per_1/status";
+  request.headers = { authorization: "Bearer allowed" };
+  request.destroy = () => {};
+  const handler = createPortalHandler(store, {
+    requireAuth: true,
+    allow: parseAllowlist("leader@example.com"),
+    authenticate() {
+      request.emit("data", Buffer.from(JSON.stringify({ status: "Visited" })));
+      request.emit("end");
+      return "leader@example.com";
+    },
+  });
+  const response = mockResponse();
+  await Promise.race([
+    handler(request, response),
+    new Promise((_, reject) => setTimeout(() => reject(new Error("status update hung")), 1000)),
+  ]);
+  assert.equal(response.statusCode, 200);
+  const payload = JSON.parse(response.body);
+  assert.equal(payload.people[0].rosterStatusKey, "visited");
+  assert.equal(payload.people[0].rosterStatus, "Visited");
+  const saved = await store.read();
+  assert.equal(saved.people[0].sheetColumns.Status, "Visited");
+});
+
+test("a scheduled check still marks visited when the platform already read the body", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "portal-check-raw-"));
+  const store = createStore(path.join(directory, "portal.json"));
+  await store.write({ ...emptyState(), people: [scheduledPerson()] });
+  const request = new EventEmitter();
+  request.method = "POST";
+  request.url = "/api/people/per_1/status";
+  request.headers = { authorization: "Bearer allowed", "content-length": "20" };
+  request.readableEnded = true;
+  request.rawBody = Buffer.from(JSON.stringify({ status: "Visited" }));
+  request.destroy = () => {};
+  const handler = createPortalHandler(store, {
+    requireAuth: true,
+    allow: parseAllowlist("leader@example.com"),
+    authenticate() {
+      return "leader@example.com";
+    },
+  });
+  const response = mockResponse();
+  await Promise.race([
+    handler(request, response),
+    new Promise((_, reject) => setTimeout(() => reject(new Error("status update hung")), 1000)),
+  ]);
+  assert.equal(response.statusCode, 200);
+  assert.equal(JSON.parse(response.body).people[0].rosterStatusKey, "visited");
 });

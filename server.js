@@ -57,32 +57,75 @@ function sendJson(response, status, body) {
   response.end(JSON.stringify(body));
 }
 
+function parseJsonBody(text) {
+  if (!text) return {};
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new PortalError("Request body must be JSON");
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new PortalError("Request body must be JSON");
+  }
+  return parsed;
+}
+
+function bufferedBody(request) {
+  const parsed = request.body;
+  const hasParsed = Boolean(parsed) && typeof parsed === "object" && !Buffer.isBuffer(parsed) && !Array.isArray(parsed);
+  const raw = request.rawBody;
+  const hasRaw = typeof raw === "string" || Buffer.isBuffer(raw);
+  if (!hasParsed && !hasRaw) return undefined;
+  if (!request.readableEnded && !hasRaw) return undefined;
+  if (hasParsed) return parsed;
+  return parseJsonBody(Buffer.isBuffer(raw) ? raw.toString("utf8") : String(raw));
+}
+
 function readBody(request) {
+  try {
+    const ready = bufferedBody(request);
+    if (ready !== undefined) return Promise.resolve(ready);
+  } catch (error) {
+    return Promise.reject(error);
+  }
+  if (request.readableEnded) {
+    const length = Number(request.headers?.["content-length"] || 0);
+    if (length > 0) return Promise.reject(new PortalError("Request body was not received", 400));
+    return Promise.resolve({});
+  }
   return new Promise((resolve, reject) => {
     const chunks = [];
     let size = 0;
+    let settled = false;
+    const finish = (error, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (error) reject(error);
+      else resolve(value);
+    };
+    const timer = setTimeout(() => {
+      finish(new PortalError("Request body was not received", 408));
+      request.destroy?.();
+    }, 15000);
     request.on("data", (chunk) => {
       size += chunk.length;
       if (size > 2_000_000) {
-        reject(new PortalError("Upload is too large", 413));
-        request.destroy();
+        finish(new PortalError("Upload is too large", 413));
+        request.destroy?.();
         return;
       }
       chunks.push(chunk);
     });
     request.on("end", () => {
-      const text = Buffer.concat(chunks).toString("utf8");
-      if (!text) {
-        resolve({});
-        return;
-      }
       try {
-        resolve(JSON.parse(text));
-      } catch {
-        reject(new PortalError("Request body must be JSON"));
+        finish(null, parseJsonBody(Buffer.concat(chunks).toString("utf8")));
+      } catch (error) {
+        finish(error);
       }
     });
-    request.on("error", reject);
+    request.on("error", (error) => finish(error));
   });
 }
 
@@ -125,11 +168,17 @@ async function verifyGoogleToken(request) {
   }
 }
 
-export function createPortalServer(store, options = {}) {
+export function createPortalHandler(store, options = {}) {
   const authRequired = options.requireAuth === true || process.env.REQUIRE_AUTH === "1";
   const allow = options.allow || parseAllowlist(process.env.ALLOWED_EMAILS);
   const authenticate = options.authenticate || verifyGoogleToken;
-  return http.createServer(async (request, response) => {
+  return async function portalHandler(request, response) {
+    const expectsBody = request.method === "POST" || request.method === "PUT" || request.method === "PATCH";
+    let bodyError = null;
+    const bodyPromise = (expectsBody ? readBody(request) : Promise.resolve({})).catch((error) => {
+      bodyError = error;
+      return null;
+    });
     try {
       const url = new URL(request.url || "/", "http://127.0.0.1");
       const { pathname } = url;
@@ -178,7 +227,8 @@ export function createPortalServer(store, options = {}) {
       }
 
       if (request.method === "POST") {
-        const body = await readBody(request);
+        const body = await bodyPromise;
+        if (bodyError) throw bodyError;
         const month = body.month || currentMonth();
         const viewOptions = { includePrivate: body.includePrivate === true };
 
@@ -385,7 +435,11 @@ export function createPortalServer(store, options = {}) {
       console.error(error instanceof Error ? error.message : "Request failed");
       sendJson(response, 500, { error: "Something went wrong" });
     }
-  });
+  };
+}
+
+export function createPortalServer(store, options = {}) {
+  return http.createServer(createPortalHandler(store, options));
 }
 
 const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
