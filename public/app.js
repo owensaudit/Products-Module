@@ -2550,13 +2550,18 @@ function directoryMissingHousehold(entry) {
   return !directorySharesHousehold(entry);
 }
 
+function directoryLastName(entry) {
+  const name = String(entry?.name || "").trim();
+  const comma = name.indexOf(",");
+  return (comma === -1 ? name : name.slice(0, comma)).trim().toLowerCase();
+}
+
 function directoryEntryVisible(entry, needle) {
   if (directoryFilter === "companion" && !directoryMissingCompanion(entry)) return false;
   if (directoryFilter === "household" && !directoryMissingHousehold(entry)) return false;
   if (directoryFilter === "youth" && !directoryWantsYouth(entry.record, entry.member)) return false;
   if (!needle) return true;
-  const haystack = [entry.name, entry.household, entry.record.address, entry.record.phone, entry.record.email, pairedCompanionName(entry.name)].join(" ").toLowerCase();
-  return haystack.includes(needle);
+  return directoryLastName(entry).includes(needle);
 }
 
 function directoryVisibleEntries() {
@@ -2770,7 +2775,7 @@ function directoryView() {
       </div>
       ${directorySummary()}
       <p class="muted" id="directory-count">${rows.length} ${noun}</p>
-      <input id="search" class="search" type="search" placeholder="Search the directory" value="${esc(search)}" aria-label="Search the directory">
+      <input id="search" class="search" type="search" placeholder="Search by last name" value="${esc(search)}" aria-label="Search by last name">
       <div id="person-list" class="person-list directory-list">${directoryListMarkup(rows)}</div>
     </div>
     <div class="card">${directoryDetail()}</div>
