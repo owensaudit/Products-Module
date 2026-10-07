@@ -2038,7 +2038,7 @@ function temporaryAddForm() {
     </div>
     <div class="assign-row">
       <span>Family</span>
-      <select name="family" required aria-label="Family"><option value="">—</option>${youthDayHouseOptions("")}</select>
+      <select name="family" required aria-label="Family"><option value="">—</option>${youthRequestHouseholdOptions("")}</select>
     </div>
     <button class="primary" type="submit">Add visit</button>
   </form>`;
@@ -2063,7 +2063,7 @@ function temporaryCard(visit) {
     <article class="role-card"><span class="role-kicker">Temporary companion</span><strong>${esc(visit.youthName)}</strong></article>
     ${visit.familyDirectoryId
       ? `<article class="role-card"><span class="role-kicker">Family</span><strong>${esc(visit.familyName)}</strong></article>`
-      : `<form class="assign-row" data-form="temporary-family" data-id="${esc(visit.id)}"><span>Family</span><select name="family" aria-label="Family"><option value="">—</option>${youthDayHouseOptions("")}</select></form>`}
+      : `<form class="assign-row" data-form="temporary-family" data-id="${esc(visit.id)}"><span>Family</span><select name="family" aria-label="Family"><option value="">—</option>${youthRequestHouseholdOptions(visit.familyDirectoryId || "")}</select></form>`}
     ${meeting}
     ${check}
   </section>`;
@@ -2718,8 +2718,9 @@ function directoryPersonCard(entry) {
     ${directoryTemporaryYouth(entry)}
     <form class="assign-row" data-form="directory-visit" data-id="${esc(record.id)}" data-member="${esc(entry.member)}">
       <span>Temporary household</span>
-      <select name="visit" aria-label="Temporary household"><option value="">—</option>${directoryHouseholdOptions("")}</select>
+      <select name="visit" aria-label="Temporary household"><option value="">—</option>${youthRequestHouseholdOptions("")}</select>
     </form>
+    ${youthRequestHouseholdOptions("") ? "" : `<p class="muted">No one has asked for a youth visit yet.</p>`}
     ${temporaryHouseholdLine}
     ${visitLine}
     ${directoryYouthSection(entry)}
@@ -2774,16 +2775,12 @@ function youthNameOptions(selected) {
   return ["", ...names].map((name) => `<option value="${esc(name)}" ${name === selected ? "selected" : ""}>${esc(name || "—")}</option>`).join("");
 }
 
-function youthDayHouseOptions(excludeId) {
+function youthRequestHouseholdOptions(selectedId = "") {
   return (state?.directory || [])
-    .filter((row) => row.id !== excludeId)
-    .map((row) => ({
-      id: row.id,
-      name: row.name,
-      marked: (row.members || []).some((member) => directoryWantsYouth(row, member)),
-    }))
-    .sort((a, b) => Number(b.marked) - Number(a.marked) || String(a.name).localeCompare(String(b.name), "en", { sensitivity: "base" }))
-    .map((row) => `<option value="${esc(row.id)}">${esc(row.name)}${row.marked ? " · youth visit" : ""}</option>`)
+    .filter((row) => (row.members || []).some((member) => directoryWantsYouth(row, member)) || (selectedId && row.id === selectedId))
+    .slice()
+    .sort((a, b) => String(a.name).localeCompare(String(b.name), "en", { sensitivity: "base" }))
+    .map((row) => `<option value="${esc(row.id)}" ${row.id === selectedId ? "selected" : ""}>${esc(row.name)}</option>`)
     .join("");
 }
 

@@ -1476,6 +1476,7 @@ test("a temporary youth visit is monthly and leaves the standing companion alone
       email: "",
       memberCompanions: {},
       memberVisits: {},
+      memberYouthHome: { cam: true },
     }],
     people: [{
       id: "per_visit",
@@ -1570,6 +1571,7 @@ test("a temporary youth companion sits beside the standing companion", () => {
       email: "",
       memberCompanions: {},
       memberVisits: {},
+      memberYouthHome: { cam: true },
     }],
   };
   state = setTemporaryCompanion(state, {
@@ -1632,6 +1634,7 @@ test("a temporary household can be removed without touching the standing assignm
       email: "",
       memberCompanions: {},
       memberVisits: {},
+      memberYouthHome: { cam: true },
     }, {
       id: "dir_keep",
       name: "Standing house",
@@ -1652,6 +1655,14 @@ test("a temporary household can be removed without touching the standing assignm
       memberVisits: {},
     }],
   };
+  assert.throws(() => assignTemporaryHousehold(state, {
+    adultDirectoryId: "dir_home",
+    adultMember: "Ben",
+    householdId: "dir_keep",
+    month: "2026-10",
+  }), /not asked for a youth visit/);
+  assert.equal(state.temporaryVisits.length, 0);
+  assert.equal(state.directory[0].memberCompanions.ben, "Keeper, Anthony");
   state = assignTemporaryHousehold(state, {
     adultDirectoryId: "dir_home",
     adultMember: "Ben",
