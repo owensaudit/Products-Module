@@ -226,10 +226,11 @@ app.addEventListener("change", (event) => {
   if (target instanceof HTMLSelectElement && target.form?.dataset.form === "directory-visit") {
     const householdId = target.value;
     if (!householdId) return;
-    post("/api/directory/visits", {
-      directoryId: target.form.dataset.id,
-      member: target.form.dataset.member,
+    post("/api/youth/temporary/household", {
+      adultDirectoryId: target.form.dataset.id,
+      adultMember: target.form.dataset.member,
       householdId,
+      month: currentMonth(),
     }).then((next) => {
       state = next;
       render();
@@ -518,6 +519,21 @@ app.addEventListener("click", (event) => {
     directoryAdding = true;
     directoryFocus = null;
     render();
+  } else if (action === "remove-directory-visit") {
+    post("/api/directory/visits/remove", {
+      directoryId: button.dataset.id,
+      member: button.dataset.member,
+      householdId: button.dataset.household,
+      label: button.dataset.label,
+    }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
+  } else if (action === "remove-temporary-household") {
+    post("/api/youth/temporary/household/remove", { id: button.dataset.id }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
   } else if (action === "remove-temporary-youth") {
     post("/api/youth/temporary/companion", {
       adultDirectoryId: button.dataset.id,
@@ -2446,11 +2462,30 @@ function pairedCompanionName(fullName) {
   return directoryCompanionNames(fullName)[0] || "";
 }
 
-function directoryAssignedVisits(entry) {
-  const key = String(entry?.member || "").trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ");
+function directorySavedVisits(entry) {
+  const key = directoryMemberKey(entry?.member);
   const saved = entry?.record?.memberVisits?.[key];
-  if (!Array.isArray(saved)) return [];
-  return saved.map((item) => String(item?.label || "").trim()).filter(Boolean);
+  return Array.isArray(saved) ? saved : [];
+}
+
+function directoryAssignedVisits(entry) {
+  return directorySavedVisits(entry).map((item) => String(item?.label || "").trim()).filter(Boolean);
+}
+
+function directoryVisitLine(entry) {
+  const saved = directorySavedVisits(entry);
+  const extra = directoryVisitNames(entry.name).filter((name) => !saved.some((item) => directoryNameMatches(item.label, name)));
+  const savedRows = saved.map((item) => `<div class="companion-row"><button type="button" class="name-link" data-action="open-name" data-name="${esc(item.label)}" data-directory="${esc(entry.directoryId)}" data-member="${esc(entry.member)}">${esc(item.label)}</button><button type="button" class="tiny" data-action="remove-directory-visit" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}" data-household="${esc(item.directoryId || "")}" data-label="${esc(item.label || "")}">Remove</button></div>`).join("");
+  const extraRows = extra.length ? directoryNameLinks(extra, entry) : "";
+  if (!savedRows && !extraRows) return "";
+  return `<div class="companion-saved"><span>Visiting</span>${savedRows}${extraRows}</div>`;
+}
+
+function temporaryHouseholdLineFor(entry) {
+  const month = currentMonth();
+  const rows = (state?.temporaryVisits || []).filter((row) => !row.done && row.month === month && row.adultDirectoryId === entry.directoryId && row.adultMember === entry.member && row.familyName);
+  if (!rows.length) return "";
+  return `<div class="companion-saved"><span>Temporary household</span>${rows.map((row) => `<div class="companion-row"><span class="name-link">${esc(row.familyName)}</span><button type="button" class="tiny" data-action="remove-temporary-household" data-id="${esc(row.id)}">Remove</button></div>`).join("")}</div>`;
 }
 
 function directoryVisitHomes(fullName) {
@@ -2647,12 +2682,8 @@ function directoryPersonCard(entry) {
   const companions = savedCompanionNames(entry);
   const companion = companions.length === 1 ? companions[0] : "";
   const companionLinks = companions.length ? `<div class="companion-saved"><span>Companion</span>${companions.map((name) => `<div class="companion-row"><button type="button" class="name-link" data-action="open-name" data-name="${esc(name)}" data-directory="${esc(record.id)}" data-member="${esc(entry.member)}">${esc(name)}</button><button type="button" class="tiny" data-action="remove-companion" data-id="${esc(record.id)}" data-member="${esc(entry.member)}" data-name="${esc(name)}">Remove</button></div>`).join("")}</div>` : "";
-  const assignedVisits = directoryAssignedVisits(entry);
-  const visits = [...assignedVisits];
-  for (const name of directoryVisitNames(entry.name)) {
-    if (!visits.some((item) => directoryNameMatches(item, name))) visits.push(name);
-  }
-  const visitLine = visits.length ? `<p class="name-links"><span>Visiting</span>${directoryNameLinks(visits, entry)}</p>` : "";
+  const visitLine = directoryVisitLine(entry);
+  const temporaryHouseholdLine = temporaryHouseholdLineFor(entry);
   const status = directoryStatusPills(entry.name);
   return `${cardBackButton()}<h2>${esc(entry.name)}</h2>
     ${status ? `<p class="status-row">${status}</p>` : ""}
@@ -2686,9 +2717,10 @@ function directoryPersonCard(entry) {
     ${companionLinks}
     ${directoryTemporaryYouth(entry)}
     <form class="assign-row" data-form="directory-visit" data-id="${esc(record.id)}" data-member="${esc(entry.member)}">
-      <span>Household to visit</span>
-      <select name="visit" aria-label="Household to visit"><option value="">—</option>${directoryHouseholdOptions("")}</select>
+      <span>Temporary household</span>
+      <select name="visit" aria-label="Temporary household"><option value="">—</option>${directoryHouseholdOptions("")}</select>
     </form>
+    ${temporaryHouseholdLine}
     ${visitLine}
     ${directoryYouthSection(entry)}
     <button type="button" class="ghost" data-action="remove-directory-member" data-id="${esc(record.id)}" data-member="${esc(entry.member)}">Remove member</button>`;
