@@ -223,18 +223,13 @@ app.addEventListener("change", (event) => {
     }).catch(showError);
     return;
   }
-  if (target instanceof HTMLSelectElement && target.form?.dataset.form === "directory-visit") {
-    const householdId = target.value;
-    if (!householdId) return;
-    post("/api/youth/temporary/household", {
-      adultDirectoryId: target.form.dataset.id,
-      adultMember: target.form.dataset.member,
-      householdId,
-      month: currentMonth(),
-    }).then((next) => {
-      state = next;
-      render();
-    }).catch(showError);
+  if (target instanceof HTMLSelectElement && target.form?.dataset.form === "directory-temporary-schedule") {
+    const show = Boolean(target.value);
+    target.form.querySelectorAll("[data-follow]").forEach((field) => {
+      field.hidden = !show;
+      if ("required" in field) field.required = show;
+    });
+    if (show) target.form.querySelector("[name=date]")?.focus();
     return;
   }
   if (target instanceof HTMLSelectElement && target.form?.dataset.form === "directory-assign") {
@@ -655,6 +650,27 @@ app.addEventListener("submit", (event) => {
       youthName: data.get("youth"),
       familyDirectoryId: data.get("family"),
       month: viewedMonth(),
+    }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
+    return;
+  }
+  if (kind === "directory-temporary-schedule") {
+    const householdId = String(data.get("visit") || "");
+    const date = String(data.get("date") || "");
+    const time = String(data.get("time") || "");
+    if (!householdId || !date || !time) {
+      showError(new Error("Choose a household, a date, and a time"));
+      return;
+    }
+    post("/api/youth/temporary/household/schedule", {
+      adultDirectoryId: form.dataset.id,
+      adultMember: form.dataset.member,
+      householdId,
+      date,
+      time,
+      month: currentMonth(),
     }).then((next) => {
       state = next;
       render();
@@ -2579,19 +2595,18 @@ function directoryVisitLine(entry) {
   return `<div class="companion-saved"><span>Visiting</span>${savedRows}${extraRows}</div>`;
 }
 
-function temporaryHouseholdLineFor(entry) {
+function scheduledTemporaryHouseholds(entry) {
   const month = currentMonth();
-  const rows = (state?.temporaryVisits || []).filter((row) => !row.done && row.month === month && row.adultDirectoryId === entry.directoryId && row.adultMember === entry.member && row.familyName);
+  return (state?.temporaryVisits || []).filter((row) => !row.done && row.month === month && row.adultDirectoryId === entry.directoryId && row.adultMember === entry.member && row.familyDirectoryId);
+}
+
+function temporaryHouseholdLineFor(entry) {
+  const rows = scheduledTemporaryHouseholds(entry);
   if (!rows.length) return "";
-  return `<div class="companion-saved"><span>Temporary household</span>${rows.map((row) => `<div class="companion-row temporary-household">
+  return `<div class="companion-saved">${rows.map((row) => `<div class="companion-row">
     <span class="name-link">${esc(row.familyName)}</span>
-    <form class="assign-row temporary-meeting" data-form="temporary-meeting" data-id="${esc(row.id)}">
-      <input name="date" type="date" required aria-label="Visit date for ${esc(row.familyName)}" value="${esc(row.meetingDate || "")}">
-      <input name="time" type="time" required aria-label="Visit time for ${esc(row.familyName)}" value="${esc(row.meetingTime || "")}">
-      <button class="tiny primary" type="submit">Schedule</button>
-    </form>
+    ${row.meeting ? `<span class="muted">${esc(row.meeting)}</span>` : ""}
     <button type="button" class="tiny" data-action="remove-temporary-household" data-id="${esc(row.id)}">Remove</button>
-    ${row.meeting ? `<p class="muted">${esc(row.meeting)}</p>` : ""}
   </div>`).join("")}</div>`;
 }
 
@@ -2823,9 +2838,12 @@ function directoryPersonCard(entry) {
     </form>
     ${companionLinks}
     ${directoryTemporaryYouth(entry)}
-    <form class="assign-row" data-form="directory-visit" data-id="${esc(record.id)}" data-member="${esc(entry.member)}">
+    <form class="assign-row temporary-pick" data-form="directory-temporary-schedule" data-id="${esc(record.id)}" data-member="${esc(entry.member)}">
       <span>Temporary household</span>
-      <select name="visit" aria-label="Temporary household"><option value="">—</option>${youthRequestHouseholdOptions("")}</select>
+      <select name="visit" aria-label="Temporary household"><option value="">—</option>${youthRequestHouseholdOptions("", scheduledTemporaryHouseholds(entry).map((row) => row.familyDirectoryId))}</select>
+      <input name="date" type="date" data-follow hidden aria-label="Visit date">
+      <input name="time" type="time" data-follow hidden aria-label="Visit time">
+      <button class="tiny primary" type="submit" data-follow hidden>Schedule</button>
     </form>
     ${youthRequestHouseholdOptions("") ? "" : `<p class="muted">No one has asked for a youth visit yet.</p>`}
     ${temporaryHouseholdLine}
@@ -2882,8 +2900,10 @@ function youthNameOptions(selected) {
   return ["", ...names].map((name) => `<option value="${esc(name)}" ${name === selected ? "selected" : ""}>${esc(name || "—")}</option>`).join("");
 }
 
-function youthRequestHouseholdOptions(selectedId = "") {
+function youthRequestHouseholdOptions(selectedId = "", excludeIds = []) {
+  const skip = new Set(excludeIds);
   return (state?.directory || [])
+    .filter((row) => !skip.has(row.id))
     .filter((row) => (row.members || []).some((member) => directoryWantsYouth(row, member)) || (selectedId && row.id === selectedId))
     .slice()
     .sort((a, b) => String(a.name).localeCompare(String(b.name), "en", { sensitivity: "base" }))

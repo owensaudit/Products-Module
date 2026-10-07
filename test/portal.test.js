@@ -36,7 +36,7 @@ import {
   setVisitStatus,
   slotsForMonth,
 } from "../lib/model.js";
-import { addDirectoryMember, addDirectoryVisit, addTemporaryVisit, applyDirectory, applyMinisteringGroups, assignDirectoryHousehold, assignTemporaryHousehold, completeTemporaryVisit, directoryAddressKey, findDirectoryRecord, mergeDirectoryByAddress, moveDirectoryPerson, parseDirectory, removeDirectoryMember, removeDirectoryVisit, removeTemporaryHousehold, scheduleTemporaryVisit, setDirectoryCompanion, setTemporaryCompanion, setTemporaryFamily, setYouthDay, setYouthHome, updateDirectoryHousehold } from "../lib/directory.js";
+import { addDirectoryMember, addDirectoryVisit, addTemporaryVisit, applyDirectory, applyMinisteringGroups, assignDirectoryHousehold, assignTemporaryHousehold, completeTemporaryVisit, directoryAddressKey, findDirectoryRecord, mergeDirectoryByAddress, moveDirectoryPerson, parseDirectory, removeDirectoryMember, removeDirectoryVisit, removeTemporaryHousehold, scheduleDirectoryTemporaryVisit, scheduleTemporaryVisit, setDirectoryCompanion, setTemporaryCompanion, setTemporaryFamily, setYouthDay, setYouthHome, updateDirectoryHousehold } from "../lib/directory.js";
 import { brotherSheetToState, calendarMarks, canonicalRosterStatus, isArchiveStatus, rosterStatusKey } from "../lib/roster.js";
 import { emailAllowed, parseAllowlist } from "../lib/allowlist.js";
 import { createStore } from "../lib/store.js";
@@ -1612,6 +1612,72 @@ test("a household cannot be scheduled twice on the same day", () => {
   assert.equal(state.directory[0].memberCompanions.ben, "Keeper, Anthony");
   assert.deepEqual(state.directory[0].memberVisits.ben, [{ directoryId: "dir_keep", label: "Standing house" }]);
   assert.equal(state.directory[1].memberYouthHome.cam, true);
+});
+
+test("a directory household is scheduled once, then another can be scheduled", () => {
+  let state = {
+    ...emptyState(),
+    directory: [{
+      id: "dir_home",
+      name: "Sample, Ben",
+      members: ["Ben"],
+      address: "",
+      phone: "",
+      email: "",
+      memberCompanions: { ben: "Keeper, Anthony" },
+      memberVisits: { ben: [{ directoryId: "dir_keep", label: "Standing house" }] },
+    }, {
+      id: "dir_other",
+      name: "Other, Cam",
+      members: ["Cam"],
+      address: "",
+      phone: "",
+      email: "",
+      memberCompanions: {},
+      memberVisits: {},
+      memberYouthHome: { cam: true },
+    }, {
+      id: "dir_extra",
+      name: "Extra, Eve",
+      members: ["Eve"],
+      address: "",
+      phone: "",
+      email: "",
+      memberCompanions: {},
+      memberVisits: {},
+      memberYouthHome: { eve: true },
+    }],
+  };
+  state = setTemporaryCompanion(state, { adultDirectoryId: "dir_home", adultMember: "Ben", youthName: "Youth, Pat", month: "2026-10" });
+  state = scheduleDirectoryTemporaryVisit(state, {
+    adultDirectoryId: "dir_home",
+    adultMember: "Ben",
+    householdId: "dir_other",
+    date: "2026-10-14",
+    time: "19:00",
+    month: "2026-10",
+  });
+  state = scheduleDirectoryTemporaryVisit(state, {
+    adultDirectoryId: "dir_home",
+    adultMember: "Ben",
+    householdId: "dir_extra",
+    date: "2026-10-14",
+    time: "19:30",
+    month: "2026-10",
+  });
+  const booked = state.temporaryVisits.filter((row) => row.familyName && row.meetingDate);
+  assert.equal(booked.length, 2);
+  assert.deepEqual(booked.map((row) => row.meeting), ["10/14 7:00 PM", "10/14 7:30 PM"]);
+  assert.equal(state.directory[0].memberCompanions.ben, "Keeper, Anthony");
+  assert.deepEqual(state.directory[0].memberVisits.ben, [{ directoryId: "dir_keep", label: "Standing house" }]);
+  assert.throws(() => scheduleDirectoryTemporaryVisit(state, {
+    adultDirectoryId: "dir_home",
+    adultMember: "Ben",
+    householdId: "dir_other",
+    date: "2026-10-15",
+    time: "18:00",
+    month: "2026-10",
+  }), /already this month/);
 });
 
 test("a temporary youth companion sits beside the standing companion", () => {

@@ -29,7 +29,7 @@ import {
   setVisitStatus,
 } from "./lib/model.js";
 import { emailAllowed, parseAllowlist } from "./lib/allowlist.js";
-import { addDirectoryMember, addDirectoryVisit, addTemporaryVisit, applyDirectory, assignDirectoryHousehold, assignTemporaryHousehold, completeTemporaryVisit, moveDirectoryPerson, parseDirectory, removeDirectoryMember, removeDirectoryVisit, removeTemporaryHousehold, scheduleTemporaryVisit, setDirectoryCompanion, setTemporaryCompanion, setTemporaryFamily, setYouthDay, setYouthHome, updateDirectoryHousehold } from "./lib/directory.js";
+import { addDirectoryMember, addDirectoryVisit, addTemporaryVisit, applyDirectory, assignDirectoryHousehold, assignTemporaryHousehold, completeTemporaryVisit, moveDirectoryPerson, parseDirectory, removeDirectoryMember, removeDirectoryVisit, removeTemporaryHousehold, scheduleDirectoryTemporaryVisit, scheduleTemporaryVisit, setDirectoryCompanion, setTemporaryCompanion, setTemporaryFamily, setYouthDay, setYouthHome, updateDirectoryHousehold } from "./lib/directory.js";
 import { createStore } from "./lib/store.js";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -379,6 +379,12 @@ export function createPortalHandler(store, options = {}) {
 
         if (pathname === "/api/youth/temporary/household") {
           const next = await store.update((state) => assignTemporaryHousehold(state, body));
+          sendJson(response, 200, presentState(next, month, viewOptions));
+          return;
+        }
+
+        if (pathname === "/api/youth/temporary/household/schedule") {
+          const next = await store.update((state) => scheduleDirectoryTemporaryVisit(state, body));
           sendJson(response, 200, presentState(next, month, viewOptions));
           return;
         }
