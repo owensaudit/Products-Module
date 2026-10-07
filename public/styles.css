@@ -1622,6 +1622,7 @@ button.mark-visited {
 }
 
 @media (max-width: 800px) {
+  .directory-list:has(.person[aria-current="true"]) .person:not([aria-current="true"]) { display: none; }
   .church-bar-inner, .site-header, #app { padding-left: 16px; padding-right: 16px; }
   .quorum-nav { margin-right: 28px; }
   .site-header, .layout { display: block; }

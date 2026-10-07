@@ -508,13 +508,17 @@ app.addEventListener("click", (event) => {
     }).catch(showError);
   } else if (action === "open-directory-person") {
     cardTrail = [];
-    const pageTop = window.scrollY;
     page = "directory";
     directoryAdding = false;
-    directoryFocus = { directoryId: button.dataset.id, member: button.dataset.member };
+    const nextFocus = { directoryId: button.dataset.id, member: button.dataset.member };
+    const same = directoryFocus?.directoryId === nextFocus.directoryId && directoryFocus?.member === nextFocus.member;
+    const narrow = window.matchMedia("(max-width: 800px)").matches;
+    directoryFocus = same && narrow ? null : nextFocus;
     render();
-    window.scrollTo(0, pageTop);
-    requestAnimationFrame(() => window.scrollTo(0, pageTop));
+    if (narrow) {
+      const current = document.querySelector(`#person-list .person[data-id="${CSS.escape(nextFocus.directoryId)}"][data-member="${CSS.escape(nextFocus.member)}"]`);
+      current?.scrollIntoView({ block: "start" });
+    }
   } else if (action === "directory-add") {
     directoryAdding = true;
     directoryFocus = null;
@@ -587,6 +591,7 @@ app.addEventListener("click", (event) => {
       render();
     }).catch(showError);
   } else if (action === "directory-filter") {
+    directoryFocus = null;
     const next = button.dataset.filter || "all";
     if (next === "all") {
       directoryFilter = "all";
@@ -843,7 +848,16 @@ app.addEventListener("submit", (event) => {
 app.addEventListener("input", (event) => {
   if (event.target.id === "search") {
     search = event.target.value;
-    if (page === "directory") renderDirectoryList();
+    if (page === "directory" && directoryFocus && window.matchMedia("(max-width: 800px)").matches) {
+      const caret = event.target.selectionStart;
+      directoryFocus = null;
+      render();
+      const input = document.querySelector("#search");
+      if (input) {
+        input.focus();
+        if (caret != null) input.setSelectionRange(caret, caret);
+      }
+    } else if (page === "directory") renderDirectoryList();
     else renderPeopleList();
   }
   if (event.target.closest?.("form[data-form='directory-add']")) {
