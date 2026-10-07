@@ -476,31 +476,52 @@ body[data-page="youth"] #presidency {
   justify-self: stretch;
   min-width: 0;
   padding-left: 12px;
+  padding-right: 8px;
 }
+
+body[data-page="youth"] .youth-boards { min-width: 0; max-width: 100%; }
 
 body[data-page="youth"] .presidency-board {
-  justify-content: start;
+  justify-content: stretch;
   padding-right: 0;
-  width: max-content;
-  max-width: none;
-  grid-template-columns: max-content max-content max-content max-content;
+  width: 100%;
+  max-width: 100%;
+  grid-template-columns: minmax(0, 1fr) 4.6rem 4.6rem max-content;
 }
 
-body[data-page="youth"] .presidency-board input.pres-name,
-body[data-page="youth"] .presidency-board input[name^="phone-"],
-body[data-page="youth"] .presidency-board input[name^="email-"] {
-  width: auto;
-  max-width: none;
+body[data-page="youth"] .pres-name-line {
   min-width: 0;
-  overflow: visible;
+  overflow: hidden;
+}
+
+body[data-page="youth"] .presidency-board input.pres-name {
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  field-sizing: fixed;
   color: var(--ink);
   caret-color: var(--ink);
-  field-sizing: content;
 }
 
 body[data-page="youth"] .presidency-board input[name^="phone-"],
 body[data-page="youth"] .presidency-board input[name^="email-"] {
-  min-width: 4.5rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  field-sizing: fixed;
+}
+
+body[data-page="youth"] .presidency-board .position {
+  white-space: nowrap;
+  overflow: visible;
+  justify-self: end;
 }
 
 .pres-section {

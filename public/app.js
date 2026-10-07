@@ -3121,9 +3121,14 @@ function youthLeaders() {
     (state?.youthLeadership?.[quorum] || []).forEach((row, index) => {
       const name = String(row.name || "").trim();
       if (!name) return;
-      const role = String(row.role || "").trim();
-      if (role.toLowerCase() !== "president" && row.section !== "adults") return;
-      entries.push({ kind: "leader", name, role, quorum, index });
+      entries.push({
+        kind: "leader",
+        name,
+        role: String(row.role || "").trim(),
+        section: row.section || "",
+        quorum,
+        index,
+      });
     });
   }
   return entries;
@@ -3183,15 +3188,32 @@ function noneListMarkup() {
   return `<p class="empty">${message}</p>`;
 }
 
+function leadersMarkup(grouped = true) {
+  const rows = visibleLeaders();
+  if (!rows.length) {
+    if (!grouped) return "";
+    const message = search.trim() ? "No leaders match this search." : "No leaders are named yet.";
+    return `<p class="empty">${message}</p>`;
+  }
+  if (!grouped) return rows.map((entry) => youthEntryButton(entry, entry.quorum)).join("");
+  return [["priests", "Priests Quorum"], ["teachers", "Teachers Quorum"]].map(([quorum, label]) => {
+    const people = rows.filter((entry) => entry.quorum === quorum);
+    if (!people.length) return "";
+    return `<section class="youth-list-block">
+      <h3>${esc(label)}</h3>
+      ${people.map((entry) => youthEntryButton(entry, quorum)).join("")}
+    </section>`;
+  }).join("");
+}
+
 function youthListMarkup() {
   if (youthList === "none") return noneListMarkup();
+  if (youthList === "leaders") return leadersMarkup();
   const lists = youthVisibleLists();
   const single = lists.length === 1;
   return lists.map(([id, label, quorum]) => {
     const membersOnly = single && (id === "priests-quorum" || id === "teachers-quorum");
-    const body = id === "leaders"
-      ? visibleLeaders().map((entry) => youthEntryButton(entry, entry.quorum)).join("")
-      : ministeringCards(quorum, membersOnly);
+    const body = id === "leaders" ? leadersMarkup(false) : ministeringCards(quorum, membersOnly);
     if (!body) return "";
     return `<section class="youth-list-block">
       ${single ? "" : `<h3>${esc(label)}</h3>`}
