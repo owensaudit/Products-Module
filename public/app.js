@@ -406,7 +406,7 @@ app.addEventListener("click", (event) => {
     view = "people";
     render();
   } else if (action === "archive") {
-    if (page === "youth" && youthList !== "temporary") youthList = "visits";
+    if (page === "youth" && youthList !== "temporary" && youthList !== "scheduled") youthList = "visits";
     viewAll = false;
     archiveOpen = !archiveOpen;
     statusFilter = "all";
@@ -1252,7 +1252,7 @@ document.querySelector("#month-calendar")?.addEventListener("click", (event) => 
   if (!control) return;
   if (control.dataset.action === "shift-month") {
     calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + Number(control.dataset.delta), 1);
-    if (page === "youth" && youthList === "temporary") render();
+    if (page === "youth" && (youthList === "temporary" || youthList === "scheduled")) render();
     else renderCalendar();
     return;
   }
@@ -1680,7 +1680,7 @@ function openCalendarDay(iso) {
   if (temporary.length) {
     const [year, month] = iso.split("-").map(Number);
     page = "youth";
-    youthList = "temporary";
+    youthList = "scheduled";
     inbox = "";
     viewAll = false;
     assigneeFilter = "";
@@ -1798,14 +1798,15 @@ function rosterNeeded() {
 function renderPeopleList() {
   const list = document.querySelector("#person-list");
   if (!list) return;
+  const scheduled = showingScheduled();
   const temporary = showingTemporary();
   const assignments = showingAssignments();
   const youthLists = showingYouthLists();
-  list.innerHTML = temporary ? temporaryListMarkup() : youthLists ? youthListMarkup() : assignments ? assignmentListMarkup() : personButtons();
+  list.innerHTML = scheduled ? scheduledListMarkup() : temporary ? temporaryListMarkup() : youthLists ? youthListMarkup() : assignments ? assignmentListMarkup() : personButtons();
   const count = document.querySelector("#people-card .muted");
-  if (count && (temporary || youthLists || assignments)) {
-    const total = temporary ? temporaryRows().length : assignments ? visibleAssignments().length : youthVisibleEntries().length;
-    const noun = temporary ? (total === 1 ? "visit" : "visits") : assignments ? (total === 1 ? "assignment" : "assignments") : (total === 1 ? "person" : "people");
+  if (count && (scheduled || temporary || youthLists || assignments)) {
+    const total = scheduled ? scheduledRows().length : temporary ? temporaryRows().length : assignments ? visibleAssignments().length : youthVisibleEntries().length;
+    const noun = scheduled ? (total === 1 ? "appointment" : "appointments") : temporary ? (total === 1 ? "visit" : "visits") : assignments ? (total === 1 ? "assignment" : "assignments") : (total === 1 ? "person" : "people");
     count.textContent = `${total} ${noun}`;
   }
 }
@@ -1977,20 +1978,23 @@ function listTitle() {
 }
 
 function peopleView() {
+  const scheduled = showingScheduled();
   const temporary = showingTemporary();
   const youthLists = showingYouthLists();
   const assignments = showingAssignments();
-  const people = temporary || youthLists || assignments ? [] : filteredPeople();
-  const title = temporary ? (archiveOpen ? "Archive" : formatMonth(viewedMonth())) : assignments ? "Assignments" : youthLists ? youthListTitle() : listTitle();
+  const people = scheduled || temporary || youthLists || assignments ? [] : filteredPeople();
+  const title = scheduled ? (archiveOpen ? "Archive" : "Scheduled") : temporary ? (archiveOpen ? "Archive" : formatMonth(viewedMonth())) : assignments ? "Assignments" : youthLists ? youthListTitle() : listTitle();
   const helpCount = page === "youth" && dayFilter ? youthHelpForDay(dayFilter).length : 0;
-  const total = (temporary ? temporaryRows().length : assignments ? visibleAssignments().length : youthLists ? youthVisibleEntries().length : people.length) + helpCount;
-  const showDetail = !temporary && (!state.rosterMode || Boolean(selectedPersonId));
-  const noun = temporary
+  const total = (scheduled ? scheduledRows().length : temporary ? temporaryRows().length : assignments ? visibleAssignments().length : youthLists ? youthVisibleEntries().length : people.length) + helpCount;
+  const showDetail = !scheduled && !temporary && (!state.rosterMode || Boolean(selectedPersonId));
+  const noun = scheduled
+    ? (total === 1 ? "appointment" : "appointments")
+    : temporary
     ? (total === 1 ? "visit" : "visits")
     : assignments
     ? (total === 1 ? "assignment" : "assignments")
     : page === "youth" ? (total === 1 ? "person" : "people") : (total === 1 ? "brother" : "brothers");
-  const markup = temporary ? temporaryListMarkup() : youthLists ? youthListMarkup() : assignments ? assignmentListMarkup() : personButtons(people);
+  const markup = scheduled ? scheduledListMarkup() : temporary ? temporaryListMarkup() : youthLists ? youthListMarkup() : assignments ? assignmentListMarkup() : personButtons(people);
   return `<section class="layout${showDetail ? "" : " layout-single"}">
     <div class="card" id="people-card">
       <div class="row">
@@ -2009,11 +2013,15 @@ function showingAssignments() {
 }
 
 function showingYouthLists() {
-  return page === "youth" && youthList !== "visits" && youthList !== "assignments" && youthList !== "temporary" && !archiveOpen && !assigneeFilter && !dayFilter;
+  return page === "youth" && youthList !== "visits" && youthList !== "assignments" && youthList !== "temporary" && youthList !== "scheduled" && !archiveOpen && !assigneeFilter && !dayFilter;
 }
 
 function showingTemporary() {
   return page === "youth" && youthList === "temporary" && !dayFilter && !assigneeFilter;
+}
+
+function showingScheduled() {
+  return page === "youth" && youthList === "scheduled" && !dayFilter && !assigneeFilter;
 }
 
 function viewedMonth() {
@@ -2065,7 +2073,7 @@ function temporaryCard(visit) {
     : `<form class="assign-row temporary-meeting" data-form="temporary-meeting" data-id="${esc(visit.id)}">
         <span>Meeting</span>
         <input name="date" type="date" required aria-label="Meeting date" value="${esc(visit.meetingDate || "")}">
-        <input name="time" type="time" required aria-label="Meeting time">
+        <input name="time" type="time" required aria-label="Meeting time" value="${esc(visit.meetingTime || "")}">
         <button class="tiny primary" type="submit">Schedule</button>
       </form>
       ${visit.meeting ? `<p class="muted">${esc(visit.meeting)}</p>` : ""}`;
@@ -2090,6 +2098,67 @@ function temporaryListMarkup() {
     ? ""
     : `<p class="empty">${search.trim() ? "No temporary visits match this search." : archiveOpen ? "No finished temporary visits." : "No temporary visits this month."}</p>`;
   return `${form}${rows.map((visit) => temporaryCard(visit)).join("")}${empty}`;
+}
+
+function scheduledRows() {
+  const month = viewedMonth();
+  const needle = search.trim().toLowerCase();
+  return (state?.temporaryVisits || [])
+    .filter((row) => row.familyName && row.meetingDate)
+    .filter((row) => (archiveOpen ? row.done || row.month < month : row.month === month && !row.done))
+    .filter((row) => !needle || `${row.adultName} ${row.youthName} ${row.familyName}`.toLowerCase().includes(needle))
+    .sort((a, b) => String(a.meetingDate).localeCompare(String(b.meetingDate)) || String(a.meeting).localeCompare(String(b.meeting)) || String(a.familyName).localeCompare(String(b.familyName), "en", { sensitivity: "base" }));
+}
+
+function scheduledGroups() {
+  const groups = [];
+  for (const row of scheduledRows()) {
+    const key = `${row.adultDirectoryId}|${row.adultMember}|${String(row.youthName || "").trim().toLowerCase()}`;
+    let group = groups.find((item) => item.key === key);
+    if (!group) {
+      group = { key, rows: [] };
+      groups.push(group);
+    }
+    group.rows.push(row);
+  }
+  return groups;
+}
+
+function scheduledCount() {
+  const month = viewedMonth();
+  return (state?.temporaryVisits || []).filter((row) => row.month === month && !row.done && row.meetingDate && row.familyName).length;
+}
+
+function scheduledArchiveCount() {
+  const month = viewedMonth();
+  return (state?.temporaryVisits || []).filter((row) => row.familyName && row.meetingDate && (row.done || row.month < month)).length;
+}
+
+function scheduledCard(rows) {
+  const first = rows[0];
+  const appointments = rows.map((row) => {
+    const when = row.meeting ? `<p class="muted">${esc(row.meeting)}</p>` : "";
+    const who = `<p class="muted">${esc(row.adultName)} with ${esc(row.youthName || "a temporary companion")}</p>`;
+    if (archiveOpen || row.done) {
+      return `<article class="role-card"><span class="role-kicker">Visited</span><strong>${esc(row.familyName)}</strong>${when}${who}</article>`;
+    }
+    return `<article class="role-card"><span class="role-kicker">Appointment</span><strong>${esc(row.familyName)}</strong>${when}
+      <div class="temporary-done"><button type="button" class="tiny" data-action="complete-temporary" data-id="${esc(row.id)}">Visited</button></div>
+    </article>`;
+  }).join("");
+  return `<section class="ministering-set" data-scheduled="${esc(first.adultDirectoryId)}:${esc(first.adultMember)}">
+    <article class="role-card"><span class="role-kicker">Adult</span><strong>${esc(first.adultName)}</strong></article>
+    <article class="role-card"><span class="role-kicker">Temporary companion</span><strong>${esc(first.youthName || "")}</strong></article>
+    ${appointments}
+  </section>`;
+}
+
+function scheduledListMarkup() {
+  const groups = scheduledGroups();
+  if (!groups.length) {
+    return `<p class="empty">${search.trim() ? "No scheduled visits match this search." : archiveOpen ? "No finished temporary visits." : "No visits are scheduled."}</p>`;
+  }
+  return groups.map((group) => scheduledCard(group.rows)).join("");
 }
 
 function visibleAssignments() {
@@ -2499,7 +2568,16 @@ function temporaryHouseholdLineFor(entry) {
   const month = currentMonth();
   const rows = (state?.temporaryVisits || []).filter((row) => !row.done && row.month === month && row.adultDirectoryId === entry.directoryId && row.adultMember === entry.member && row.familyName);
   if (!rows.length) return "";
-  return `<div class="companion-saved"><span>Temporary household</span>${rows.map((row) => `<div class="companion-row"><span class="name-link">${esc(row.familyName)}</span><button type="button" class="tiny" data-action="remove-temporary-household" data-id="${esc(row.id)}">Remove</button></div>`).join("")}</div>`;
+  return `<div class="companion-saved"><span>Temporary household</span>${rows.map((row) => `<div class="companion-row temporary-household">
+    <span class="name-link">${esc(row.familyName)}</span>
+    <form class="assign-row temporary-meeting" data-form="temporary-meeting" data-id="${esc(row.id)}">
+      <input name="date" type="date" required aria-label="Visit date for ${esc(row.familyName)}" value="${esc(row.meetingDate || "")}">
+      <input name="time" type="time" required aria-label="Visit time for ${esc(row.familyName)}" value="${esc(row.meetingTime || "")}">
+      <button class="tiny primary" type="submit">Schedule</button>
+    </form>
+    <button type="button" class="tiny" data-action="remove-temporary-household" data-id="${esc(row.id)}">Remove</button>
+    ${row.meeting ? `<p class="muted">${esc(row.meeting)}</p>` : ""}
+  </div>`).join("")}</div>`;
 }
 
 function directoryVisitHomes(fullName) {
@@ -3092,12 +3170,14 @@ function youthRosterSummary() {
   const assignmentPressed = showingAssignments();
   const visitPressed = youthList === "visits" && !archiveOpen && !viewAll && !assigneeFilter && !dayFilter && statusFilter === "all";
   const monthPressed = showingTemporary() && !archiveOpen;
-  const archiveCount = youthList === "temporary" ? temporaryArchiveCount() : archivedCount;
+  const scheduledPressed = showingScheduled() && !archiveOpen;
+  const archiveCount = youthList === "scheduled" ? scheduledArchiveCount() : youthList === "temporary" ? temporaryArchiveCount() : archivedCount;
   return `<div class="summary" aria-label="Youth lists">
     <button type="button" data-action="view-all" aria-pressed="${allPressed}">All ${allCount}</button>
     ${listButtons}
     <button type="button" data-action="youth-list" data-list="none" aria-pressed="${nonePressed}">None ${noneCount}</button>
     <button type="button" data-action="youth-list" data-list="temporary" aria-pressed="${monthPressed}">This month ${temporaryActiveCount()}</button>
+    <button type="button" data-action="youth-list" data-list="scheduled" aria-pressed="${scheduledPressed}">Scheduled ${scheduledCount()}</button>
     <button type="button" data-action="youth-list" data-list="assignments" aria-pressed="${assignmentPressed}">Assignments ${activeCount}</button>
     <button type="button" data-action="show-people" data-list="to-visit" aria-pressed="${visitPressed}">To Visit ${activeCount}</button>
     <button type="button" class="archive-toggle" data-action="archive" aria-pressed="${archiveOpen}">Archive ${archiveCount}</button>

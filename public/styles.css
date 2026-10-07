@@ -1044,6 +1044,11 @@ article.role-card { cursor: default; }
   margin: 4px 0;
 }
 .companion-row .name-link { display: inline; }
+.temporary-household { flex-wrap: wrap; align-items: center; }
+.temporary-household .temporary-meeting { flex: 1 1 14rem; margin: 0; }
+.temporary-household .temporary-meeting input[type="date"],
+.temporary-household .temporary-meeting input[type="time"] { width: auto; min-width: 0; }
+.temporary-household > .muted { flex: 1 0 100%; margin: 0; }
 .name-link:hover { text-decoration: underline; }
 .name-links { margin: 0 0 12px; }
 .card-back { margin: 0 0 8px; }

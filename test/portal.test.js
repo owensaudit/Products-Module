@@ -1517,16 +1517,31 @@ test("a temporary youth visit is monthly and leaves the standing companion alone
   state = scheduleTemporaryVisit(state, { id: october.id, date: "2026-10-21", time: "19:00" });
   assert.equal(state.temporaryVisits[0].meeting, "10/21 7:00 PM");
   assert.equal(state.temporaryVisits[0].meetingDate, "2026-10-21");
+  assert.equal(state.temporaryVisits[0].meetingTime, "19:00");
   let view = presentState(state, "2026-10");
   assert.equal(view.temporaryVisits.length, 1);
+  assert.equal(view.temporaryVisits[0].meetingTime, "19:00");
   assert.ok(view.calendarMarks["2026-10-21"].kinds.includes("temporary"));
   state = completeTemporaryVisit(state, { id: october.id });
   assert.equal(state.temporaryVisits[0].done, true);
+  assert.equal(state.temporaryVisits[0].adultName, "Sample, Ben");
+  assert.equal(state.temporaryVisits[0].youthName, "Youth, Pat");
+  assert.equal(state.temporaryVisits[0].familyName, "Other, Cam");
+  assert.equal(state.temporaryVisits[0].meeting, "10/21 7:00 PM");
   assert.equal(state.directory[0].memberCompanions.ben, "Keeper, Anthony");
   assert.deepEqual(state.directory[0].memberVisits.ben, [{ directoryId: "dir_keep", label: "Standing house" }]);
+  assert.equal(state.directory[1].memberYouthHome.cam, true);
   assert.equal(state.people[0].sheetColumns.Assigned, "Youth, Pat | Sample, Ben");
   view = presentState(state, "2026-10");
   assert.equal(view.calendarMarks["2026-10-21"], undefined);
+  state = assignTemporaryHousehold(state, {
+    adultDirectoryId: "dir_home",
+    adultMember: "Ben",
+    householdId: "dir_other",
+    month: "2026-10",
+  });
+  assert.equal(state.temporaryVisits.filter((row) => !row.done && row.familyDirectoryId === "dir_other" && row.month === "2026-10").length, 1);
+  assert.equal(state.directory[1].memberYouthHome.cam, true);
   state = addTemporaryVisit(state, {
     adultDirectoryId: "dir_home",
     adultMember: "Ben",
@@ -1534,18 +1549,18 @@ test("a temporary youth visit is monthly and leaves the standing companion alone
     familyDirectoryId: "dir_other",
     month: "2026-11",
   });
-  assert.equal(state.temporaryVisits.length, 2);
-  assert.equal(state.temporaryVisits[1].month, "2026-11");
-  assert.equal(state.temporaryVisits[1].done, false);
-  assert.equal(state.temporaryVisits[1].youthName, "Youth, Ada");
+  assert.equal(state.temporaryVisits.length, 3);
+  const november = state.temporaryVisits.find((row) => row.month === "2026-11");
+  assert.equal(november.done, false);
+  assert.equal(november.youthName, "Youth, Ada");
   assert.equal(state.directory[0].memberCompanions.ben, "Keeper, Anthony");
   const folder = await mkdtemp(path.join(tmpdir(), "portal-temp-"));
   const store = createStore(path.join(folder, "portal.json"));
   await store.write(state);
   const saved = await store.read();
-  assert.equal(saved.temporaryVisits.length, 2);
+  assert.equal(saved.temporaryVisits.length, 3);
   assert.equal(saved.temporaryVisits[0].done, true);
-  assert.equal(saved.temporaryVisits[1].month, "2026-11");
+  assert.equal(saved.temporaryVisits.find((row) => row.month === "2026-11").month, "2026-11");
   assert.equal(saved.directory[0].memberCompanions.ben, "Keeper, Anthony");
   assert.throws(() => scheduleTemporaryVisit(state, { id: "missing", date: "2026-11-02", time: "18:00" }), /Temporary visit not found/);
 });
