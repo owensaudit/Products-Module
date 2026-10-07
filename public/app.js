@@ -2681,7 +2681,7 @@ function directoryPersonCard(entry) {
   const address = String(record.address || "").trim();
   const companions = savedCompanionNames(entry);
   const companion = companions.length === 1 ? companions[0] : "";
-  const companionLinks = companions.length ? `<div class="companion-saved"><span>Companion</span>${companions.map((name) => `<div class="companion-row"><button type="button" class="name-link" data-action="open-name" data-name="${esc(name)}" data-directory="${esc(record.id)}" data-member="${esc(entry.member)}">${esc(name)}</button><button type="button" class="tiny" data-action="remove-companion" data-id="${esc(record.id)}" data-member="${esc(entry.member)}" data-name="${esc(name)}">Remove</button></div>`).join("")}</div>` : "";
+  const companionLinks = companions.length > 1 ? `<div class="companion-saved"><span>Companion</span>${companions.map((name) => `<div class="companion-row"><span class="name-link">${esc(name)}</span></div>`).join("")}</div>` : "";
   const visitLine = directoryVisitLine(entry);
   const temporaryHouseholdLine = temporaryHouseholdLineFor(entry);
   const status = directoryStatusPills(entry.name);
