@@ -490,6 +490,16 @@ app.addEventListener("click", (event) => {
     directoryAdding = true;
     directoryFocus = null;
     render();
+  } else if (action === "remove-companion") {
+    post("/api/directory/companion", {
+      directoryId: button.dataset.id,
+      member: button.dataset.member,
+      companion: button.dataset.name,
+      remove: true,
+    }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
   } else if (action === "remove-youth-visit") {
     post("/api/directory/youth-day", {
       directoryId: button.dataset.id,
@@ -2237,28 +2247,22 @@ function directoryCompanionNames(fullName) {
     for (const row of state?.directory || []) {
       for (const member of row.members || []) {
         if (directoryPersonName(row, member).toLowerCase() !== key) continue;
-        for (const companion of companionValues(row.memberCompanions?.[member.trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ")])) add(companion);
+        for (const companion of companionValues(row.memberCompanions?.[directoryMemberKey(member)])) add(companion);
       }
     }
   }
-  for (const row of state?.directory || []) {
-    for (const member of row.members || []) {
-      const memberKey = member.trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ");
-      const saved = companionValues(row.memberCompanions?.[memberKey]);
-      if (saved.some((companion) => directoryNameMatches(companion, fullName))) add(directoryPersonName(row, member));
-    }
-  }
   for (const person of state?.people || []) {
+    if (person.list === "youth") continue;
     const companion = person.sheetColumns?.Companion;
     if (companion && directoryNameMatches(nameKey(person), fullName)) add(companion);
-    if (companion && directoryNameMatches(companion, fullName)) add(nameKey(person));
-    const assigned = person.list === "youth" ? person.assigned || [] : [];
-    if (assigned[0] && assigned[1] && directoryNameMatches(assigned[0], fullName)) add(assigned[1]);
-    if (assigned[0] && assigned[1] && directoryNameMatches(assigned[1], fullName)) add(assigned[0]);
   }
   const youth = (state?.people || []).find((person) => (person.group === "priests" || person.group === "teachers") && directoryNameMatches(nameKey(person), fullName));
   if (youth?.sheetColumns?.Companion) add(youth.sheetColumns.Companion);
   return names;
+}
+
+function savedCompanionNames(entry) {
+  return companionValues(entry?.record?.memberCompanions?.[directoryMemberKey(entry?.member)]);
 }
 
 function directoryCompanionFor(fullName) {
@@ -2319,19 +2323,11 @@ function peopleWithCompanions() {
       const companions = companionValues(row.memberCompanions?.[key]);
       if (!companions.length) continue;
       add(directoryPersonName(row, member));
-      for (const companion of companions) add(companion);
     }
   }
   for (const person of state?.people || []) {
-    const companion = person.sheetColumns?.Companion;
-    if (companion) {
-      add(nameKey(person));
-      add(companion);
-    }
-    if (person.list === "youth" && person.assigned?.[0] && person.assigned?.[1]) {
-      add(person.assigned[0]);
-      add(person.assigned[1]);
-    }
+    if (person.list === "youth") continue;
+    if (person.sheetColumns?.Companion) add(nameKey(person));
   }
   companionMarkState = state;
   companionMarkSet = set;
@@ -2471,9 +2467,9 @@ function directoryPersonCard(entry) {
   const phone = String(record.phone || "").trim();
   const email = String(record.email || "").trim();
   const address = String(record.address || "").trim();
-  const companions = directoryCompanionNames(entry.name);
+  const companions = savedCompanionNames(entry);
   const companion = companions.length === 1 ? companions[0] : "";
-  const companionLinks = companions.length ? `<p class="name-links"><span>Companion</span>${directoryNameLinks(companions, entry)}</p>` : "";
+  const companionLinks = companions.length ? `<div class="companion-saved"><span>Companion</span>${companions.map((name) => `<div class="companion-row"><button type="button" class="name-link" data-action="open-name" data-name="${esc(name)}" data-directory="${esc(record.id)}" data-member="${esc(entry.member)}">${esc(name)}</button><button type="button" class="tiny" data-action="remove-companion" data-id="${esc(record.id)}" data-member="${esc(entry.member)}" data-name="${esc(name)}">Remove</button></div>`).join("")}</div>` : "";
   const assignedVisits = directoryAssignedVisits(entry);
   const visits = [...assignedVisits];
   for (const name of directoryVisitNames(entry.name)) {

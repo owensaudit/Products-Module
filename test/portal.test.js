@@ -1351,6 +1351,44 @@ test("a scheduled check still marks visited when the platform already read the b
   assert.equal(JSON.parse(response.body).people[0].rosterStatusKey, "visited");
 });
 
+test("removing one saved companion leaves the other and ignores a youth assignment", () => {
+  let state = {
+    ...emptyState(),
+    directory: [{
+      id: "dir_home",
+      name: "Sample, Ada & Ben",
+      members: ["Ben"],
+      address: "",
+      phone: "",
+      email: "",
+      memberCompanions: { ben: ["Keeper, Anthony", "Other, Cam"] },
+      memberVisits: { ben: [{ directoryId: "dir_keep", label: "Standing house" }] },
+    }],
+    people: [{
+      id: "per_visit",
+      list: "youth",
+      displayName: "Sample, Ada & Ben",
+      phone: "",
+      email: "",
+      household: "Ada\nBen",
+      notes: "",
+      sheetColumns: { Brother: "Sample, Ada & Ben", Assigned: "Youth, Pat | Sample, Ben" },
+      createdAt: "2026-10-07T00:00:00.000Z",
+      updatedAt: "2026-10-07T00:00:00.000Z",
+    }],
+  };
+  state = setDirectoryCompanion(state, { directoryId: "dir_home", member: "Ben", companion: "Keeper, Anthony", remove: true });
+  assert.equal(state.directory[0].memberCompanions.ben, "Other, Cam");
+  assert.equal(state.people[0].sheetColumns.Assigned, "Youth, Pat | Sample, Ben");
+  assert.deepEqual(state.directory[0].memberVisits.ben, [{ directoryId: "dir_keep", label: "Standing house" }]);
+  state = setDirectoryCompanion(state, { directoryId: "dir_home", member: "Ben", companion: "Other, Cam", remove: true });
+  assert.equal(state.directory[0].memberCompanions.ben, undefined);
+  state = setDirectoryCompanion(state, { directoryId: "dir_home", member: "Ben", companion: "Keeper, Anthony" });
+  assert.equal(state.directory[0].memberCompanions.ben, "Keeper, Anthony");
+  state = setDirectoryCompanion(state, { directoryId: "dir_home", member: "Ben", companion: "" });
+  assert.equal(state.directory[0].memberCompanions.ben, undefined);
+});
+
 test("a directory person can ask for a youth visit and volunteer on a day", () => {
   const home = {
     id: "dir_home",

@@ -1024,7 +1024,22 @@ article.role-card { cursor: default; }
   cursor: pointer;
 }
 .household-line .name-link,
-.contact-line.name-links .name-link { display: block; }
+.contact-line.name-links .name-link,
+.name-links .name-link { display: block; }
+.companion-saved { margin: 0 0 12px; }
+.companion-saved > span {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
+.companion-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 4px 0;
+}
+.companion-row .name-link { display: inline; }
 .name-link:hover { text-decoration: underline; }
 .name-links { margin: 0 0 12px; }
 .card-back { margin: 0 0 8px; }
