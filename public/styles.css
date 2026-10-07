@@ -660,6 +660,7 @@ button.cal-day.is-open {
 .cal-dot.driveby { background: #c9a6e8; }
 .cal-dot.scheduled { background: var(--status-scheduled); }
 .cal-dot.reschedule { background: #7dcea0; }
+.cal-dot.with_youth { background: #d98a2b; }
 
 .cal-num {
   font-size: 13px;
@@ -1333,6 +1334,28 @@ button.mark-visited {
 .person small, .muted { color: var(--muted); }
 
 .person .pill { justify-self: start; width: fit-content; }
+
+.pill.youth-visit { background: #f3e2c4; color: #6a3e08; }
+
+.youth-home {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.youth-day-add,
+.youth-day {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.youth-day select { min-width: 0; flex: 1 1 8rem; }
+
+.person.with-youth { box-shadow: inset 0 0 0 2px #d98a2b; }
 
 .person[aria-current="true"] { outline: 2px solid var(--ink); border-color: var(--ink); }
 

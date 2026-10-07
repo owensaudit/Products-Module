@@ -29,7 +29,7 @@ import {
   setVisitStatus,
 } from "./lib/model.js";
 import { emailAllowed, parseAllowlist } from "./lib/allowlist.js";
-import { addDirectoryMember, addDirectoryVisit, applyDirectory, assignDirectoryHousehold, moveDirectoryPerson, parseDirectory, removeDirectoryMember, setDirectoryCompanion, updateDirectoryHousehold } from "./lib/directory.js";
+import { addDirectoryMember, addDirectoryVisit, applyDirectory, assignDirectoryHousehold, moveDirectoryPerson, parseDirectory, removeDirectoryMember, setDirectoryCompanion, setYouthDay, setYouthHome, updateDirectoryHousehold } from "./lib/directory.js";
 import { createStore } from "./lib/store.js";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -385,6 +385,18 @@ export function createPortalHandler(store, options = {}) {
 
         if (pathname === "/api/directory/remove") {
           const next = await store.update((state) => removeDirectoryMember(state, body));
+          sendJson(response, 200, presentState(next, month, viewOptions));
+          return;
+        }
+
+        if (pathname === "/api/directory/youth-home") {
+          const next = await store.update((state) => setYouthHome(state, body));
+          sendJson(response, 200, presentState(next, month, viewOptions));
+          return;
+        }
+
+        if (pathname === "/api/directory/youth-day") {
+          const next = await store.update((state) => setYouthDay(state, body));
           sendJson(response, 200, presentState(next, month, viewOptions));
           return;
         }

@@ -36,7 +36,7 @@ import {
   setVisitStatus,
   slotsForMonth,
 } from "../lib/model.js";
-import { addDirectoryMember, addDirectoryVisit, applyDirectory, applyMinisteringGroups, assignDirectoryHousehold, directoryAddressKey, findDirectoryRecord, mergeDirectoryByAddress, moveDirectoryPerson, parseDirectory, removeDirectoryMember, setDirectoryCompanion, updateDirectoryHousehold } from "../lib/directory.js";
+import { addDirectoryMember, addDirectoryVisit, applyDirectory, applyMinisteringGroups, assignDirectoryHousehold, directoryAddressKey, findDirectoryRecord, mergeDirectoryByAddress, moveDirectoryPerson, parseDirectory, removeDirectoryMember, setDirectoryCompanion, setYouthDay, setYouthHome, updateDirectoryHousehold } from "../lib/directory.js";
 import { brotherSheetToState, calendarMarks, canonicalRosterStatus, isArchiveStatus, rosterStatusKey } from "../lib/roster.js";
 import { emailAllowed, parseAllowlist } from "../lib/allowlist.js";
 import { createStore } from "../lib/store.js";
@@ -232,6 +232,9 @@ test("a phone number and email can be saved on a person", () => {
   state = setPersonContact(state, "per_1", { assigned: ["Ada, Example", "Bea, Sample"] });
   assert.equal(state.people[0].sheetColumns.Assigned, "Ada, Example | Bea, Sample");
   assert.deepEqual(presentState(state, "2026-09").people[0].assigned, ["Ada, Example", "Bea, Sample"]);
+  state = setPersonContact(state, "per_1", { assigned: ["Ada, Example"] });
+  assert.equal(state.people[0].sheetColumns.Assigned, "Ada, Example");
+  assert.deepEqual(presentState(state, "2026-09").people[0].assigned, ["Ada, Example"]);
   state = setPersonContact(state, "per_1", { assigned: ["Ada Example", "Ada Example"] });
   assert.equal(state.people[0].sheetColumns.Assigned, "Ada Example");
   state = setPersonContact(state, "per_1", { assigned: [] });
@@ -1346,4 +1349,61 @@ test("a scheduled check still marks visited when the platform already read the b
   ]);
   assert.equal(response.statusCode, 200);
   assert.equal(JSON.parse(response.body).people[0].rosterStatusKey, "visited");
+});
+
+test("a directory person can ask for a youth visit and volunteer on a day", () => {
+  const home = {
+    id: "dir_home",
+    name: "Sample, Ada & Ben",
+    members: ["Ada", "Ben"],
+    address: "1 Example St",
+    phone: "",
+    email: "",
+    memberCompanions: {},
+    memberVisits: {},
+  };
+  let state = {
+    ...emptyState(),
+    directory: [home, {
+      id: "dir_other",
+      name: "Other, Cam",
+      members: ["Cam"],
+      address: "",
+      phone: "",
+      email: "",
+      memberCompanions: {},
+      memberVisits: {},
+    }],
+    people: [
+      { id: "per_ada", group: "priests", displayName: "Ada Youth", phone: "", email: "", household: "", notes: "", sheetColumns: { Brother: "Youth, Ada" }, createdAt: "2026-10-07T00:00:00.000Z", updatedAt: "2026-10-07T00:00:00.000Z" },
+      { id: "per_ben", group: "teachers", displayName: "Ben Youth", phone: "", email: "", household: "", notes: "", sheetColumns: { Brother: "Youth, Ben" }, createdAt: "2026-10-07T00:00:00.000Z", updatedAt: "2026-10-07T00:00:00.000Z" },
+    ],
+  };
+  state = setYouthHome(state, { directoryId: "dir_home", member: "Ada", wanted: true }, deps());
+  state = setYouthHome(state, { directoryId: "dir_home", member: "Ben", wanted: true }, deps());
+  const visits = state.people.filter((person) => person.list === "youth");
+  assert.equal(visits.length, 1);
+  assert.equal(visits[0].youthRequest, true);
+  assert.equal(visits[0].directoryId, "dir_home");
+  assert.equal(visits[0].displayName, "Sample, Ada & Ben");
+  state = setYouthHome(state, { directoryId: "dir_home", member: "Ada", wanted: false }, deps());
+  assert.equal(state.people.filter((person) => person.list === "youth").length, 1);
+  state = setYouthHome(state, { directoryId: "dir_home", member: "Ben", wanted: false }, deps());
+  assert.equal(state.people.some((person) => person.list === "youth"), false);
+
+  state = setYouthHome(state, { directoryId: "dir_home", member: "Ada", wanted: true }, deps());
+  state = setYouthDay(state, { directoryId: "dir_home", member: "Ben", date: "2026-10-21", youth: ["Youth, Ada", "Youth, Ben", "Youth, Cam"] });
+  assert.deepEqual(state.directory[0].memberYouthDays.ben, [{ date: "2026-10-21", youth: ["Youth, Ada", "Youth, Ben"] }]);
+  state = setYouthDay(state, { directoryId: "dir_home", member: "Ben", date: "2026-10-21" });
+  assert.deepEqual(state.directory[0].memberYouthDays.ben[0].youth, ["Youth, Ada", "Youth, Ben"]);
+  const view = presentState(state, "2026-10");
+  assert.equal(view.directory[0].memberYouthHome.ada, true);
+  assert.ok(view.calendarMarks["2026-10-21"].kinds.includes("with_youth"));
+  assert.equal(view.people.filter((person) => person.list === "youth").length, 1);
+  const kept = applyDirectory(state, [{ name: "Sample, Ada & Ben", members: ["Ada", "Ben"], address: "1 Example St", phone: "", email: "" }]);
+  assert.equal(kept.directory[0].memberYouthHome.ada, true);
+  assert.equal(kept.directory[0].memberYouthDays.ben[0].date, "2026-10-21");
+  const cleared = setYouthDay(state, { directoryId: "dir_home", member: "Ben", date: "2026-10-21", remove: true });
+  assert.equal(cleared.directory[0].memberYouthDays.ben, undefined);
+  assert.throws(() => setYouthDay(state, { directoryId: "dir_home", member: "Ben", date: "October" }), /Choose a date/);
 });
