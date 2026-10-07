@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ministering Visit Portal</title>
+    <link rel="stylesheet" href="/styles.css?v=118">
+  </head>
+  <body>
+    <a class="skip" href="#app">Skip to the portal</a>
+    <div class="church-bar">
+      <div class="church-bar-inner">
+        <div class="church-brand">
+          <svg class="church-mark" viewBox="0 0 64 88" role="img" aria-label="Jesus Christ">
+            <path d="M16 84 V38 A16 16 0 0 1 48 38 V84" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+            <path d="M12 84 H52" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+            <circle cx="32" cy="30" r="4.6" fill="currentColor"/>
+            <path d="M11 43 L20 38 L32 42 L44 38 L53 43 L47 48 L32 45 L17 48 Z" fill="currentColor"/>
+            <path d="M25 44 H39 L42 78 H22 Z" fill="currentColor"/>
+          </svg>
+          <p class="church-name">
+            <span>The Church of</span>
+            <strong>Jesus Christ</strong>
+            <span>of Latter-day Saints</span>
+          </p>
+        </div>
+        <nav class="quorum-nav" aria-label="Quorum">
+          <button type="button" id="sign-out" class="tiny sign-out" hidden>Sign out</button>
+          <button type="button" id="open-elders" data-page-link="elders" aria-pressed="true">Ministering visits</button>
+          <button type="button" id="open-youth" data-page-link="youth" aria-pressed="false">Youth ministry</button>
+          <button type="button" id="open-directory" data-page-link="directory" aria-pressed="false">Directory</button>
+        </nav>
+      </div>
+    </div>
+    <header class="site-header">
+      <div class="quorum-titles">
+        <div class="title-block" data-page-header="elders">
+          <p class="eyebrow">Elders Quorum</p>
+          <div class="title-row">
+            <button type="button" class="title-link" id="open-elders-title">Ministering visits</button>
+            <button type="button" id="message-inbox" class="message-inbox" aria-label="Messages that need an answer">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4 3v-3H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+              </svg>
+              <span class="message-bubble" hidden>0</span>
+            </button>
+          </div>
+          <p class="lede">To minister as the Savior would, to Love, and Invite.</p>
+        </div>
+        <div class="title-block" data-page-header="youth">
+          <p class="eyebrow">Youth Quorum</p>
+          <div class="title-row">
+            <button type="button" class="title-link" id="open-youth-title">Youth ministry</button>
+            <button type="button" id="youth-message-inbox" class="message-inbox" aria-label="Youth messages that need an answer">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4 3v-3H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+              </svg>
+              <span class="message-bubble" hidden>0</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <section id="month-calendar" class="month-cal" aria-label="Current calendar"></section>
+      <aside id="presidency" aria-label="EQ Presidency"></aside>
+    </header>
+    <p id="notice" class="notice" role="status" hidden></p>
+    <section id="sign-in" class="sign-in" hidden>
+      <div class="card stack">
+        <h2>Sign in</h2>
+        <p>Use the Google account that was invited to the PruneHill portal.</p>
+        <button type="button" class="primary" id="google-sign-in">Sign in with Google</button>
+      </div>
+    </section>
+    <main id="app" tabindex="-1"></main>
+    <script src="/app.js?v=140" type="module"></script>
+  </body>
+</html>
