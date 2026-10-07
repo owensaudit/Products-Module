@@ -39,6 +39,7 @@ import {
 } from "../lib/model.js";
 import { addDirectoryMember, addDirectoryVisit, addTemporaryVisit, applyDirectory, applyMinisteringGroups, assignDirectoryHousehold, assignTemporaryHousehold, completeTemporaryVisit, directoryAddressKey, findDirectoryRecord, mergeDirectoryByAddress, moveDirectoryPerson, parseDirectory, removeDirectoryMember, removeDirectoryVisit, removeTemporaryHousehold, scheduleDirectoryTemporaryVisit, scheduleTemporaryVisit, setDirectoryCompanion, setTemporaryCompanion, setTemporaryFamily, setYouthDay, setYouthHome, updateDirectoryHousehold } from "../lib/directory.js";
 import { brotherSheetToState, calendarMarks, canonicalRosterStatus, isArchiveStatus, rosterStatusKey } from "../lib/roster.js";
+import { reminderMessage } from "../public/reminder.js";
 import { emailAllowed, parseAllowlist } from "../lib/allowlist.js";
 import { createStore } from "../lib/store.js";
 import { PortalError } from "../lib/model.js";
@@ -1867,4 +1868,28 @@ test("every scheduled visit asks for a family notice two days before and the day
   assert.equal(state.temporaryVisits[0].notified, false);
   assert.equal(state.directory[0].memberCompanions.ben, "Keeper, Anthony");
   assert.deepEqual(state.directory[0].memberVisits.ben, [{ directoryId: "dir_keep", label: "Standing house" }]);
+});
+
+test("a reminder names the visit, the household, and the companion", () => {
+  assert.equal(
+    reminderMessage({
+      name: "Greg",
+      kind: "Ministering Visit",
+      when: "10/21 7:00 PM",
+      household: "Gillespie, Greg & Sara",
+      individual: "Gillespie, Greg",
+      companion: "Owens, Paxton",
+    }),
+    "Brother Greg. Friendly reminder you have a scheduled Ministering Visit on 10/21 7:00 PM with Gillespie, Greg & Sara and Gillespie, Greg. Your Companion for this will be Owens, Paxton.",
+  );
+  assert.equal(
+    reminderMessage({
+      name: "Ben",
+      kind: "Youth Ministry",
+      when: "10/14 7:30 PM",
+      household: "Other, Cam",
+      companion: "Youth, Pat",
+    }),
+    "Brother Ben. Friendly reminder you have a scheduled Youth Ministry on 10/14 7:30 PM with Other, Cam. Your Companion for this will be Youth, Pat.",
+  );
 });

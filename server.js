@@ -42,6 +42,7 @@ const staticFiles = {
   "/index.html": { file: path.join(publicDir, "index.html"), type: "text/html; charset=utf-8" },
   "/styles.css": { file: path.join(publicDir, "styles.css"), type: "text/css; charset=utf-8" },
   "/app.js": { file: path.join(publicDir, "app.js"), type: "text/javascript; charset=utf-8" },
+  "/reminder.js": { file: path.join(publicDir, "reminder.js"), type: "text/javascript; charset=utf-8" },
   "/template.csv": { file: templatePath, type: "text/csv; charset=utf-8" },
 };
 
