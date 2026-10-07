@@ -1344,13 +1344,38 @@ button.mark-visited {
   margin: 12px 0;
 }
 
-.youth-day-add,
-.youth-day {
+.youth-outing {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.youth-outing-title { margin: 0; font-weight: 700; }
+
+.youth-day-add {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   margin: 8px 0;
+}
+
+.youth-day {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.youth-day-head,
+.youth-day-row,
+.youth-day-house {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 .youth-day select { min-width: 0; flex: 1 1 8rem; }

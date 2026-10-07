@@ -1392,10 +1392,18 @@ test("a directory person can ask for a youth visit and volunteer on a day", () =
   assert.equal(state.people.some((person) => person.list === "youth"), false);
 
   state = setYouthHome(state, { directoryId: "dir_home", member: "Ada", wanted: true }, deps());
-  state = setYouthDay(state, { directoryId: "dir_home", member: "Ben", date: "2026-10-21", youth: ["Youth, Ada", "Youth, Ben", "Youth, Cam"] });
-  assert.deepEqual(state.directory[0].memberYouthDays.ben, [{ date: "2026-10-21", youth: ["Youth, Ada", "Youth, Ben"] }]);
+  state.directory[0].memberCompanions = { ben: "Keeper, Anthony" };
+  state.directory[0].memberVisits = { ben: [{ directoryId: "dir_keep", label: "Standing house" }] };
+  state = setYouthDay(state, { directoryId: "dir_home", member: "Ben", date: "2026-10-21", youth: ["Youth, Ada", "Youth, Ben", "Youth, Cam"], householdId: "dir_other" });
+  assert.deepEqual(state.directory[0].memberYouthDays.ben, [{ date: "2026-10-21", youth: ["Youth, Ada", "Youth, Ben"], visits: [{ directoryId: "dir_other", label: "Other, Cam" }] }]);
+  assert.equal(state.directory[0].memberCompanions.ben, "Keeper, Anthony");
+  assert.deepEqual(state.directory[0].memberVisits.ben, [{ directoryId: "dir_keep", label: "Standing house" }]);
   state = setYouthDay(state, { directoryId: "dir_home", member: "Ben", date: "2026-10-21" });
   assert.deepEqual(state.directory[0].memberYouthDays.ben[0].youth, ["Youth, Ada", "Youth, Ben"]);
+  assert.deepEqual(state.directory[0].memberYouthDays.ben[0].visits, [{ directoryId: "dir_other", label: "Other, Cam" }]);
+  state = setYouthDay(state, { directoryId: "dir_home", member: "Ben", date: "2026-10-21", removeHouseholdId: "dir_other" });
+  assert.deepEqual(state.directory[0].memberYouthDays.ben[0].visits, []);
+  assert.equal(state.directory[0].memberCompanions.ben, "Keeper, Anthony");
   const view = presentState(state, "2026-10");
   assert.equal(view.directory[0].memberYouthHome.ada, true);
   assert.ok(view.calendarMarks["2026-10-21"].kinds.includes("with_youth"));

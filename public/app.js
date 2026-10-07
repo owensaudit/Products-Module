@@ -173,13 +173,27 @@ app.addEventListener("change", (event) => {
     return;
   }
   const youthDay = target.closest?.("[data-youth-day]");
-  if (youthDay && target instanceof HTMLSelectElement) {
+  if (youthDay && target instanceof HTMLSelectElement && target.dataset.youthSlot) {
     const youth = ["1", "2"].map((slot) => youthDay.querySelector(`[data-youth-slot="${slot}"]`)?.value.trim() || "").filter(Boolean);
     post("/api/directory/youth-day", {
       directoryId: youthDay.dataset.id,
       member: youthDay.dataset.member,
       date: youthDay.dataset.date,
       youth,
+    }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
+    return;
+  }
+  if (target instanceof HTMLSelectElement && target.form?.dataset.form === "youth-day-house") {
+    const householdId = target.value;
+    if (!householdId) return;
+    post("/api/directory/youth-day", {
+      directoryId: target.form.dataset.id,
+      member: target.form.dataset.member,
+      date: target.form.dataset.date,
+      householdId,
     }).then((next) => {
       state = next;
       render();
@@ -476,6 +490,16 @@ app.addEventListener("click", (event) => {
     directoryAdding = true;
     directoryFocus = null;
     render();
+  } else if (action === "remove-youth-visit") {
+    post("/api/directory/youth-day", {
+      directoryId: button.dataset.id,
+      member: button.dataset.member,
+      date: button.dataset.date,
+      removeHouseholdId: button.dataset.household,
+    }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
   } else if (action === "remove-youth-day") {
     post("/api/directory/youth-day", {
       directoryId: button.dataset.id,
@@ -2138,7 +2162,7 @@ function youthHelpForDay(iso) {
   const rows = [];
   for (const entry of directoryEntries()) {
     for (const day of directoryYouthDays(entry.record, entry.member)) {
-      if (day.date === iso) rows.push({ ...entry, date: day.date, youth: day.youth || [] });
+      if (day.date === iso) rows.push({ ...entry, date: day.date, youth: day.youth || [], visits: day.visits || [] });
     }
   }
   return rows.sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
@@ -2506,28 +2530,71 @@ function youthNameOptions(selected) {
   return ["", ...names].map((name) => `<option value="${esc(name)}" ${name === selected ? "selected" : ""}>${esc(name || "—")}</option>`).join("");
 }
 
+function youthDayHouseOptions(excludeId) {
+  return (state?.directory || [])
+    .filter((row) => row.id !== excludeId)
+    .map((row) => ({
+      id: row.id,
+      name: row.name,
+      marked: (row.members || []).some((member) => directoryWantsYouth(row, member)),
+    }))
+    .sort((a, b) => Number(b.marked) - Number(a.marked) || String(a.name).localeCompare(String(b.name), "en", { sensitivity: "base" }))
+    .map((row) => `<option value="${esc(row.id)}">${esc(row.name)}${row.marked ? " · youth visit" : ""}</option>`)
+    .join("");
+}
+
+function youthDayVisitLabel(visit) {
+  const row = (state?.directory || []).find((item) => item.id === visit?.directoryId);
+  return row?.name || visit?.label || "";
+}
+
 function directoryYouthSection(entry) {
   const record = entry.record;
   const wanted = directoryWantsYouth(record, entry.member);
   const visit = (state?.people || []).find((person) => person.list === "youth" && person.directoryId === record.id);
   const open = visit ? `<button type="button" class="tiny" data-action="open-youth-assignment" data-id="${esc(visit.id)}">Assign companionship</button>` : "";
-  const days = directoryYouthDays(record, entry.member).map((day) => `<div class="youth-day" data-youth-day="1" data-id="${esc(record.id)}" data-member="${esc(entry.member)}" data-date="${esc(day.date)}">
-      <span>${esc(formatDate(day.date))}</span>
-      <select data-youth-slot="1" aria-label="First youth for ${esc(formatDate(day.date))}">${youthNameOptions(day.youth?.[0] || "")}</select>
-      <select data-youth-slot="2" aria-label="Second youth for ${esc(formatDate(day.date))}">${youthNameOptions(day.youth?.[1] || "")}</select>
-      <button type="button" class="tiny" data-action="remove-youth-day" data-id="${esc(record.id)}" data-member="${esc(entry.member)}" data-date="${esc(day.date)}">Remove</button>
-    </div>`).join("");
+  const days = directoryYouthDays(record, entry.member).map((day) => {
+    const houses = (day.visits || []).map((item) => {
+      const label = youthDayVisitLabel(item);
+      const household = (state?.directory || []).find((row) => row.id === item.directoryId);
+      const member = household?.members?.[0] || "";
+      const link = member
+        ? `<button type="button" class="name-link" data-action="open-directory-person" data-id="${esc(item.directoryId)}" data-member="${esc(member)}">${esc(label)}</button>`
+        : esc(label);
+      return `<span class="youth-day-house">${link}<button type="button" class="tiny" data-action="remove-youth-visit" data-id="${esc(record.id)}" data-member="${esc(entry.member)}" data-date="${esc(day.date)}" data-household="${esc(item.directoryId)}">Remove</button></span>`;
+    }).join("");
+    return `<div class="youth-day" data-youth-day="1" data-id="${esc(record.id)}" data-member="${esc(entry.member)}" data-date="${esc(day.date)}">
+      <div class="youth-day-head">
+        <strong>${esc(formatDate(day.date))}</strong>
+        <button type="button" class="tiny" data-action="remove-youth-day" data-id="${esc(record.id)}" data-member="${esc(entry.member)}" data-date="${esc(day.date)}">Remove day</button>
+      </div>
+      <div class="youth-day-row">
+        <span>Youth going</span>
+        <select data-youth-slot="1" aria-label="Youth going on ${esc(formatDate(day.date))}">${youthNameOptions(day.youth?.[0] || "")}</select>
+        <select data-youth-slot="2" aria-label="Second youth on ${esc(formatDate(day.date))}, optional">${youthNameOptions(day.youth?.[1] || "")}</select>
+      </div>
+      ${houses ? `<div class="youth-day-houses">${houses}</div>` : ""}
+      <form class="assign-row" data-form="youth-day-house" data-id="${esc(record.id)}" data-member="${esc(entry.member)}" data-date="${esc(day.date)}">
+        <span>House this day</span>
+        <select aria-label="House to visit on ${esc(formatDate(day.date))}"><option value="">—</option>${youthDayHouseOptions(record.id)}</select>
+      </form>
+    </div>`;
+  }).join("");
   return `<label class="youth-home">
       <input type="checkbox" data-youth-home="1" data-id="${esc(record.id)}" data-member="${esc(entry.member)}" ${wanted ? "checked" : ""}>
       Would like the youth to visit
     </label>
     ${open}
-    <form class="youth-day-add" data-form="youth-day" data-id="${esc(record.id)}" data-member="${esc(entry.member)}">
-      <span>Available with youth</span>
-      <input name="date" type="date" required aria-label="Date available to minister with the youth">
-      <button class="tiny primary" type="submit">Add day</button>
-    </form>
-    ${days}`;
+    <div class="youth-outing">
+      <p class="youth-outing-title">Available to take youth</p>
+      <p class="muted">For one day. Their companion stays the same.</p>
+      <form class="youth-day-add" data-form="youth-day" data-id="${esc(record.id)}" data-member="${esc(entry.member)}">
+        <span>Date</span>
+        <input name="date" type="date" required aria-label="Date available to take a youth">
+        <button class="tiny primary" type="submit">Add day</button>
+      </form>
+      ${days}
+    </div>`;
 }
 
 function directoryNameLinks(names, entry) {
@@ -2819,6 +2886,7 @@ function youthRosterSummary() {
 function personButtons(people = filteredPeople()) {
   const loaded = page === "youth" ? youthVisits() : eldersPeople();
   if (!loaded.length) {
+    if (page === "youth" && dayFilter && !search.trim()) return youthHelpCards(youthHelpForDay(dayFilter));
     if (page === "youth") return "";
     return `<p class="empty">No one is loaded yet. The outreach spreadsheet is not readable from here, so this list starts empty. Import a CSV or add a person. No sample members are included.</p>`;
   }
@@ -2851,11 +2919,13 @@ function personButtons(people = filteredPeople()) {
 function youthHelpCards(rows) {
   return rows.map((entry) => {
     const names = (entry.youth || []).filter(Boolean);
-    const withWhom = names.length ? names.join(" · ") : "Choose one or two youth";
+    const houses = (entry.visits || []).map((visit) => youthDayVisitLabel(visit)).filter(Boolean);
+    const withWhom = names.length ? names.join(" · ") : "Choose a youth";
+    const house = houses.length ? houses.join(" · ") : "Choose a house";
     return `<div class="person with-youth" data-action="open-directory-person" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}">
       <span class="role-kicker">With youth</span>
       <strong>${esc(entry.name)}</strong>
-      <small>${esc(formatDate(entry.date))} · ${esc(withWhom)}</small>
+      <small>${esc(formatDate(entry.date))} · ${esc(withWhom)} · ${esc(house)}</small>
     </div>`;
   }).join("");
 }
