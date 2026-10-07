@@ -2475,7 +2475,7 @@ function directoryAssignedVisits(entry) {
 function directoryVisitLine(entry) {
   const saved = directorySavedVisits(entry);
   const extra = directoryVisitNames(entry.name).filter((name) => !saved.some((item) => directoryNameMatches(item.label, name)));
-  const savedRows = saved.map((item) => `<div class="companion-row"><button type="button" class="name-link" data-action="open-name" data-name="${esc(item.label)}" data-directory="${esc(entry.directoryId)}" data-member="${esc(entry.member)}">${esc(item.label)}</button><button type="button" class="tiny" data-action="remove-directory-visit" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}" data-household="${esc(item.directoryId || "")}" data-label="${esc(item.label || "")}">Remove</button></div>`).join("");
+  const savedRows = saved.map((item) => `<div class="companion-row"><button type="button" class="name-link" data-action="open-name" data-name="${esc(item.label)}" data-directory="${esc(entry.directoryId)}" data-member="${esc(entry.member)}">${esc(item.label)}</button></div>`).join("");
   const extraRows = extra.length ? directoryNameLinks(extra, entry) : "";
   if (!savedRows && !extraRows) return "";
   return `<div class="companion-saved"><span>Visiting</span>${savedRows}${extraRows}</div>`;
