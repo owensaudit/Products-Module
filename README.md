@@ -1,6 +1,6 @@
 # Products Module
 
-Vessel performance for the Products Module — answers **How fast is it?**
+Ranger Tugs **R-29** speed rating — answers **How fast is it?**
 
 ## Speeds
 

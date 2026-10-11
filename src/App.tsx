@@ -47,10 +47,10 @@ function App() {
 
       <section className="speeds" id="speeds" aria-labelledby="speeds-title">
         <div className="section-head">
-          <p className="eyebrow">Published performance</p>
+          <p className="eyebrow">Ranger Tugs R-29 · published performance</p>
           <h2 id="speeds-title">Cruise holds the day. Max is the reserve.</h2>
           <p className="section-lede">
-            Toggle between the two rated speeds — values stay pinned to the published figures.
+            Toggle between the two rated speeds — cruising 14.77 kn and max 17.38 kn.
           </p>
         </div>
 
@@ -87,6 +87,9 @@ function App() {
               <span className="detail__unit">kn</span>
             </p>
             <p className="detail__note">{selected.note}</p>
+            <a className="detail__link" href={vessel.makerUrl} target="_blank" rel="noreferrer">
+              Ranger Tugs R-29
+            </a>
             <SpeedBar mode={selected} />
           </div>
 
@@ -141,7 +144,9 @@ function App() {
       <section className="context" id="context" aria-labelledby="context-title">
         <div className="section-head section-head--light">
           <p className="eyebrow">How to read it</p>
-          <h2 id="context-title">What 14.77 and 17.38 kn actually mean underway</h2>
+          <h2 id="context-title">
+            What 14.77 and 17.38 kn mean on an R-29 underway
+          </h2>
         </div>
         <div className="guide">
           {contextNotes.map((item, index) => (
@@ -160,7 +165,7 @@ function App() {
 
       <footer className="footer">
         <p>
-          {vessel.brand} · cruising {speeds[0].knots.toFixed(2)} kn · max{" "}
+          {vessel.brand} · {vessel.name} · cruising {speeds[0].knots.toFixed(2)} kn · max{" "}
           {speeds[1].knots.toFixed(2)} kn
         </p>
       </footer>

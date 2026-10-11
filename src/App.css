@@ -165,6 +165,20 @@
   animation-delay: 320ms;
 }
 
+.detail__link {
+  display: inline-block;
+  margin: 0 0 1.35rem;
+  color: var(--accent);
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.detail__link:hover {
+  border-bottom-color: var(--accent);
+}
+
 .speeds,
 .context {
   padding: clamp(3.5rem, 9vh, 6rem) clamp(1.25rem, 4vw, 3.5rem);
