@@ -1,0 +1,54 @@
+:root {
+  --ink: #061820;
+  --ink-deep: #031016;
+  --ink-soft: #0d2a36;
+  --foam: #e8f0f2;
+  --foam-muted: #b7c7cc;
+  --sea: #5ec8c0;
+  --sea-bright: #8fe0d8;
+  --amber: #f0a35e;
+  --line: rgba(232, 240, 242, 0.14);
+  --mist: rgba(6, 24, 32, 0.55);
+  --font-display: "Fraunces", "Times New Roman", serif;
+  --font-body: "Sora", system-ui, sans-serif;
+  color: var(--foam);
+  background: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 400;
+  line-height: 1.5;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font: inherit;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+#root {
+  min-height: 100svh;
+}
