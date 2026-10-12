@@ -28,6 +28,7 @@ import {
   setPresidency,
   setYouthLeadership,
   addPerson,
+  alignYouthAssignments,
   removePerson,
   personOutreachStatus,
   previewImport,
@@ -1963,4 +1964,66 @@ test("a ministering visit counts for one year and then returns to To Visit", () 
   assert.equal(youth.rosterStatusKey, "visited");
   assert.equal(youth.visitYearReset, false);
   assert.equal(youth.lastVisited, "10/12/2025");
+});
+
+test("a temporary companion lasts for one assignment visit", () => {
+  const ids = deps();
+  let state = emptyState();
+  state = addPerson(state, { displayName: "Example, Ada", group: "priests", sheetColumns: { Brother: "Example, Ada", Companion: "Keeper, Anthony" } }, ids);
+  state = addPerson(state, {
+    displayName: "Guest, Cam",
+    list: "youth",
+    sheetColumns: { Brother: "Guest, Cam", Assigned: "Example, Ada | Keeper, Anthony", "Visit Date": "7/14 6:00 PM" },
+  }, ids);
+  state = setPersonContact(state, "per_2", { temporaryCompanion: "Sample, Bea", visitedOn: "2026-10-12" });
+  assert.equal(state.people[1].sheetColumns["Temporary Companion"], "Sample, Bea");
+  assert.equal(state.people[1].sheetColumns.Assigned, "Example, Ada | Keeper, Anthony");
+  state = setPersonContact(state, "per_2", { logVisit: true, visitedOn: "2026-10-12" });
+  assert.equal(state.people[1].sheetColumns["Visited On"], "7/14/2026");
+  assert.equal(state.people[1].sheetColumns["Temporary Companion"], undefined);
+  assert.equal(state.people[1].sheetColumns.Assigned, "Example, Ada | Keeper, Anthony");
+  assert.equal(state.people[0].sheetColumns.Companion, "Keeper, Anthony");
+  state = setPersonContact(state, "per_2", { temporaryCompanion: "Other, Cam", visitDate: { date: "2026-11-04", time: "19:00" }, visitedOn: "2026-10-12" });
+  assert.equal(state.people[1].sheetColumns["Temporary Companion"], "Other, Cam");
+  assert.equal(state.people[1].sheetColumns["Visit Date"], "11/4 7:00 PM");
+  assert.equal(state.people[1].sheetColumns["Visited On"], "7/14/2026");
+  state = setPersonStatus(state, "per_2", "Visited", { visitedOn: "2026-10-12" });
+  assert.equal(state.people[1].sheetColumns["Temporary Companion"], undefined);
+  assert.equal(state.people[1].sheetColumns.Assigned, "Example, Ada | Keeper, Anthony");
+  assert.equal(state.people[1].sheetColumns["Visited On"], "7/14/2026");
+});
+
+test("aligning youth assignments leaves a teacher who is not on the list", () => {
+  const ids = deps();
+  let state = emptyState();
+  state = addPerson(state, { displayName: "Example, Ada", group: "priests", sheetColumns: { Brother: "Example, Ada", Companion: "Old, Companion" } }, ids);
+  state = addPerson(state, {
+    displayName: "Guest, Cam",
+    list: "youth",
+    phone: "555-0100",
+    sheetColumns: { Brother: "Guest, Cam", Assigned: "Example, Ada | Old, Companion" },
+  }, ids);
+  state = addPerson(state, { displayName: "Youth, Pat", group: "teachers", sheetColumns: { Brother: "Youth, Pat", Companion: "Kept, Companion" } }, ids);
+  state = addPerson(state, {
+    displayName: "Other, Cam",
+    list: "youth",
+    sheetColumns: { Brother: "Other, Cam", Assigned: "Youth, Pat | Kept, Companion", "Visited On": "7/14/2026" },
+  }, ids);
+  state = alignYouthAssignments(state, {
+    priests: [{ name: "Example, Ada", companion: "Keeper, Anthony", families: ["New, House"] }],
+    teachers: [],
+  }, ids);
+  const ada = state.people.find((person) => person.displayName === "Example, Ada");
+  const guest = state.people.find((person) => person.displayName === "Guest, Cam");
+  const house = state.people.find((person) => person.displayName === "New, House");
+  const pat = state.people.find((person) => person.displayName === "Youth, Pat");
+  const other = state.people.find((person) => person.displayName === "Other, Cam");
+  assert.equal(ada.sheetColumns.Companion, "Keeper, Anthony");
+  assert.equal(guest, undefined);
+  assert.equal(house.sheetColumns.Assigned, "Example, Ada | Keeper, Anthony");
+  assert.equal(house.phone || "", "");
+  assert.equal(pat.sheetColumns.Companion, "Kept, Companion");
+  assert.equal(pat.group, "teachers");
+  assert.equal(other.sheetColumns.Assigned, "Youth, Pat | Kept, Companion");
+  assert.equal(other.sheetColumns["Visited On"], "7/14/2026");
 });

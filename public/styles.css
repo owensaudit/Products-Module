@@ -1257,7 +1257,20 @@ a.address-pill {
 .last-visit.earlier,
 .last-visit.reset { background: #fff4d6; }
 .last-visit-row .mark-visited { position: static; flex: none; }
-.role-card .last-visit-row { grid-column: 1 / -1; margin-top: 6px; }
+.role-card .last-visit-row,
+.role-card .standing-companion,
+.role-card .temporary-companion { grid-column: 1 / -1; margin-top: 6px; }
+.standing-companion { margin: 0; font-weight: 700; }
+.temporary-companion {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #e7f0ff;
+  color: var(--ink);
+  font-weight: 700;
+}
+.role-card .temporary-companion,
+.role-card .standing-companion { display: block; padding: 6px 8px; }
 
 .assignment-editor .text-button {
   flex: none;

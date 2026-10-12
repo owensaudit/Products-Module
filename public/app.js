@@ -767,6 +767,7 @@ app.addEventListener("submit", (event) => {
     post(`/api/people/${form.dataset.id}/contact`, {
       visitDate: { date: data.get("date"), time: data.get("time") },
       visitedOn: clientToday(),
+      temporaryCompanion: data.get("temporaryCompanion") || "",
     }).then(render).catch(showError);
     return;
   }
@@ -2276,6 +2277,7 @@ function assignmentListMarkup() {
 
 function youthListTitle() {
   if (youthList === "none") return "None";
+  if (youthList === "companions") return "Companion";
   return YOUTH_LISTS.find(([id]) => id === youthList)?.[1] || "All";
 }
 
@@ -3090,7 +3092,7 @@ function roleCard(person, kind, fallback = "") {
   const paired = hasCompanionPair(title) ? " has-companion" : "";
   const tone = `${kind === "Assignment" ? " role-assignment" : ""}${paired}`;
   const facts = kind === "Assignment" ? contactLines(person) : "";
-  const logged = kind === "Assignment" ? assignmentVisitMarkup(person, false) : "";
+  const logged = kind === "Assignment" ? `${assignmentCompanionMarkup(person)}${assignmentVisitMarkup(person, false)}` : "";
   const body = `<span class="role-kicker">${esc(kind)}</span><strong>${esc(title)}</strong>${companionPill(title)}${kind === "Priest" || kind === "Teacher" ? noCompanionPill(title) : ""}${facts}${logged}`;
   if (!person) return `<article class="role-card${tone}">${body}</article>`;
   const current = ` aria-current="${person.id === selectedPersonId}"`;
@@ -3158,6 +3160,7 @@ function youthListSize(id, quorum) {
 }
 
 function youthVisibleEntries() {
+  if (youthList === "companions") return companionEntries();
   if (youthList === "none") return [...youthWithoutCompanions("priests"), ...youthWithoutCompanions("teachers")];
   if (youthList === "all") {
     const seen = new Set();
@@ -3219,6 +3222,7 @@ function leadersMarkup(grouped = true) {
 function youthListMarkup() {
   if (youthList === "none") return noneListMarkup();
   if (youthList === "leaders") return leadersMarkup();
+  if (youthList === "companions") return companionListMarkup();
   const lists = youthVisibleLists();
   const single = lists.length === 1;
   return lists.map(([id, label, quorum]) => {
@@ -3286,6 +3290,7 @@ function youthRosterSummary() {
   }).join("");
   const allPressed = listsOpen && youthList === "all";
   const nonePressed = listsOpen && youthList === "none";
+  const companionPressed = listsOpen && youthList === "companions";
   const noneCount = youthMembers().filter((person) => !hasCompanionPair(nameKey(person))).length;
   const assignmentPressed = showingAssignments();
   const visitPressed = youthList === "visits" && !archiveOpen && !viewAll && !assigneeFilter && !dayFilter && statusFilter === "all";
@@ -3294,6 +3299,7 @@ function youthRosterSummary() {
   return `<div class="summary" aria-label="Youth lists">
     <button type="button" data-action="view-all" aria-pressed="${allPressed}">All ${allCount}</button>
     ${listButtons}
+    <button type="button" data-action="youth-list" data-list="companions" aria-pressed="${companionPressed}">Companion ${companionGroups().length}</button>
     <button type="button" data-action="youth-list" data-list="none" aria-pressed="${nonePressed}">None ${noneCount}</button>
     <button type="button" data-action="youth-list" data-list="scheduled" aria-pressed="${scheduledPressed}">Scheduled ${scheduledCount()}</button>
     <button type="button" data-action="youth-list" data-list="assignments" aria-pressed="${assignmentPressed}">Assignments ${activeCount}</button>
@@ -3643,6 +3649,100 @@ function ministeringVisitNote(person) {
   return `<p class="last-visit"><strong>Last visited ${esc(person.lastVisited)}</strong></p>`;
 }
 
+function standingCompanionName(family) {
+  return String(family?.assigned?.[1] || "").trim();
+}
+
+function temporaryCompanionName(family) {
+  return String(family?.sheetColumns?.["Temporary Companion"] || "").trim();
+}
+
+function assignmentCompanionMarkup(person) {
+  if (!person || person.list !== "youth") return "";
+  const standing = standingCompanionName(person);
+  const temporary = temporaryCompanionName(person);
+  return `${standing ? `<small class="standing-companion">Companion ${esc(standing)}</small>` : ""}${temporary ? `<small class="temporary-companion">Temporary companion ${esc(temporary)} · this visit only</small>` : ""}`;
+}
+
+function companionScheduleNote(family) {
+  const standing = standingCompanionName(family);
+  const temporary = temporaryCompanionName(family);
+  const standingLine = `<p class="standing-companion"><strong>Companion</strong> ${esc(standing || "None")}</p>`;
+  const temporaryLine = temporary ? `<p class="temporary-companion"><strong>Temporary companion</strong> ${esc(temporary)} · this visit only</p>` : "";
+  return standingLine + temporaryLine;
+}
+
+function temporaryCompanionChoices(selected) {
+  const names = [];
+  const add = (name) => {
+    const text = String(name || "").trim();
+    if (!text || names.some((item) => directoryNameMatches(item, text))) return;
+    names.push(text);
+  };
+  for (const name of youthVisitorNames()) add(name);
+  for (const group of companionGroups()) add(group.name);
+  add(selected);
+  names.sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
+  const option = (name) => `<option value="${esc(name)}" ${directoryNameMatches(name, selected) ? "selected" : ""}>${esc(name)}</option>`;
+  return `<select name="temporaryCompanion" aria-label="Temporary companion for this visit">
+    <option value="" ${selected ? "" : "selected"}>Standing companion</option>
+    ${names.map(option).join("")}
+  </select>`;
+}
+
+function standingCompanionships() {
+  const rows = [];
+  for (const quorum of ["priests", "teachers"]) {
+    for (const person of youthMembers(quorum)) {
+      const families = ministeringForYouth(nameKey(person)).families;
+      const companion = ministeringCompanionValue(person, families);
+      if (!companion) continue;
+      rows.push({
+        companion,
+        youth: nameKey(person),
+        quorum,
+        families: families.map((family) => nameKey(family)).filter(Boolean),
+      });
+    }
+  }
+  return rows;
+}
+
+function companionGroups() {
+  const groups = [];
+  for (const row of standingCompanionships()) {
+    const key = row.companion.trim().toLowerCase();
+    let group = groups.find((item) => item.name.trim().toLowerCase() === key);
+    if (!group) {
+      group = { name: row.companion, pairs: [] };
+      groups.push(group);
+    }
+    group.pairs.push(row);
+  }
+  return groups.sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
+}
+
+function companionEntries() {
+  const needle = search.trim().toLowerCase();
+  return companionGroups().filter((group) => {
+    if (!needle) return true;
+    const haystack = [group.name, ...group.pairs.flatMap((pair) => [pair.youth, ...pair.families])].join(" ").toLowerCase();
+    return haystack.includes(needle);
+  });
+}
+
+function companionListMarkup() {
+  const groups = companionEntries();
+  if (!groups.length) {
+    const message = search.trim() ? "No companions match this search." : "No companions are assigned yet.";
+    return `<p class="empty">${message}</p>`;
+  }
+  return `<div class="ministering-cards">${groups.map((group) => {
+    const pairs = group.pairs.map((pair) => `<small>with ${esc(pair.youth)}</small><small>${esc(pair.families.join(" · ") || "No families yet")}</small>`).join("");
+    return `<article class="role-card"><span class="role-kicker">Companion</span><strong>${esc(group.name)}</strong>${pairs}</article>`;
+  }).join("")}</div>`;
+}
+
 function youthAssignmentVisit(family) {
   const responded = family.sheetColumns?.Response === "Responded";
   const visit = family.sheetColumns?.["Visit Date"] || "";
@@ -3651,11 +3751,13 @@ function youthAssignmentVisit(family) {
     <input data-assignment-id="${esc(family.id)}" value="${esc(nameKey(family))}" aria-label="Assignment">
     <button type="button" class="name-link" data-action="open-name" data-name="${esc(nameKey(family))}" data-person="${esc(family.id)}">${esc(nameKey(family))}</button>
     <label class="responded"><input type="checkbox" data-response-id="${esc(family.id)}" ${responded ? "checked" : ""}> Responded</label>
+    ${companionScheduleNote(family)}
     ${visit ? `<p class="plan-line"><strong>Visit</strong> ${esc(visit)}</p>${family.sheetColumns?.["Visit Notified"] === "Yes" ? `<p class="notified">Notified</p>` : ""}` : ""}
     ${assignmentVisitMarkup(family)}
     <form class="appointment-row" data-form="assignment-visit" data-id="${esc(family.id)}">
       <input name="date" type="date" aria-label="Visit date" required value="${esc(parts.date)}">
       <input name="time" type="time" aria-label="Visit time" required value="${esc(parts.time)}">
+      ${temporaryCompanionChoices(temporaryCompanionName(family))}
       <button class="tiny primary" type="submit">Schedule visit</button>
     </form>
     <button type="button" class="text-button" data-action="clear-assignment" data-id="${esc(family.id)}">Remove</button>
@@ -3666,6 +3768,7 @@ function assignmentDetail(person) {
   const confirm = person.rosterStatusKey === "scheduled" ? visitCheck(person) : "";
   return `${cardBackButton()}${personNameField(person)}
     <p class="muted">Assignment</p>
+    ${companionScheduleNote(person)}
     ${assignmentVisitMarkup(person)}
     <p class="status-row">${statusSelect(person)}${confirm}${missionPill(person)}</p>
     ${contactFields(person, true)}
