@@ -1027,10 +1027,12 @@ article.role-card { cursor: default; }
   text-transform: uppercase;
 }
 .role-card small { color: var(--muted); }
-.role-card .companion-open {
-  justify-self: start;
-  font-weight: 700;
-  color: inherit;
+button.companion-pill {
+  box-shadow: 0 0 0 2px var(--ink);
+  cursor: pointer;
+}
+button.companion-pill[aria-pressed="true"] {
+  box-shadow: 0 0 0 3px var(--church);
 }
 .companion-schedule { display: grid; gap: 8px; margin-top: 16px; }
 .companion-schedule h3 { margin: 0; }

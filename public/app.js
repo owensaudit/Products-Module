@@ -3751,7 +3751,7 @@ function companionListMarkup() {
   return `<div class="ministering-cards">${groups.map((group) => {
     const pairs = group.pairs.map((pair) => `<small>with ${esc(pair.youth)}</small><small>${esc(pair.families.join(" · ") || "No families yet")}</small>`).join("");
     const open = directoryNameMatches(group.name, selectedCompanionName);
-    return `<article class="role-card" aria-current="${open}"><span class="role-kicker">Companion</span><button type="button" class="name-link companion-open" data-action="open-companion" data-name="${esc(group.name)}" aria-pressed="${open}">${esc(group.name)}</button>${pairs}</article>`;
+    return `<button type="button" class="role-card companion-pill" data-action="open-companion" data-name="${esc(group.name)}" aria-pressed="${open}" aria-current="${open}"><span class="role-kicker">Companion</span><strong>${esc(group.name)}</strong>${pairs}</button>`;
   }).join("")}</div>`;
 }
 
