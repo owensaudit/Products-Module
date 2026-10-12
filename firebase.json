@@ -1,0 +1,46 @@
+{
+  "functions": {
+    "source": ".",
+    "runtime": "nodejs22",
+    "codebase": "default",
+    "ignore": [
+      "node_modules",
+      ".git",
+      "data/**",
+      "test/**",
+      ".env",
+      "*.local.json"
+    ]
+  },
+  "hosting": {
+    "rewrites": [
+      {
+        "source": "**",
+        "function": {
+          "functionId": "portal",
+          "region": "us-west1"
+        }
+      }
+    ]
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json",
+    "edition": "enterprise",
+    "database": "portal",
+    "location": "us-west1"
+  },
+  "auth": {
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "PruneHill",
+        "supportEmail": "owensaudit@gmail.com"
+      }
+    },
+    "authorizedDomains": [
+      "localhost",
+      "prunehill.web.app",
+      "prunehill.firebaseapp.com"
+    ]
+  }
+}
