@@ -79,6 +79,7 @@ let directoryFilter = "all";
 let directoryAdding = false;
 let youthGroup = "priests";
 let youthList = "all";
+let selectedCompanionName = "";
 let commentFor = "";
 let editingCommentId = "";
 let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -464,6 +465,14 @@ app.addEventListener("click", (event) => {
     const current = selectedPerson();
     if (current && !personMatchesFilters(current)) selectedPersonId = null;
     render();
+  } else if (action === "open-companion") {
+    selectedCompanionName = button.dataset.name || "";
+    selectedPersonId = null;
+    detailForm = null;
+    view = "people";
+    const narrow = window.matchMedia("(max-width: 800px)").matches;
+    render();
+    if (narrow) document.querySelector("#companion-detail")?.scrollIntoView({ block: "start" });
   } else if (action === "open-name") {
     openLinkedName(button.dataset.name, {
       personId: button.dataset.person || "",
@@ -1488,6 +1497,7 @@ function saveContactFields() {
 
 function render() {
   if (youthList === "temporary") youthList = "all";
+  if (youthList !== "companions") selectedCompanionName = "";
   if (blankPlanFor && blankPlanFor !== selectedPersonId) blankPlanFor = "";
   if (inbox && !inboxMessages().length) inbox = "";
   const contactDraft = readContactDraft();
@@ -2018,7 +2028,8 @@ function peopleView() {
   const noticeCount = !reminding && !scheduled && !youthLists && !assignments && dayFilter ? noticesOn(dayFilter).length : 0;
   const reminderCount = reminding ? visibleReminders().length : 0;
   const total = reminderCount + (scheduled ? scheduledRows().length : assignments ? visibleAssignments().length : youthLists ? youthVisibleEntries().length : people.length) + helpCount + dayCount + noticeCount;
-  const showDetail = !reminding && !scheduled && (!state.rosterMode || Boolean(selectedPersonId));
+  const companionOpen = page === "youth" && youthList === "companions" && Boolean(selectedCompanionName);
+  const showDetail = !reminding && !scheduled && (companionOpen || !state.rosterMode || Boolean(selectedPersonId));
   const onlyDayVisits = !reminding && !scheduled && !youthLists && !assignments && people.length === 0 && dayCount > 0 && noticeCount === 0;
   const onlyNotices = !reminding && !scheduled && !youthLists && !assignments && people.length === 0 && dayCount === 0 && noticeCount > 0;
   const noun = reminding || onlyNotices
@@ -2038,7 +2049,7 @@ function peopleView() {
       <input id="search" class="search" type="search" placeholder="Search by name" value="${esc(search)}" aria-label="Search by name">
       <div id="person-list" class="person-list">${markup}</div>
     </div>
-    ${showDetail ? `<div class="card">${personDetail()}</div>` : ""}
+    ${showDetail ? `<div class="card"${companionOpen ? ` id="companion-detail"` : ""}>${companionOpen ? companionDetail() : personDetail()}</div>` : ""}
   </section>`;
 }
 
@@ -3739,8 +3750,21 @@ function companionListMarkup() {
   }
   return `<div class="ministering-cards">${groups.map((group) => {
     const pairs = group.pairs.map((pair) => `<small>with ${esc(pair.youth)}</small><small>${esc(pair.families.join(" · ") || "No families yet")}</small>`).join("");
-    return `<article class="role-card"><span class="role-kicker">Companion</span><strong>${esc(group.name)}</strong>${pairs}</article>`;
+    const open = directoryNameMatches(group.name, selectedCompanionName);
+    return `<article class="role-card" aria-current="${open}"><span class="role-kicker">Companion</span><button type="button" class="name-link companion-open" data-action="open-companion" data-name="${esc(group.name)}" aria-pressed="${open}">${esc(group.name)}</button>${pairs}</article>`;
   }).join("")}</div>`;
+}
+
+function companionDetail() {
+  const group = companionGroups().find((item) => directoryNameMatches(item.name, selectedCompanionName));
+  if (!group) return `<h2>Companion</h2><p class="empty">Choose a companion.</p>`;
+  const blocks = group.pairs.map((pair) => {
+    const youth = youthMembers().find((person) => directoryNameMatches(nameKey(person), pair.youth));
+    const families = youth ? ministeringForYouth(nameKey(youth)).families : [];
+    const visits = families.map((family) => youthAssignmentVisit(family)).join("");
+    return `<section class="companion-schedule"><h3>with ${esc(pair.youth)}</h3>${visits || `<p class="empty">No families yet.</p>`}</section>`;
+  }).join("");
+  return `<p class="muted">Companion</p><h2>${esc(group.name)}</h2><p class="muted">Schedule this companion with an assignment.</p>${blocks}`;
 }
 
 function youthAssignmentVisit(family) {

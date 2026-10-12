@@ -1027,6 +1027,13 @@ article.role-card { cursor: default; }
   text-transform: uppercase;
 }
 .role-card small { color: var(--muted); }
+.role-card .companion-open {
+  justify-self: start;
+  font-weight: 700;
+  color: inherit;
+}
+.companion-schedule { display: grid; gap: 8px; margin-top: 16px; }
+.companion-schedule h3 { margin: 0; }
 .contact-line { white-space: pre-line; }
 .role-assignment .contact-line { display: block; }
 
