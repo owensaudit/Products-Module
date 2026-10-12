@@ -419,6 +419,14 @@ app.addEventListener("click", (event) => {
     render();
   } else if (action === "mark-visited") {
     applyStatus(button.dataset.personId, "Visited", { keepView: true });
+  } else if (action === "log-assignment-visit") {
+    post(`/api/people/${button.dataset.id}/contact`, {
+      logVisit: true,
+      visitedOn: clientToday(),
+    }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
   } else if (action === "complete-temporary") {
     post("/api/youth/temporary/complete", { id: button.dataset.id }).then((next) => {
       state = next;
@@ -758,6 +766,7 @@ app.addEventListener("submit", (event) => {
   if (kind === "assignment-visit") {
     post(`/api/people/${form.dataset.id}/contact`, {
       visitDate: { date: data.get("date"), time: data.get("time") },
+      visitedOn: clientToday(),
     }).then(render).catch(showError);
     return;
   }
@@ -1932,7 +1941,7 @@ function applyStatus(personId, status, options = {}) {
     }
   }
   archiveChoicesFor = "";
-  post(`/api/people/${personId}/status`, { status }).then((next) => {
+  post(`/api/people/${personId}/status`, { status, visitedOn: clientToday() }).then((next) => {
     state = next;
     selectedPersonId = personId;
     const person = selectedPerson();
@@ -3081,7 +3090,8 @@ function roleCard(person, kind, fallback = "") {
   const paired = hasCompanionPair(title) ? " has-companion" : "";
   const tone = `${kind === "Assignment" ? " role-assignment" : ""}${paired}`;
   const facts = kind === "Assignment" ? contactLines(person) : "";
-  const body = `<span class="role-kicker">${esc(kind)}</span><strong>${esc(title)}</strong>${companionPill(title)}${kind === "Priest" || kind === "Teacher" ? noCompanionPill(title) : ""}${facts}`;
+  const logged = kind === "Assignment" ? assignmentVisitMarkup(person, false) : "";
+  const body = `<span class="role-kicker">${esc(kind)}</span><strong>${esc(title)}</strong>${companionPill(title)}${kind === "Priest" || kind === "Teacher" ? noCompanionPill(title) : ""}${facts}${logged}`;
   if (!person) return `<article class="role-card${tone}">${body}</article>`;
   const current = ` aria-current="${person.id === selectedPersonId}"`;
   if (kind === "Assignment") return `<div class="role-card${tone}" data-action="select-person" data-id="${esc(person.id)}"${current}>${body}</div>`;
@@ -3458,6 +3468,8 @@ function rosterLine(person) {
   if (person.reachOutDate) bits.push(`Reach out ${esc(person.reachOutDate)}`);
   if (person.appointment) bits.push(`Appt ${esc(person.appointment)}${placeMark(person.appointmentPlace)}`);
   if (person.list === "youth" && person.assigned?.length) bits.push(esc(person.assigned.join(" · ")));
+  if (person.visitYearReset && person.lastVisited) bits.push(`Year reset · last visited ${esc(person.lastVisited)}`);
+  else if (person.lastVisited && person.list !== "youth" && !isYouthMember(person)) bits.push(`Last visited ${esc(person.lastVisited)}`);
   const touch = lastTouch(person);
   if (touch) bits.push(esc(touch));
   return bits.join(" · ") || esc(person.sheetName || "");
@@ -3585,6 +3597,52 @@ function youthMemberDetail(person) {
     ${commentForm("person", person.id)}`;
 }
 
+function clientToday() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
+function loggedVisitIso(person) {
+  if (person?.lastVisitedOn) return person.lastVisitedOn;
+  const raw = String(person?.sheetColumns?.["Visited On"] || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const match = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!match) return "";
+  return `${match[3]}-${match[1].padStart(2, "0")}-${match[2].padStart(2, "0")}`;
+}
+
+function quarterKey(iso) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso || "")) return "";
+  const month = Number(iso.slice(5, 7));
+  return `${iso.slice(0, 4)}-${Math.floor((month - 1) / 3) + 1}`;
+}
+
+function assignmentVisitCopy(person) {
+  const iso = loggedVisitIso(person);
+  if (!iso) return { text: "No visit logged this quarter", tone: "due" };
+  const [year, month, day] = iso.split("-");
+  const label = person?.lastVisited || `${Number(month)}/${Number(day)}/${year}`;
+  if (quarterKey(iso) === quarterKey(clientToday())) return { text: `Last visited ${label} · this quarter`, tone: "current" };
+  return { text: `Last visited ${label}`, tone: "earlier" };
+}
+
+function assignmentVisitMarkup(person, withCheck = true) {
+  if (!person || person.list !== "youth") return "";
+  const note = assignmentVisitCopy(person);
+  const check = withCheck
+    ? `<button type="button" class="mark-visited" data-action="log-assignment-visit" data-id="${esc(person.id)}" aria-label="Log this visit">✓</button>`
+    : "";
+  return `<div class="last-visit-row ${note.tone}"><p><strong>${esc(note.text)}</strong></p>${check}</div>`;
+}
+
+function ministeringVisitNote(person) {
+  if (!person || isYouthVisit(person) || isYouthMember(person) || !person.lastVisited) return "";
+  if (person.visitYearReset) {
+    return `<p class="last-visit reset"><strong>Last visited ${esc(person.lastVisited)}. This year has reset.</strong></p>`;
+  }
+  return `<p class="last-visit"><strong>Last visited ${esc(person.lastVisited)}</strong></p>`;
+}
+
 function youthAssignmentVisit(family) {
   const responded = family.sheetColumns?.Response === "Responded";
   const visit = family.sheetColumns?.["Visit Date"] || "";
@@ -3594,6 +3652,7 @@ function youthAssignmentVisit(family) {
     <button type="button" class="name-link" data-action="open-name" data-name="${esc(nameKey(family))}" data-person="${esc(family.id)}">${esc(nameKey(family))}</button>
     <label class="responded"><input type="checkbox" data-response-id="${esc(family.id)}" ${responded ? "checked" : ""}> Responded</label>
     ${visit ? `<p class="plan-line"><strong>Visit</strong> ${esc(visit)}</p>${family.sheetColumns?.["Visit Notified"] === "Yes" ? `<p class="notified">Notified</p>` : ""}` : ""}
+    ${assignmentVisitMarkup(family)}
     <form class="appointment-row" data-form="assignment-visit" data-id="${esc(family.id)}">
       <input name="date" type="date" aria-label="Visit date" required value="${esc(parts.date)}">
       <input name="time" type="time" aria-label="Visit time" required value="${esc(parts.time)}">
@@ -3607,6 +3666,7 @@ function assignmentDetail(person) {
   const confirm = person.rosterStatusKey === "scheduled" ? visitCheck(person) : "";
   return `${cardBackButton()}${personNameField(person)}
     <p class="muted">Assignment</p>
+    ${assignmentVisitMarkup(person)}
     <p class="status-row">${statusSelect(person)}${confirm}${missionPill(person)}</p>
     ${contactFields(person, true)}
     ${assignmentFields(person)}
@@ -3625,6 +3685,7 @@ function rosterDetail(person) {
     ${householdLine(person)}
     ${companionLine(person)}
     <p class="status-row">${statusSelect(person)}${archiveControl(person)}${missionPill(person)}${person.rosterStatusKey === "scheduled" ? visitCheck(person) : ""}</p>
+    ${ministeringVisitNote(person)}
     ${contactFields(person, false, true)}
     ${factsForm(person)}
     ${planLine(person)}

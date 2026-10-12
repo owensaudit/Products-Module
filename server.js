@@ -257,7 +257,9 @@ export function createPortalHandler(store, options = {}) {
 
         const personStatus = pathname.match(/^\/api\/people\/([^/]+)\/status$/);
         if (personStatus) {
-          const options = Object.hasOwn(body, "mission") ? { mission: body.mission } : {};
+          const options = {};
+          if (Object.hasOwn(body, "mission")) options.mission = body.mission;
+          if (Object.hasOwn(body, "visitedOn")) options.visitedOn = body.visitedOn;
           const next = await store.update((state) => setPersonStatus(state, decodeURIComponent(personStatus[1]), body.status, options));
           sendJson(response, 200, presentState(next, month, viewOptions));
           return;

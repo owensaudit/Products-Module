@@ -1234,6 +1234,30 @@ a.address-pill {
 }
 .assignment-visit.is-responded { background: #f3faf6; border-radius: 10px; padding: 10px; }
 .assignment-visit .responded { display: flex; gap: 6px; align-items: center; }
+.last-visit-row,
+.last-visit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fff4d6;
+  color: var(--ink);
+  font-weight: 700;
+}
+.last-visit-row p,
+.last-visit { margin: 0; }
+.last-visit-row.current,
+.last-visit.current { background: #e7f6ea; }
+.last-visit-row.due,
+.last-visit.due { background: #ffe8df; }
+.last-visit-row.earlier,
+.last-visit.earlier,
+.last-visit.reset { background: #fff4d6; }
+.last-visit-row .mark-visited { position: static; flex: none; }
+.role-card .last-visit-row { grid-column: 1 / -1; margin-top: 6px; }
 
 .assignment-editor .text-button {
   flex: none;

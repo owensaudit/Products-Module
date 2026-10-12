@@ -632,6 +632,7 @@ test("a youth ministry meeting and a family visit mark the calendar", () => {
   assert.equal(state.people[0].sheetColumns.Companion, "Sample, Bea");
   assert.equal(state.people[1].sheetColumns.Response, "Responded");
   assert.equal(state.people[1].sheetColumns["Visit Date"], "10/22 6:30 PM");
+  assert.equal(state.people[1].sheetColumns["Visited On"], undefined);
   const marks = presentState(state, "2026-10").calendarMarks;
   assert.deepEqual(marks["2026-10-21"], { kinds: ["scheduled"], people: ["per_1"] });
   assert.deepEqual(marks["2026-10-22"], { kinds: ["scheduled"], people: ["per_2"] });
@@ -1894,4 +1895,63 @@ test("a reminder names the visit, the household, and the companion", () => {
     }),
     "Brother Ben. Friendly reminder you have a scheduled Youth Ministry on 10/14 7:30 PM with Other, Cam. Your Companion for this will be Youth, Pat.",
   );
+});
+
+test("a youth assignment keeps the logged visit date when another visit is scheduled", () => {
+  const ids = deps();
+  let state = emptyState();
+  state = addPerson(state, { displayName: "Guest, Cam", list: "youth", sheetColumns: { Brother: "Guest, Cam" } }, ids);
+  state = setPersonContact(state, "per_1", { visitDate: { date: "2026-10-22", time: "18:30" }, visitedOn: "2026-10-12" });
+  assert.equal(state.people[0].sheetColumns["Visited On"], undefined);
+  state = setPersonContact(state, "per_1", { visitDate: { date: "2026-10-23", time: "18:30" }, visitedOn: "2026-10-12" });
+  assert.equal(state.people[0].sheetColumns["Visited On"], undefined);
+  assert.equal(state.people[0].sheetColumns["Visit Date"], "10/23 6:30 PM");
+  state = setPersonContact(state, "per_1", { visitDate: { date: "2026-07-14", time: "18:00" }, visitedOn: "2026-10-12" });
+  state = setPersonContact(state, "per_1", { logVisit: true, visitedOn: "2026-10-12" });
+  assert.equal(state.people[0].sheetColumns["Visited On"], "7/14/2026");
+  assert.equal(state.people[0].sheetColumns["Visit Date"], undefined);
+  state = setPersonContact(state, "per_1", { visitDate: { date: "2026-10-20", time: "19:00" }, visitedOn: "2026-10-12" });
+  assert.equal(state.people[0].sheetColumns["Visited On"], "7/14/2026");
+  assert.equal(state.people[0].sheetColumns["Visit Date"], "10/20 7:00 PM");
+  const shown = presentState(state, "2026-10", { today: "2026-10-12" }).people[0];
+  assert.equal(shown.lastVisited, "7/14/2026");
+  assert.equal(shown.lastVisitedOn, "2026-07-14");
+  assert.equal(shown.visitYearReset, false);
+});
+
+test("a ministering visit counts for one year and then returns to To Visit", () => {
+  const ids = deps();
+  let state = emptyState();
+  state = addPerson(state, { displayName: "Sample, Ben", sheetColumns: { Brother: "Sample, Ben" } }, ids);
+  state = setAppointment(state, "per_1", { date: "2025-10-12", time: "19:00", kind: "scheduled", place: "home" });
+  state = setPersonStatus(state, "per_1", "Visited", { visitedOn: "2026-10-12" });
+  assert.equal(state.people[0].sheetColumns.Status, "Visited");
+  assert.equal(state.people[0].sheetColumns["Visited On"], "10/12/2025");
+  let view = presentState(state, "2026-10", { today: "2026-10-11" });
+  assert.equal(view.people[0].rosterStatusKey, "visited");
+  assert.equal(view.people[0].visitYearReset, false);
+  assert.equal(view.people[0].lastVisited, "10/12/2025");
+  view = presentState(state, "2026-10", { today: "2026-10-12" });
+  assert.equal(view.people[0].rosterStatusKey, "none");
+  assert.equal(view.people[0].rosterStatus, "");
+  assert.equal(view.people[0].visitYearReset, true);
+  assert.equal(view.people[0].lastVisited, "10/12/2025");
+  assert.equal(state.people[0].sheetColumns.Status, "Visited");
+  state = setPersonStatus(state, "per_1", "Reach Out");
+  assert.equal(state.people[0].sheetColumns["Visited On"], "10/12/2025");
+  state = addPerson(state, { displayName: "Keeper, Anthony", sheetColumns: { Brother: "Keeper, Anthony", Status: "Visited" } }, ids);
+  view = presentState(state, "2026-10", { today: "2026-10-12" });
+  assert.equal(view.people[1].rosterStatusKey, "visited");
+  assert.equal(view.people[1].visitYearReset, false);
+  assert.equal(view.people[1].lastVisited, "");
+  state = addPerson(state, {
+    displayName: "Guest, Cam",
+    list: "youth",
+    sheetColumns: { Brother: "Guest, Cam", Status: "Visited", "Visited On": "10/12/2025" },
+  }, ids);
+  view = presentState(state, "2026-10", { today: "2026-10-12" });
+  const youth = view.people.find((person) => person.list === "youth");
+  assert.equal(youth.rosterStatusKey, "visited");
+  assert.equal(youth.visitYearReset, false);
+  assert.equal(youth.lastVisited, "10/12/2025");
 });
