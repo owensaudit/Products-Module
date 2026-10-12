@@ -3073,7 +3073,8 @@ function directorySummary() {
 function directoryView() {
   const rows = directoryVisibleEntries();
   const noun = rows.length === 1 ? "person" : "people";
-  return `<section class="layout">
+  const showDetail = directoryAdding || Boolean(directoryFocusedEntry());
+  return `<section class="layout${showDetail ? "" : " layout-single"}">
     <div class="card">
       <div class="row">
         <h2>Member directory</h2>
@@ -3084,7 +3085,7 @@ function directoryView() {
       <input id="search" class="search" type="search" placeholder="Search by last name" value="${esc(search)}" aria-label="Search by last name">
       <div id="person-list" class="person-list directory-list">${directoryListMarkup(rows)}</div>
     </div>
-    <div class="card">${directoryDetail()}</div>
+    ${showDetail ? `<div class="card">${directoryDetail()}</div>` : ""}
   </section>`;
 }
 
