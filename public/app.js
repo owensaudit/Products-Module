@@ -3813,10 +3813,7 @@ function assignmentVisitMarkup(person, withCheck = true) {
 }
 
 function ministeringVisitor(person) {
-  const iso = loggedVisitIso(person);
-  if (!iso) return "";
-  const attempt = personTouches(person).find((item) => item.channel === "in_person" && item.date === iso && whoLabel(item));
-  return attempt ? whoLabel(attempt) : "";
+  return String(person?.sheetColumns?.["Visited By"] || "").trim();
 }
 
 function ministeringVisitSentence(person) {
@@ -3831,7 +3828,7 @@ function ministeringVisitNote(person) {
   if (person.visitYearReset) {
     return `<p class="last-visit reset"><strong>${esc(sentence)}. This year has reset.</strong></p>`;
   }
-  return `<p class="last-visit"><strong>${esc(sentence)}</strong></p>`;
+  return `<p class="last-visit visit-tag"><strong>${esc(sentence)}</strong></p>`;
 }
 
 function standingCompanionName(family) {

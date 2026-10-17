@@ -2150,19 +2150,31 @@ test("a ministering card can state who visited and the date", () => {
   state = recordMinisteringVisit(state, "per_1", { by: "Mark Lillenberg", date: "2026-10-14" }, ids);
   assert.equal(state.people[0].sheetColumns.Status, "Visited");
   assert.equal(state.people[0].sheetColumns["Visited On"], "10/14/2026");
+  assert.equal(state.people[0].sheetColumns["Visited By"], "Mark Lillenberg");
   assert.equal(state.people[0].sheetColumns.Companion, "Delahunty, Andy");
   assert.equal(state.people[0].phone || "", "");
   assert.equal(state.people[0].email || "", "");
-  assert.equal(state.outreachAttempts.length, 1);
-  assert.equal(state.outreachAttempts[0].sheetColumns.By, "Mark Lillenberg");
-  assert.equal(state.outreachAttempts[0].channel, "in_person");
-  assert.equal(state.outreachAttempts[0].date, "2026-10-14");
+  assert.equal(state.outreachAttempts.length, 0);
   const view = presentState(state, "2026-10", { today: "2026-10-17" });
   assert.equal(view.people[0].rosterStatusKey, "visited");
   assert.equal(view.people[0].lastVisited, "10/14/2026");
+  assert.equal(view.people[0].sheetColumns["Visited By"], "Mark Lillenberg");
   assert.equal(view.people[0].visitYearReset, false);
+  state = logOutreach(state, {
+    personId: "per_1",
+    channel: "in_person",
+    date: "2026-10-14",
+    status: "contacted",
+    by: "Mark Lillenberg",
+  }, ids);
+  state = updateOutreach(state, state.outreachAttempts[0].id, { by: "", channel: "text", date: "2026-10-14" });
+  assert.equal(state.people[0].sheetColumns["Visited By"], "Mark Lillenberg");
+  state = removeOutreach(state, state.outreachAttempts[0].id);
+  assert.equal(state.outreachAttempts.length, 0);
+  assert.equal(state.people[0].sheetColumns["Visited By"], "Mark Lillenberg");
+  assert.equal(state.people[0].sheetColumns["Visited On"], "10/14/2026");
   state = recordMinisteringVisit(state, "per_1", { by: "Mark Lillenberg", date: "10/14/2026" }, ids);
-  assert.equal(state.outreachAttempts.length, 1);
+  assert.equal(state.outreachAttempts.length, 0);
   assert.throws(() => recordMinisteringVisit(state, "per_1", { by: "", date: "2026-10-14" }, ids), /who visited/);
   assert.throws(() => recordMinisteringVisit(state, "per_1", { by: "Mark Lillenberg", date: "Wednesday" }, ids), /Visit date/);
   state = addPerson(state, { displayName: "Youth, Pat", group: "priests", sheetColumns: { Brother: "Youth, Pat" } }, ids);
