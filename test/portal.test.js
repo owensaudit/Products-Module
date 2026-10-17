@@ -2088,6 +2088,57 @@ test("aligning youth assignments leaves a teacher who is not on the list", () =>
   assert.equal(other.sheetColumns["Visited On"], "7/14/2026");
 });
 
+test("a visited brother can take a directory companion without changing the assignment", () => {
+  let state = emptyState();
+  state = {
+    ...state,
+    people: [{
+      id: "per_steven",
+      displayName: "Locke, Steven",
+      phone: "555-0100",
+      email: "",
+      household: "",
+      notes: "",
+      sheetColumns: {
+        Brother: "Locke, Steven",
+        Status: "Visited",
+        "Visited On": "10/14/2026",
+        Assigned: "Mark Lillenberg",
+        Priesthood: "Priest",
+      },
+      createdAt: "2026-10-17T00:00:00.000Z",
+      updatedAt: "2026-10-17T00:00:00.000Z",
+    }],
+    directory: [
+      {
+        id: "dir_locke",
+        name: "Locke, Steven & Mandy",
+        members: ["Steven"],
+        memberCompanions: {},
+        memberVisits: { steven: [{ directoryId: "dir_keep", label: "Standing house" }] },
+        phone: "555-0199",
+        address: "1 Example St",
+      },
+      {
+        id: "dir_mark",
+        name: "Lillenberg, Mark & Melodie",
+        members: ["Mark"],
+        memberCompanions: {},
+      },
+    ],
+  };
+  state = setDirectoryCompanion(state, { directoryId: "dir_locke", member: "Steven", companion: "Lillenberg, Mark" });
+  assert.equal(state.directory[0].memberCompanions.steven, "Lillenberg, Mark");
+  assert.equal(state.people[0].sheetColumns.Assigned, "Mark Lillenberg");
+  assert.equal(state.people[0].sheetColumns.Status, "Visited");
+  assert.equal(state.people[0].sheetColumns["Visited On"], "10/14/2026");
+  assert.equal(state.people[0].phone, "555-0100");
+  assert.equal(state.directory[0].phone, "555-0199");
+  assert.equal(state.directory[0].address, "1 Example St");
+  assert.deepEqual(state.directory[0].memberVisits.steven, [{ directoryId: "dir_keep", label: "Standing house" }]);
+  assert.deepEqual(state.directory[1].members, ["Mark"]);
+});
+
 test("a ministering card can state who visited and the date", () => {
   const ids = deps();
   let state = emptyState();

@@ -250,6 +250,10 @@ app.addEventListener("change", (event) => {
     saveDirectoryAssignment(target.form);
     return;
   }
+  if (target instanceof HTMLSelectElement && target.form?.dataset.form === "ministering-companion") {
+    saveMinisteringCompanion(target.form);
+    return;
+  }
   if (target instanceof HTMLSelectElement && target.form?.dataset.form === "assign") {
     saveAssignment(target.form);
     return;
@@ -2808,12 +2812,62 @@ function companionPill(name) {
   return `<span class="pill companion-pair">Companion</span>${who ? `<small class="companion-who">${esc(who)}</small>` : ""}`;
 }
 
+function directoryEntryForMinister(person) {
+  const name = nameKey(person);
+  for (const row of state?.directory || []) {
+    for (const member of row.members || []) {
+      const fullName = directoryPersonName(row, member);
+      if (!directoryNameMatches(fullName, name)) continue;
+      return { directoryId: row.id, member, name: fullName };
+    }
+  }
+  return null;
+}
+
+function canonicalCompanionName(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const match = directoryPeople().find((person) => directoryNameMatches(person.name, raw));
+  return match?.name || raw;
+}
+
+function ministeringCompanionOptions(selected) {
+  const names = directoryPeople().map((person) => person.name);
+  for (const member of state?.presidency || []) {
+    const name = String(member?.name || "").trim();
+    if (!name || names.some((item) => directoryNameMatches(item, name))) continue;
+    names.push(name);
+  }
+  if (selected && !names.some((name) => directoryNameMatches(name, selected))) names.push(selected);
+  names.sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
+  const option = (name) => `<option value="${esc(name)}" ${name && directoryNameMatches(name, selected) ? "selected" : ""}>${esc(name || "—")}</option>`;
+  return [`<option value="" ${selected ? "" : "selected"}>—</option>`, ...names.map(option)].join("");
+}
+
 function companionLine(person) {
   const names = directoryCompanionNames(nameKey(person));
-  if (!names.length) return "";
-  const hint = `data-person="${esc(person.id)}"`;
-  const links = names.map((name) => `<button type="button" class="name-link" data-action="open-name" data-name="${esc(name)}" ${hint}>${esc(name)}</button>`).join("");
-  return `<p class="name-links"><span>Companion</span>${links}</p>`;
+  const selected = names.length === 1 ? names[0] : "";
+  const saved = names.length > 1
+    ? `<div class="companion-saved"><span>Companion</span>${names.map((name) => `<span class="name-link">${esc(name)}</span>`).join("")}</div>`
+    : "";
+  return `<form class="assign-row" data-form="ministering-companion">
+    <span>Companion</span>
+    <select name="companion" aria-label="Companion">${ministeringCompanionOptions(selected)}</select>
+  </form>${saved}`;
+}
+
+function saveMinisteringCompanion(form) {
+  const person = selectedPerson();
+  if (!person) return;
+  const companion = canonicalCompanionName(form.querySelector("[name=companion]")?.value || "");
+  const entry = directoryEntryForMinister(person);
+  const request = entry
+    ? post("/api/directory/companion", { directoryId: entry.directoryId, member: entry.member, companion })
+    : post(`/api/people/${person.id}/contact`, { companion });
+  request.then((next) => {
+    state = next;
+    render();
+  }).catch(showError);
 }
 
 function noCompanionPill(name) {
@@ -2837,9 +2891,9 @@ function directoryNameMatches(left, right) {
 
 function directoryOptions(selected) {
   const names = directoryPeople().map((person) => person.name);
-  if (selected && !names.some((name) => name.toLowerCase() === String(selected).toLowerCase())) names.push(selected);
+  if (selected && !names.some((name) => directoryNameMatches(name, selected))) names.push(selected);
   names.sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
-  return [`<option value="">—</option>`, ...names.map((name) => `<option value="${esc(name)}" ${name === selected ? "selected" : ""}>${esc(name)}</option>`)].join("");
+  return [`<option value="">—</option>`, ...names.map((name) => `<option value="${esc(name)}" ${directoryNameMatches(name, selected) ? "selected" : ""}>${esc(name)}</option>`)].join("");
 }
 
 function directoryMinister(name) {
