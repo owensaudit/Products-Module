@@ -25,6 +25,7 @@ import {
   setYouthLeadership,
   previewImport,
   scheduleVisit,
+  recordMinisteringVisit,
   setPersonStatus,
   setVisitStatus,
   markVisitNotified,
@@ -253,6 +254,13 @@ export function createPortalHandler(store, options = {}) {
         const personContact = pathname.match(/^\/api\/people\/([^/]+)\/contact$/);
         if (personContact) {
           const next = await store.update((state) => setPersonContact(state, decodeURIComponent(personContact[1]), body));
+          sendJson(response, 200, presentState(next, month, viewOptions));
+          return;
+        }
+
+        const personVisited = pathname.match(/^\/api\/people\/([^/]+)\/visited$/);
+        if (personVisited) {
+          const next = await store.update((state) => recordMinisteringVisit(state, decodeURIComponent(personVisited[1]), body));
           sendJson(response, 200, presentState(next, month, viewOptions));
           return;
         }

@@ -118,6 +118,10 @@ if (monthInput) {
 
 app.addEventListener("change", (event) => {
   const target = event.target;
+  if (target.form?.dataset.form === "plan" && target.name === "kind") {
+    syncPlanKind(target.form);
+    return;
+  }
   if (target instanceof HTMLInputElement && target.name === "place" && target.value === "driveby" && target.form?.dataset.form === "plan") {
     applyStatus(selectedPersonId, "Drive by");
     return;
@@ -831,6 +835,18 @@ app.addEventListener("submit", (event) => {
     const plan = String(data.get("kind") || "");
     const time = String(data.get("time") || "");
     const place = String(data.get("place") || "");
+    if (plan === "visited") {
+      const by = String(data.get("by") || "").trim();
+      if (!by) {
+        showError(new Error("Choose who visited"));
+        return;
+      }
+      post(`/api/people/${selectedPersonId}/visited`, { date, by }).then(() => {
+        blankPlanFor = selectedPersonId;
+        render();
+      }).catch(showError);
+      return;
+    }
     if (place === "driveby") {
       if (date && !time) {
         showError(new Error("Add a time for a scheduled appointment"));
@@ -845,7 +861,7 @@ app.addEventListener("submit", (event) => {
       return;
     }
     if (!plan) {
-      showError(new Error("Choose Reach out, Scheduled Appt, or Re-Schedule"));
+      showError(new Error("Choose Reach out, Scheduled Appt, Re-Schedule, or Visited"));
       return;
     }
     if ((plan === "scheduled" || plan === "reschedule") && !time) {
@@ -3546,8 +3562,8 @@ function rosterLine(person) {
   if (person.reachOutDate) bits.push(`Reach out ${esc(person.reachOutDate)}`);
   if (person.appointment) bits.push(`Appt ${esc(person.appointment)}${placeMark(person.appointmentPlace)}`);
   if (person.list === "youth" && person.assigned?.length) bits.push(esc(person.assigned.join(" · ")));
-  if (person.visitYearReset && person.lastVisited) bits.push(`Year reset · last visited ${esc(person.lastVisited)}`);
-  else if (person.lastVisited && person.list !== "youth" && !isYouthMember(person)) bits.push(`Last visited ${esc(person.lastVisited)}`);
+  if (person.visitYearReset && person.lastVisited) bits.push(`Year reset · ${esc(ministeringVisitSentence(person))}`);
+  else if (person.lastVisited && person.list !== "youth" && !isYouthMember(person)) bits.push(esc(ministeringVisitSentence(person)));
   const touch = lastTouch(person);
   if (touch) bits.push(esc(touch));
   return bits.join(" · ") || esc(person.sheetName || "");
@@ -3742,12 +3758,26 @@ function assignmentVisitMarkup(person, withCheck = true) {
   return `<div class="last-visit-row ${note.tone}"><p><strong>${esc(note.text)}</strong></p>${check}</div>`;
 }
 
+function ministeringVisitor(person) {
+  const iso = loggedVisitIso(person);
+  if (!iso) return "";
+  const attempt = personTouches(person).find((item) => item.channel === "in_person" && item.date === iso && whoLabel(item));
+  return attempt ? whoLabel(attempt) : "";
+}
+
+function ministeringVisitSentence(person) {
+  const who = ministeringVisitor(person);
+  if (who) return `${who} visited ${person.lastVisited}`;
+  return `Last visited ${person.lastVisited}`;
+}
+
 function ministeringVisitNote(person) {
   if (!person || isYouthVisit(person) || isYouthMember(person) || !person.lastVisited) return "";
+  const sentence = ministeringVisitSentence(person);
   if (person.visitYearReset) {
-    return `<p class="last-visit reset"><strong>Last visited ${esc(person.lastVisited)}. This year has reset.</strong></p>`;
+    return `<p class="last-visit reset"><strong>${esc(sentence)}. This year has reset.</strong></p>`;
   }
-  return `<p class="last-visit"><strong>Last visited ${esc(person.lastVisited)}</strong></p>`;
+  return `<p class="last-visit"><strong>${esc(sentence)}</strong></p>`;
 }
 
 function standingCompanionName(family) {
@@ -3941,12 +3971,12 @@ function placeMark(place) {
   return `<span class="place-mark">${icon}${esc(place)}</span>`;
 }
 
-function placeChoice(place) {
+function placeChoice(place, hidden = false) {
   const option = (value, label, icon) => `<label class="place-option">
     <input type="radio" name="place" value="${value}" ${place === label ? "checked" : ""}>
     ${icon}${label}
   </label>`;
-  return `<span class="place-choices">${option("church", "Church", churchIcon())}${option("home", "Home", homeIcon())}${option("driveby", "Drive by", drivebyIcon())}</span>`;
+  return `<span class="place-choices" ${hidden ? "hidden" : ""}>${option("church", "Church", churchIcon())}${option("home", "Home", homeIcon())}${option("driveby", "Drive by", drivebyIcon())}</span>`;
 }
 
 function planLine(person) {
@@ -4032,20 +4062,40 @@ function saveAssignment(form) {
   }).catch(showError);
 }
 
+function syncPlanKind(form) {
+  if (!form) return;
+  const visited = form.querySelector("[name=kind]")?.value === "visited";
+  const time = form.querySelector("[name=time]");
+  const who = form.querySelector("[name=by]");
+  const places = form.querySelector(".place-choices");
+  const button = form.querySelector("button[type=submit]");
+  if (time) time.hidden = visited;
+  if (who) who.hidden = !visited;
+  if (places) places.hidden = visited;
+  if (button) button.textContent = visited ? "Done" : "Schedule";
+}
+
 function planForm(person) {
   const current = blankPlanFor === person.id ? { date: "", time: "", kind: "", place: "" } : planParts(person);
+  const visited = current.kind === "visited";
   const choice = (value, label) => `<option value="${value}" ${current.kind === value ? "selected" : ""}>${label}</option>`;
+  const visitors = leaderNamesFor(person);
   return `<form class="appointment-row" data-form="plan">
     <input name="date" type="date" aria-label="Date" required value="${esc(current.date)}">
-    <input name="time" type="time" aria-label="Time" value="${esc(current.time)}">
+    <input name="time" type="time" aria-label="Time" value="${esc(current.time)}" ${visited ? "hidden" : ""}>
     <select name="kind" aria-label="What this date is" required>
       <option value="" ${current.kind ? "" : "selected"}>What</option>
       ${choice("reach_out", "Reach out")}
       ${choice("scheduled", "Scheduled Appt")}
       ${choice("reschedule", "Re-Schedule")}
+      ${choice("visited", "Visited")}
     </select>
-    ${placeChoice(current.place)}
-    <button class="tiny primary" type="submit">Schedule</button>
+    <select name="by" aria-label="Who visited" ${visited ? "" : "hidden"}>
+      <option value="">Who</option>
+      ${visitors.map((name) => `<option value="${esc(name)}">${esc(name)}</option>`).join("")}
+    </select>
+    ${placeChoice(current.place, visited)}
+    <button class="tiny primary" type="submit">${visited ? "Done" : "Schedule"}</button>
   </form>`;
 }
 

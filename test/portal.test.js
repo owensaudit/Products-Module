@@ -24,6 +24,7 @@ import {
   setAppointment,
   setReachOutDate,
   setPersonContact,
+  recordMinisteringVisit,
   setPersonStatus,
   setPresidency,
   setYouthLeadership,
@@ -2085,4 +2086,36 @@ test("aligning youth assignments leaves a teacher who is not on the list", () =>
   assert.equal(pat.group, "teachers");
   assert.equal(other.sheetColumns.Assigned, "Youth, Pat | Kept, Companion");
   assert.equal(other.sheetColumns["Visited On"], "7/14/2026");
+});
+
+test("a ministering card can state who visited and the date", () => {
+  const ids = deps();
+  let state = emptyState();
+  state = addPerson(state, {
+    displayName: "Wang, Henry",
+    sheetColumns: { Brother: "Wang, Henry", Priesthood: "Unordained", Companion: "Delahunty, Andy" },
+  }, ids);
+  state = setAppointment(state, "per_1", { date: "2026-10-01", time: "19:00", kind: "scheduled", place: "home" });
+  state = recordMinisteringVisit(state, "per_1", { by: "Mark Lillenberg", date: "2026-10-14" }, ids);
+  assert.equal(state.people[0].sheetColumns.Status, "Visited");
+  assert.equal(state.people[0].sheetColumns["Visited On"], "10/14/2026");
+  assert.equal(state.people[0].sheetColumns.Companion, "Delahunty, Andy");
+  assert.equal(state.people[0].phone || "", "");
+  assert.equal(state.people[0].email || "", "");
+  assert.equal(state.outreachAttempts.length, 1);
+  assert.equal(state.outreachAttempts[0].sheetColumns.By, "Mark Lillenberg");
+  assert.equal(state.outreachAttempts[0].channel, "in_person");
+  assert.equal(state.outreachAttempts[0].date, "2026-10-14");
+  const view = presentState(state, "2026-10", { today: "2026-10-17" });
+  assert.equal(view.people[0].rosterStatusKey, "visited");
+  assert.equal(view.people[0].lastVisited, "10/14/2026");
+  assert.equal(view.people[0].visitYearReset, false);
+  state = recordMinisteringVisit(state, "per_1", { by: "Mark Lillenberg", date: "10/14/2026" }, ids);
+  assert.equal(state.outreachAttempts.length, 1);
+  assert.throws(() => recordMinisteringVisit(state, "per_1", { by: "", date: "2026-10-14" }, ids), /who visited/);
+  assert.throws(() => recordMinisteringVisit(state, "per_1", { by: "Mark Lillenberg", date: "Wednesday" }, ids), /Visit date/);
+  state = addPerson(state, { displayName: "Youth, Pat", group: "priests", sheetColumns: { Brother: "Youth, Pat" } }, ids);
+  const youth = state.people.find((person) => person.displayName === "Youth, Pat");
+  assert.throws(() => recordMinisteringVisit(state, youth.id, { by: "Mark Lillenberg", date: "2026-10-14" }, ids), /ministering brother/);
+  assert.equal(state.people.find((person) => person.displayName === "Wang, Henry").sheetColumns.Companion, "Delahunty, Andy");
 });
