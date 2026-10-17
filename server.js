@@ -30,7 +30,7 @@ import {
   markVisitNotified,
 } from "./lib/model.js";
 import { emailAllowed, parseAllowlist } from "./lib/allowlist.js";
-import { addDirectoryMember, addDirectoryVisit, addTemporaryVisit, applyDirectory, assignDirectoryHousehold, assignTemporaryHousehold, completeTemporaryVisit, moveDirectoryPerson, parseDirectory, removeDirectoryMember, removeDirectoryVisit, removeTemporaryHousehold, scheduleDirectoryTemporaryVisit, scheduleTemporaryVisit, setDirectoryCompanion, setTemporaryCompanion, setTemporaryFamily, setYouthDay, setYouthHome, updateDirectoryHousehold } from "./lib/directory.js";
+import { addDirectoryMember, addDirectoryVisit, addTemporaryVisit, applyDirectory, assignDirectoryHousehold, assignTemporaryHousehold, completeTemporaryVisit, moveDirectoryPerson, parseDirectory, removeDirectoryMember, removeDirectoryVisit, removeTemporaryHousehold, scheduleDirectoryTemporaryVisit, scheduleTemporaryVisit, setDirectoryCompanion, setDirectoryMan, setTemporaryCompanion, setTemporaryFamily, setYouthDay, setYouthHome, syncDirectoryMen, updateDirectoryHousehold } from "./lib/directory.js";
 import { createStore } from "./lib/store.js";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -218,7 +218,9 @@ export function createPortalHandler(store, options = {}) {
       if (request.method === "GET" && pathname === "/api/state") {
         const month = url.searchParams.get("month") || currentMonth();
         const state = await store.read();
-        sendJson(response, 200, presentState(state, month, { includePrivate: url.searchParams.get("private") === "1" }));
+        const synced = syncDirectoryMen(state);
+        const ready = synced === state ? state : await store.update((current) => syncDirectoryMen(current));
+        sendJson(response, 200, presentState(ready, month, { includePrivate: url.searchParams.get("private") === "1" }));
         return;
       }
 
@@ -407,6 +409,12 @@ export function createPortalHandler(store, options = {}) {
 
         if (pathname === "/api/directory/member") {
           const next = await store.update((state) => addDirectoryMember(state, body));
+          sendJson(response, 200, presentState(next, month, viewOptions));
+          return;
+        }
+
+        if (pathname === "/api/directory/man") {
+          const next = await store.update((state) => setDirectoryMan(state, body));
           sendJson(response, 200, presentState(next, month, viewOptions));
           return;
         }

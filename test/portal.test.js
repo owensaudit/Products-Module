@@ -38,7 +38,7 @@ import {
   setVisitStatus,
   slotsForMonth,
 } from "../lib/model.js";
-import { addDirectoryMember, addDirectoryVisit, addTemporaryVisit, applyDirectory, applyMinisteringGroups, assignDirectoryHousehold, assignTemporaryHousehold, completeTemporaryVisit, directoryAddressKey, findDirectoryRecord, mergeDirectoryByAddress, moveDirectoryPerson, parseDirectory, removeDirectoryMember, removeDirectoryVisit, removeTemporaryHousehold, scheduleDirectoryTemporaryVisit, scheduleTemporaryVisit, setDirectoryCompanion, setTemporaryCompanion, setTemporaryFamily, setYouthDay, setYouthHome, updateDirectoryHousehold } from "../lib/directory.js";
+import { addDirectoryMember, addDirectoryVisit, addTemporaryVisit, applyDirectory, applyMinisteringGroups, assignDirectoryHousehold, assignTemporaryHousehold, completeTemporaryVisit, directoryAddressKey, findDirectoryRecord, mergeDirectoryByAddress, moveDirectoryPerson, parseDirectory, removeDirectoryMember, removeDirectoryVisit, removeTemporaryHousehold, scheduleDirectoryTemporaryVisit, scheduleTemporaryVisit, setDirectoryCompanion, setDirectoryMan, setTemporaryCompanion, setTemporaryFamily, setYouthDay, setYouthHome, syncDirectoryMen, updateDirectoryHousehold } from "../lib/directory.js";
 import { brotherSheetToState, calendarMarks, canonicalRosterStatus, isArchiveStatus, rosterStatusKey } from "../lib/roster.js";
 import { reminderMessage } from "../public/reminder.js";
 import { emailAllowed, parseAllowlist } from "../lib/allowlist.js";
@@ -1029,6 +1029,65 @@ test("a directory member can be added or removed without touching the roster", (
   const last = removeDirectoryMember(gone, { directoryId: "dir_1", member: "Ben" });
   assert.equal(last.directory.length, 0);
   assert.equal(last.people.length, 1);
+});
+
+test("a man added in the directory also lands on ministering visits", () => {
+  const state = {
+    ...emptyState(),
+    directory: [{
+      id: "dir_wang",
+      name: "Wang",
+      members: ["Henry"],
+      phone: "(360) 555-0101",
+      email: "hidden@example.com",
+      address: "1 Hidden St",
+    }, {
+      id: "dir_ada",
+      name: "Example, Ada",
+      members: ["Ada"],
+      phone: "(360) 555-0102",
+    }],
+    people: [
+      { id: "per_priest", group: "priests", displayName: "Youth, Pat", phone: "", email: "", household: "", notes: "", sheetColumns: { Brother: "Youth, Pat", Priesthood: "Priest" }, createdAt: "2026-10-01T00:00:00.000Z", updatedAt: "2026-10-01T00:00:00.000Z" },
+      { id: "per_brother", displayName: "Keeper, Ed", phone: "555-0103", email: "ed@example.com", household: "", notes: "", sheetColumns: { Brother: "Keeper, Ed", Priesthood: "Unordained" }, createdAt: "2026-10-01T00:00:00.000Z", updatedAt: "2026-10-01T00:00:00.000Z" },
+      { id: "per_woman", displayName: "Guest, Bea", phone: "", email: "", household: "", notes: "", sheetColumns: { Brother: "Guest, Bea" }, createdAt: "2026-10-01T00:00:00.000Z", updatedAt: "2026-10-01T00:00:00.000Z" },
+    ],
+  };
+  state.directory.push({ id: "dir_ed", name: "Keeper, Ed", members: ["Ed"], phone: "(360) 555-0103" });
+  state.directory.push({ id: "dir_pat", name: "Youth, Pat", members: ["Pat"] });
+  const synced = syncDirectoryMen(state, { id: () => "per_henry" });
+  const henry = synced.people.find((person) => person.id === "per_henry");
+  assert.equal(henry.displayName, "Wang, Henry");
+  assert.equal(henry.sheetColumns.Brother, "Wang, Henry");
+  assert.equal(henry.sheetColumns.Priesthood, "Unordained");
+  assert.equal(henry.phone, "");
+  assert.equal(henry.email, "");
+  assert.equal(henry.list, undefined);
+  assert.equal(henry.group, undefined);
+  assert.equal(synced.people.filter((person) => person.group === "priests").length, 1);
+  assert.equal(synced.people.find((person) => person.id === "per_woman").displayName, "Guest, Bea");
+  assert.equal(synced.people.filter((person) => person.sheetColumns.Brother === "Keeper, Ed").length, 1);
+  assert.equal(syncDirectoryMen(synced).people.length, synced.people.length);
+  assert.equal(synced.directory.find((row) => row.id === "dir_wang").phone, "(360) 555-0101");
+  const added = addDirectoryMember(emptyState(), {
+    name: "Sample, Cam",
+    householdName: "Sample, Cam",
+    phone: "3605550199",
+    email: "cam@example.com",
+    man: true,
+  }, { id: (prefix) => (prefix === "per" ? "per_cam" : "dir_cam") });
+  const brother = added.people.find((person) => person.id === "per_cam");
+  assert.equal(brother.sheetColumns.Brother, "Sample, Cam");
+  assert.equal(brother.sheetColumns.Priesthood, "Unordained");
+  assert.equal(brother.phone, "");
+  assert.equal(added.directory[0].phone, "(360) 555-0199");
+  const marked = setDirectoryMan(state, { directoryId: "dir_ada", member: "Ada", man: true }, { id: () => "per_ada_brother" });
+  assert.equal(marked.people.find((person) => person.id === "per_woman").displayName, "Guest, Bea");
+  assert.equal(marked.people.find((person) => person.id === "per_ada_brother").sheetColumns.Brother, "Example, Ada");
+  assert.equal(marked.people.find((person) => person.id === "per_ada_brother").sheetColumns.Priesthood, "Unordained");
+  assert.equal(marked.people.find((person) => person.id === "per_ada_brother").phone, "");
+  const kept = setDirectoryMan(synced, { directoryId: "dir_ed", member: "Ed", man: true }, { id: () => "per_dup" });
+  assert.equal(kept.people.some((person) => person.id === "per_dup"), false);
 });
 
 test("people at the same address join that household", () => {

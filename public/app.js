@@ -177,6 +177,18 @@ app.addEventListener("change", (event) => {
     }).catch(showError);
     return;
   }
+  if (target instanceof HTMLInputElement && target.dataset.directoryMan === "1") {
+    if (!target.checked) return;
+    post("/api/directory/man", {
+      directoryId: target.dataset.id,
+      member: target.dataset.member,
+      man: true,
+    }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
+    return;
+  }
   if (target instanceof HTMLInputElement && target.dataset.youthHome === "1") {
     post("/api/directory/youth-home", {
       directoryId: target.dataset.id,
@@ -737,6 +749,7 @@ app.addEventListener("submit", (event) => {
       email: data.get("email"),
       companion: data.get("companion"),
       visitHouseholdId: data.get("visit"),
+      man: data.get("man") === "on",
     }).then((next) => {
       state = next;
       directoryAdding = false;
@@ -1574,6 +1587,33 @@ function eldersPeople() {
   return (state?.people || []).filter((person) => !isYouthMember(person) && !isYouthVisit(person));
 }
 
+function matchingMinisteringBrothers() {
+  const needle = search.trim();
+  if (!needle) return [];
+  return eldersPeople().filter((person) => personSearchHit(person, needle));
+}
+
+function ministeringBrotherSearchMarkup(people = matchingMinisteringBrothers()) {
+  if (!people.length) return "";
+  return `<section class="youth-list-block"><h3>Ministering brothers</h3>${people.map((person) => `<div class="person ${state.rosterMode ? person.rosterStatusKey : person.outreachStatus}${hasCompanionPair(nameKey(person)) ? " has-companion" : ""}" data-action="select-person" data-id="${esc(person.id)}" aria-current="${person.id === selectedPersonId}">
+      <strong>${esc(personLabel(person))}</strong>
+      <small>${esc(person.priesthood || "Brother")}</small>
+    </div>`).join("")}</section>`;
+}
+
+function ministeringBrotherOptions(selected) {
+  const names = [];
+  const add = (name) => {
+    const text = String(name || "").trim();
+    if (!text || names.some((item) => directoryNameMatches(item, text))) return;
+    names.push(text);
+  };
+  for (const person of eldersPeople()) add(nameKey(person));
+  add(selected);
+  names.sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
+  return [`<option value="">—</option>`, ...names.map((name) => `<option value="${esc(name)}" ${directoryNameMatches(name, selected) ? "selected" : ""}>${esc(name)}</option>`)].join("");
+}
+
 function youthMembers(group = "all") {
   return (state?.people || []).filter((person) => isYouthMember(person) && (group === "all" || person.group === group));
 }
@@ -1839,10 +1879,12 @@ function renderPeopleList() {
   const scheduled = showingScheduled();
   const assignments = showingAssignments();
   const youthLists = showingYouthLists();
-  list.innerHTML = scheduled ? scheduledListMarkup() : youthLists ? youthListMarkup() : assignments ? assignmentListMarkup() : personButtons();
+  const brothers = page === "youth" && !scheduled ? ministeringBrotherSearchMarkup() : "";
+  list.innerHTML = `${scheduled ? scheduledListMarkup() : youthLists ? youthListMarkup() : assignments ? assignmentListMarkup() : personButtons()}${brothers}`;
   const count = document.querySelector("#people-card .muted");
   if (count && (scheduled || youthLists || assignments)) {
-    const total = scheduled ? scheduledRows().length : assignments ? visibleAssignments().length : youthVisibleEntries().length;
+    const extra = page === "youth" && !scheduled ? matchingMinisteringBrothers().length : 0;
+    const total = (scheduled ? scheduledRows().length : assignments ? visibleAssignments().length : youthVisibleEntries().length) + extra;
     const noun = scheduled ? (total === 1 ? "appointment" : "appointments") : assignments ? (total === 1 ? "assignment" : "assignments") : (total === 1 ? "person" : "people");
     count.textContent = `${total} ${noun}`;
   }
@@ -2022,12 +2064,13 @@ function peopleView() {
   const youthLists = !reminding && showingYouthLists();
   const assignments = !reminding && showingAssignments();
   const people = reminding || scheduled || youthLists || assignments ? [] : filteredPeople();
+  const brotherMatches = page === "youth" && !reminding && !scheduled ? matchingMinisteringBrothers() : [];
   const title = reminding ? "Notify" : scheduled ? (archiveOpen ? "Archive" : "Scheduled") : assignments ? "Assignments" : youthLists ? youthListTitle() : listTitle();
   const helpCount = !reminding && page === "youth" && dayFilter ? youthHelpForDay(dayFilter).length : 0;
   const dayCount = !reminding && !scheduled && !youthLists && !assignments && dayFilter ? temporaryVisitsOn(dayFilter).length : 0;
   const noticeCount = !reminding && !scheduled && !youthLists && !assignments && dayFilter ? noticesOn(dayFilter).length : 0;
   const reminderCount = reminding ? visibleReminders().length : 0;
-  const total = reminderCount + (scheduled ? scheduledRows().length : assignments ? visibleAssignments().length : youthLists ? youthVisibleEntries().length : people.length) + helpCount + dayCount + noticeCount;
+  const total = reminderCount + (scheduled ? scheduledRows().length : assignments ? visibleAssignments().length : youthLists ? youthVisibleEntries().length : people.length) + brotherMatches.length + helpCount + dayCount + noticeCount;
   const companionOpen = page === "youth" && youthList === "companions" && Boolean(selectedCompanionName);
   const showDetail = !reminding && !scheduled && (companionOpen || !state.rosterMode || Boolean(selectedPersonId));
   const onlyDayVisits = !reminding && !scheduled && !youthLists && !assignments && people.length === 0 && dayCount > 0 && noticeCount === 0;
@@ -2039,7 +2082,7 @@ function peopleView() {
     : assignments
     ? (total === 1 ? "assignment" : "assignments")
     : page === "youth" ? (total === 1 ? "person" : "people") : (total === 1 ? "brother" : "brothers");
-  const markup = reminding ? notifyListMarkup() : scheduled ? scheduledListMarkup() : youthLists ? youthListMarkup() : assignments ? assignmentListMarkup() : personButtons(people);
+  const markup = `${reminding ? notifyListMarkup() : scheduled ? scheduledListMarkup() : youthLists ? youthListMarkup() : assignments ? assignmentListMarkup() : personButtons(people)}${ministeringBrotherSearchMarkup(brotherMatches)}`;
   return `<section class="layout${showDetail ? "" : " layout-single"}">
     <div class="card" id="people-card">
       <div class="row">
@@ -2924,6 +2967,7 @@ function directoryPersonCard(entry) {
     ${temporaryHouseholdLine}
     ${visitLine}
     ${directoryYouthSection(entry)}
+    ${directoryManControl(entry)}
     <button type="button" class="ghost" data-action="remove-directory-member" data-id="${esc(record.id)}" data-member="${esc(entry.member)}">Remove member</button>`;
 }
 
@@ -2991,6 +3035,18 @@ function youthDayVisitLabel(visit) {
   return row?.name || visit?.label || "";
 }
 
+function directoryManListed(name) {
+  return eldersPeople().some((person) => directoryNameMatches(nameKey(person), name) || directoryNameMatches(person.displayName, name));
+}
+
+function directoryManControl(entry) {
+  const listed = directoryManListed(entry.name);
+  return `<label class="youth-home">
+      <input type="checkbox" data-directory-man="1" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}" ${listed ? "checked disabled" : ""}>
+      Man
+    </label>`;
+}
+
 function directoryYouthSection(entry) {
   const record = entry.record;
   const wanted = directoryWantsYouth(record, entry.member);
@@ -3011,6 +3067,10 @@ function directoryNameLinks(names, entry) {
 function directoryAddForm() {
   return `<form class="stack" data-form="directory-add">
       <input class="person-name" name="name" required autocomplete="off" placeholder="Name" aria-label="Name">
+      <label class="youth-home">
+        <input type="checkbox" name="man">
+        Man
+      </label>
       <div class="assign-row">
         <span>Household</span>
         <select name="householdId" aria-label="Household">
@@ -3512,19 +3572,48 @@ function personMatchesFilters(person) {
   return true;
 }
 
+function queryVariants(value) {
+  const raw = String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+  if (!raw) return [];
+  const keys = [raw];
+  const comma = raw.indexOf(",");
+  if (comma !== -1) {
+    const flipped = `${raw.slice(comma + 1)} ${raw.slice(0, comma)}`.replace(/\s+/g, " ").trim();
+    if (flipped) keys.push(flipped);
+  }
+  return keys;
+}
+
+function textHit(value, needles) {
+  const text = String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+  if (!text) return false;
+  const forms = [text];
+  const comma = text.indexOf(",");
+  if (comma !== -1) {
+    const flipped = `${text.slice(comma + 1)} ${text.slice(0, comma)}`.replace(/\s+/g, " ").trim();
+    if (flipped) forms.push(flipped);
+  }
+  return needles.some((needle) => forms.some((form) => form.includes(needle)));
+}
+
+function personSearchHit(person, needle) {
+  const needles = queryVariants(needle);
+  if (!needles.length) return true;
+  return [person.displayName, person.sheetName, person.household, nameKey(person)].some((value) => textHit(value, needles));
+}
+
 function filteredPeople() {
-  const needle = search.trim().toLowerCase();
+  const needle = search.trim();
   const dayIds = viewAll || !dayFilter ? null : new Set(state.calendarMarks?.[dayFilter]?.people || []);
   const source = page === "youth" && dayFilter ? [...youthMembers(), ...youthVisits()] : pagePeople();
   return source
     .filter((person) => !dayIds || dayIds.has(person.id))
-    .filter((person) => personMatchesFilters(person))
     .filter((person) => {
-      if (!needle) return true;
-      const name = String(person.displayName || "").toLowerCase();
-      const sheetName = String(person.sheetName || "").toLowerCase();
-      const household = String(person.household || "").toLowerCase();
-      return name.includes(needle) || sheetName.includes(needle) || household.includes(needle);
+      if (!needle) return personMatchesFilters(person);
+      if (!personSearchHit(person, needle)) return false;
+      if (state.rosterMode && officeFilter !== "all" && person.priesthood !== officeFilter) return false;
+      if (assigneeFilter && !(person.assigned || []).includes(assigneeFilter)) return false;
+      return true;
     })
     .slice()
     .sort((a, b) => {
@@ -3595,7 +3684,7 @@ function youthMemberDetail(person) {
     ${contactFields(person, false, true)}
     ${factsForm(person)}
     <form class="companion-row" data-form="youth-companion">
-      <label>Companion <input name="companion" value="${esc(companion)}" autocomplete="off" aria-label="Companion"></label>
+      <label>Companion <select name="companion" aria-label="Companion">${ministeringBrotherOptions(companion)}</select></label>
     </form>
     <h3>Youth ministry meeting</h3>
     <p class="muted">Meet with ${companionLink} to see which assignments respond, then give a date and time to visit.</p>
