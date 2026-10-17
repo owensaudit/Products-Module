@@ -1614,15 +1614,26 @@ button.tiny.notify {
 
 .cell-row, .outreach-cells {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.7fr) minmax(0, 1fr) max-content;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 6px;
   align-items: center;
 }
-.remove-outreach { white-space: nowrap; justify-self: end; }
 .cell-row > select,
-.cell-row > input {
+.cell-row > input,
+.outreach-add input[type="date"],
+.outreach-edit input[type="date"] {
   min-width: 0;
   max-width: 100%;
+}
+.outreach-add input[type="date"],
+.outreach-edit input[type="date"],
+.outreach-edit .remove-outreach {
+  grid-column: 1 / -1;
+}
+.remove-outreach {
+  justify-self: start;
+  white-space: nowrap;
+  width: fit-content;
 }
 
 .outreach-add select,
