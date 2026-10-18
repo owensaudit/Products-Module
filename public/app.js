@@ -1135,6 +1135,7 @@ function todayIso() {
 function showError(error) {
   notice.hidden = false;
   notice.textContent = error instanceof Error ? error.message : "Something went wrong";
+  notice.scrollIntoView({ block: "nearest" });
 }
 
 function clearError() {
@@ -2880,12 +2881,20 @@ function ministryPersonChoices(entry) {
 }
 
 function consistentVisitCopy(item) {
-  const iso = String(item?.lastVisited || "");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return { text: "No visit this quarter", tone: "due" };
-  const [year, month, day] = iso.split("-");
-  const label = `${Number(month)}/${Number(day)}/${year}`;
-  if (quarterKey(iso) === quarterKey(clientToday())) return { text: `Visited this quarter ${label}`, tone: "current" };
-  return { text: `Last visited ${label}`, tone: "earlier" };
+  const visited = String(item?.lastVisited || "");
+  const visitedOk = /^\d{4}-\d{2}-\d{2}$/.test(visited);
+  if (visitedOk && quarterKey(visited) === quarterKey(clientToday())) {
+    const [year, month, day] = visited.split("-");
+    return { text: `Visited this quarter ${Number(month)}/${Number(day)}/${year}`, tone: "current" };
+  }
+  const scheduled = String(item?.scheduledDate || "");
+  if (/^\d{4}-\d{2}-\d{2}$/.test(scheduled)) {
+    const when = item.meeting || `${Number(scheduled.slice(5, 7))}/${Number(scheduled.slice(8, 10))}`;
+    return { text: `Scheduled ${when}`, tone: "current" };
+  }
+  if (!visitedOk) return { text: "No visit this quarter", tone: "due" };
+  const [year, month, day] = visited.split("-");
+  return { text: `Last visited ${Number(month)}/${Number(day)}/${year}`, tone: "earlier" };
 }
 
 function companionAddChoices(entry) {
@@ -2983,21 +2992,25 @@ function consistentAssignmentRow(entry, item, kind) {
   const remove = kind === "person"
     ? `<button type="button" class="tiny" data-action="remove-ministry-person" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}" data-household="${target}" data-person="${person}" data-label="${label}">Remove</button>`
     : `<button type="button" class="tiny" data-action="remove-directory-visit" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}" data-household="${target}" data-label="${label}">Remove</button>`;
-  const parts = item.scheduledDate ? { date: item.scheduledDate, time: item.scheduledTime || "" } : { date: "", time: "" };
+  const scheduled = /^\d{4}-\d{2}-\d{2}$/.test(item.scheduledDate || "");
+  const check = `<button type="button" class="mark-visited" data-action="log-consistent-visit" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}" data-kind="${kind}" data-target="${target}" data-person="${person}" data-label="${label}" aria-label="Log this quarter's visit for ${label}">✓</button>`;
+  const controls = scheduled
+    ? `<span class="consistent-actions">${check}${remove}</span>`
+    : `<form class="consistent-when" data-form="consistent-schedule" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}" data-kind="${kind}" data-target="${target}" data-person="${person}" data-label="${label}">
+      <input name="date" type="date" aria-label="Quarter visit date for ${label}" required>
+      <input name="time" type="time" aria-label="Quarter visit time for ${label}" required>
+      <span class="consistent-actions">
+        <button class="tiny primary" type="submit">Schedule</button>
+        ${check}
+        ${remove}
+      </span>
+    </form>`;
   return `<div class="consistent-assignment">
     <div class="consistent-head">
       <button type="button" class="name-link" data-action="open-name" data-name="${label}" data-directory="${esc(entry.directoryId)}" data-member="${esc(entry.member)}">${label}</button>
       <span class="consistent-quarter ${note.tone}">${esc(note.text)}</span>
     </div>
-    <form class="consistent-when" data-form="consistent-schedule" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}" data-kind="${kind}" data-target="${target}" data-person="${person}" data-label="${label}">
-      <input name="date" type="date" aria-label="Quarter visit date for ${label}" required value="${esc(parts.date)}">
-      <input name="time" type="time" aria-label="Quarter visit time for ${label}" required value="${esc(parts.time)}">
-      <span class="consistent-actions">
-        <button class="tiny primary" type="submit">Schedule</button>
-        <button type="button" class="mark-visited" data-action="log-consistent-visit" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}" data-kind="${kind}" data-target="${target}" data-person="${person}" data-label="${label}" aria-label="Log this quarter's visit for ${label}">✓</button>
-        ${remove}
-      </span>
-    </form>
+    ${controls}
   </div>`;
 }
 

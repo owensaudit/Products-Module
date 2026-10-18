@@ -2020,6 +2020,17 @@ test("a consistent assignment can be scheduled each quarter and a finished tempo
   assert.equal(state.directory[0].memberVisits.ben[0].meeting, "10/21 7:00 PM");
   assert.equal(state.directory[0].memberVisits.ben[0].label, "Standing house");
   assert.equal(state.directory[0].memberMinistryPeople.ben[0].scheduledDate, "2026-11-04");
+  state = scheduleConsistentVisit(state, {
+    directoryId: "dir_home",
+    member: "Ben",
+    kind: "person",
+    targetId: "dir_ada",
+    person: "Ada",
+    label: "Example, Ada",
+    date: "2026-11-04",
+    time: "11:16:00",
+  });
+  assert.equal(state.directory[0].memberMinistryPeople.ben[0].meeting, "11/4 11:16 AM");
   assert.equal(state.directory[0].memberCompanions.ben, "Keeper, Anthony");
   assert.equal(state.temporaryVisits.length, 0);
   const shown = presentState(state, "2026-10", { includePrivate: false, today: "2026-10-18" });
