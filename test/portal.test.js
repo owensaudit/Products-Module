@@ -1453,6 +1453,29 @@ test("removing one saved companion leaves the other and ignores a youth assignme
   assert.equal(state.directory[0].memberCompanions.ben, undefined);
 });
 
+test("adding a second companion keeps the first", () => {
+  let state = {
+    ...emptyState(),
+    directory: [{
+      id: "dir_home",
+      name: "Sample, Ben",
+      members: ["Ben"],
+      address: "",
+      phone: "",
+      email: "",
+      memberCompanions: {},
+      memberVisits: {},
+    }],
+  };
+  state = setDirectoryCompanion(state, { directoryId: "dir_home", member: "Ben", companion: "Keeper, Anthony" });
+  state = setDirectoryCompanion(state, { directoryId: "dir_home", member: "Ben", companion: "Keeper, Sam" });
+  assert.deepEqual(state.directory[0].memberCompanions.ben, ["Keeper, Anthony", "Keeper, Sam"]);
+  state = setDirectoryCompanion(state, { directoryId: "dir_home", member: "Ben", companion: "Anthony Keeper" });
+  assert.deepEqual(state.directory[0].memberCompanions.ben, ["Keeper, Anthony", "Keeper, Sam"]);
+  state = setDirectoryCompanion(state, { directoryId: "dir_home", member: "Ben", companion: "" });
+  assert.equal(state.directory[0].memberCompanions.ben, undefined);
+});
+
 test("a directory person can ask for a youth visit and volunteer on a day", () => {
   const home = {
     id: "dir_home",

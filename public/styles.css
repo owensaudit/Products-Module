@@ -684,8 +684,54 @@ button.cal-day.is-open {
 .cal-dot.with_youth { background: #d98a2b; }
 .cal-dot.temporary { background: #1f7a8c; }
 .cal-dot.consistent { background: #2f6f4e; }
-.consistent-assignment { display: grid; gap: 4px; margin: 0 0 10px; }
-.consistent-assignment .appointment-row { margin: 0; }
+.consistent-add,
+.consistent-assignment {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px;
+  margin: 0 0 8px;
+}
+.consistent-add { display: grid; gap: 6px; }
+.consistent-add select { width: 100%; }
+.consistent-names { display: flex; flex-wrap: wrap; gap: 6px 10px; }
+.consistent-assignment { display: grid; gap: 6px; }
+.consistent-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 8px;
+}
+.consistent-assignment .name-link { font-weight: 700; }
+.consistent-quarter { font-size: 12px; color: var(--muted); }
+.consistent-quarter.current { color: #1d6b3a; }
+.consistent-quarter.due { color: #9a4d2a; }
+.consistent-when {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px 8px;
+  margin: 0;
+  min-width: 0;
+}
+.consistent-when input[type="date"],
+.consistent-when input[type="time"] {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.consistent-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+.consistent-actions .mark-visited { position: static; flex: none; }
 .cal-dot.notify { background: #c47b12; }
 
 .cal-num {

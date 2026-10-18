@@ -182,6 +182,7 @@ app.addEventListener("change", (event) => {
     return;
   }
   if (target instanceof HTMLSelectElement && target.form?.dataset.form === "directory-companion") {
+    if (!target.value) return;
     post("/api/directory/companion", {
       directoryId: target.form.dataset.id,
       member: target.form.dataset.member,
@@ -797,10 +798,12 @@ app.addEventListener("submit", (event) => {
     return;
   }
   if (kind === "directory-companion") {
+    const companion = String(data.get("companion") || "").trim();
+    if (!companion) return;
     post("/api/directory/companion", {
       directoryId: form.dataset.id,
       member: form.dataset.member,
-      companion: data.get("companion"),
+      companion,
     }).then((next) => {
       state = next;
       render();
@@ -2832,6 +2835,22 @@ function consistentVisitCopy(item) {
   return { text: `Last visited ${label}`, tone: "earlier" };
 }
 
+function companionAddOptions(entry) {
+  const saved = savedCompanionNames(entry);
+  const names = directoryPeople()
+    .map((person) => person.name)
+    .filter((name) => !directoryNameMatches(name, entry.name))
+    .filter((name) => !saved.some((item) => directoryNameMatches(item, name)));
+  for (const member of state?.presidency || []) {
+    const name = String(member?.name || "").trim();
+    if (!name || names.some((item) => directoryNameMatches(item, name)) || saved.some((item) => directoryNameMatches(item, name))) continue;
+    if (directoryNameMatches(name, entry.name)) continue;
+    names.push(name);
+  }
+  names.sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
+  return [`<option value="">Companion</option>`, ...names.map((name) => `<option value="${esc(name)}">${esc(name)}</option>`)].join("");
+}
+
 function consistentAssignmentRow(entry, item, kind) {
   const note = consistentVisitCopy(item);
   const target = esc(item.directoryId || "");
@@ -2842,39 +2861,41 @@ function consistentAssignmentRow(entry, item, kind) {
     : `<button type="button" class="tiny" data-action="remove-directory-visit" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}" data-household="${target}" data-label="${label}">Remove</button>`;
   const parts = item.scheduledDate ? { date: item.scheduledDate, time: item.scheduledTime || "" } : { date: "", time: "" };
   return `<div class="consistent-assignment">
-    <div class="companion-row">
+    <div class="consistent-head">
       <button type="button" class="name-link" data-action="open-name" data-name="${label}" data-directory="${esc(entry.directoryId)}" data-member="${esc(entry.member)}">${label}</button>
-      ${remove}
+      <span class="consistent-quarter ${note.tone}">${esc(note.text)}</span>
     </div>
-    <div class="last-visit-row ${note.tone}">
-      <p><strong>${esc(note.text)}</strong></p>
-      <button type="button" class="mark-visited" data-action="log-consistent-visit" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}" data-kind="${kind}" data-target="${target}" data-person="${person}" data-label="${label}" aria-label="Log this quarter's visit">✓</button>
-    </div>
-    ${item.meeting ? `<p class="plan-line"><strong>Scheduled</strong> ${esc(item.meeting)}</p>` : ""}
-    <form class="appointment-row" data-form="consistent-schedule" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}" data-kind="${kind}" data-target="${target}" data-person="${person}" data-label="${label}">
-      <input name="date" type="date" aria-label="Quarter visit date" required value="${esc(parts.date)}">
-      <input name="time" type="time" aria-label="Quarter visit time" required value="${esc(parts.time)}">
-      <button class="tiny primary" type="submit">Schedule</button>
+    <form class="consistent-when" data-form="consistent-schedule" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}" data-kind="${kind}" data-target="${target}" data-person="${person}" data-label="${label}">
+      <input name="date" type="date" aria-label="Quarter visit date for ${label}" required value="${esc(parts.date)}">
+      <input name="time" type="time" aria-label="Quarter visit time for ${label}" required value="${esc(parts.time)}">
+      <span class="consistent-actions">
+        <button class="tiny primary" type="submit">Schedule</button>
+        <button type="button" class="mark-visited" data-action="log-consistent-visit" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}" data-kind="${kind}" data-target="${target}" data-person="${person}" data-label="${label}" aria-label="Log this quarter's visit for ${label}">✓</button>
+        ${remove}
+      </span>
     </form>
   </div>`;
 }
 
 function standingMinistryBlock(entry) {
   if (!entry?.record) return "";
+  const companions = savedCompanionNames(entry).map((name) => `<span class="name-link">${esc(name)}</span>`).join("");
   const householdRows = directorySavedVisits(entry).map((item) => consistentAssignmentRow(entry, item, "household")).join("");
   const personRows = directoryMinistryPeople(entry).map((item) => consistentAssignmentRow(entry, item, "person")).join("");
   return `<div class="standing-ministry">
-    <form class="assign-row" data-form="ministry-household" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}">
-      <span>Consistent household</span>
-      <select name="household" aria-label="Consistent household"><option value="">—</option>${ministryHouseholdChoices(entry)}</select>
-    </form>
-    <p class="muted">Households they visit regularly. These stay on the card. Schedule one at least each quarter.</p>
+    <div class="consistent-add">
+      <form data-form="directory-companion" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}">
+        <select name="companion" aria-label="Companion">${companionAddOptions(entry)}</select>
+      </form>
+      <form data-form="ministry-household" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}">
+        <select name="household" aria-label="Consistent household"><option value="">Household</option>${ministryHouseholdChoices(entry)}</select>
+      </form>
+      <form data-form="ministry-person" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}">
+        <select name="person" aria-label="Consistent person"><option value="">Person</option>${ministryPersonChoices(entry)}</select>
+      </form>
+      ${companions ? `<div class="consistent-names">${companions}</div>` : ""}
+    </div>
     ${householdRows}
-    <form class="assign-row" data-form="ministry-person" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}">
-      <span>Consistent person</span>
-      <select name="person" aria-label="Consistent person"><option value="">—</option>${ministryPersonChoices(entry)}</select>
-    </form>
-    <p class="muted">People they visit regularly. These stay on the card. Schedule one at least each quarter.</p>
     ${personRows}
   </div>`;
 }
@@ -3143,9 +3164,6 @@ function directoryPersonCard(entry) {
   const phone = String(record.phone || "").trim();
   const email = String(record.email || "").trim();
   const address = String(record.address || "").trim();
-  const companions = savedCompanionNames(entry);
-  const companion = companions.length === 1 ? companions[0] : "";
-  const companionLinks = companions.length > 1 ? `<div class="companion-saved"><span>Companion</span>${companions.map((name) => `<div class="companion-row"><span class="name-link">${esc(name)}</span></div>`).join("")}</div>` : "";
   const visitLine = directoryVisitLine(entry);
   const temporaryHouseholdLine = temporaryHouseholdLineFor(entry);
   const status = directoryStatusPills(entry.name);
@@ -3174,11 +3192,6 @@ function directoryPersonCard(entry) {
         </span>
       </div>
     </form>
-    <form class="assign-row" data-form="directory-companion" data-id="${esc(record.id)}" data-member="${esc(entry.member)}">
-      <span>Companion</span>
-      <select name="companion" aria-label="Companion">${directoryOptions(companion)}</select>
-    </form>
-    ${companionLinks}
     ${directoryTemporaryYouth(entry)}
     ${standingMinistryBlock(entry)}
     <form class="assign-row temporary-pick" data-form="directory-temporary-schedule" data-id="${esc(record.id)}" data-member="${esc(entry.member)}">
@@ -4138,8 +4151,7 @@ function rosterDetail(person) {
   return `${cardBackButton()}${personNameField(person)}
     ${specialNotes(person)}
     ${householdLine(person)}
-    ${companionLine(person)}
-    ${ministry ? standingMinistryBlock(ministry) : ""}
+    ${ministry ? standingMinistryBlock(ministry) : companionLine(person)}
     <p class="status-row">${statusSelect(person)}${archiveControl(person)}${missionPill(person)}${person.rosterStatusKey === "scheduled" ? visitCheck(person) : ""}</p>
     ${ministeringVisitNote(person)}
     ${contactFields(person, false, true)}
