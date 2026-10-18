@@ -708,12 +708,23 @@ button.cal-day.is-open {
   padding: 6px 12px;
 }
 .consistent-matches {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 8px;
+  z-index: 50;
   display: grid;
   gap: 4px;
-  max-height: 11rem;
+  max-height: min(11rem, 40vh);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 6px;
 }
+.consistent-matches[hidden] { display: none; }
 .consistent-matches button {
   text-align: left;
   border-radius: 10px;

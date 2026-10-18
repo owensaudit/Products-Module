@@ -350,6 +350,22 @@ app.addEventListener("focusin", (event) => {
   showConsistentMatches(field);
 });
 
+if (window.visualViewport) {
+  const moveConsistentMenu = () => {
+    document.querySelectorAll(".consistent-matches:not([hidden])").forEach(placeConsistentMenu);
+  };
+  window.visualViewport.addEventListener("resize", moveConsistentMenu);
+  window.visualViewport.addEventListener("scroll", moveConsistentMenu);
+}
+
+app.addEventListener("keydown", (event) => {
+  const field = event.target;
+  if (!(field instanceof HTMLInputElement) || !field.classList.contains("consistent-find-input") || event.key !== "Enter") return;
+  event.preventDefault();
+  const matches = [...field.closest(".consistent-find")?.querySelectorAll("button[data-action='consistent-pick']") || []];
+  if (matches.length === 1) pickConsistent(matches[0]);
+});
+
 app.addEventListener("input", (event) => {
   const field = event.target;
   if (field instanceof HTMLInputElement && field.classList.contains("consistent-find-input")) {
@@ -2911,9 +2927,9 @@ function ministryEntryFromForm(form) {
 }
 
 function showConsistentMatches(input) {
-  const form = input.form;
-  const menu = form?.querySelector(".consistent-matches");
-  if (!form || !menu) return;
+  const host = input.closest(".consistent-find");
+  const menu = host?.querySelector(".consistent-matches");
+  if (!host || !menu) return;
   const needle = input.value.trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ");
   document.querySelectorAll(".consistent-matches").forEach((other) => {
     if (other !== menu) {
@@ -2921,20 +2937,27 @@ function showConsistentMatches(input) {
       other.innerHTML = "";
     }
   });
-  const entry = ministryEntryFromForm(form);
-  const hits = entry ? consistentChoices(entry, form.dataset.form).filter((item) => !needle || consistentNameHit(item.label, needle)) : [];
+  const entry = ministryEntryFromForm(host);
+  const hits = entry ? consistentChoices(entry, host.dataset.form).filter((item) => !needle || consistentNameHit(item.label, needle)) : [];
   menu.hidden = false;
   menu.innerHTML = hits.length
     ? hits.map((item) => `<button type="button" data-action="consistent-pick" data-value="${esc(item.value)}">${esc(item.label)}</button>`).join("")
     : `<p class="consistent-more">No matches</p>`;
+  placeConsistentMenu(menu);
+}
+
+function placeConsistentMenu(menu) {
+  const viewport = window.visualViewport;
+  const keyboard = viewport ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop) : 0;
+  menu.style.bottom = `${keyboard + 8}px`;
 }
 
 function pickConsistent(button) {
-  const form = button.closest("form");
+  const host = button.closest(".consistent-find");
   const value = button.dataset.value;
-  if (!form || !value) return;
-  const kind = form.dataset.form;
-  const body = { directoryId: form.dataset.id, member: form.dataset.member };
+  if (!host || !value) return;
+  const kind = host.dataset.form;
+  const body = { directoryId: host.dataset.id, member: host.dataset.member };
   const path = kind === "ministry-household" ? "/api/directory/visits" : kind === "ministry-person" ? "/api/directory/ministry-person" : "/api/directory/companion";
   if (kind === "ministry-household") body.householdId = value;
   else if (kind === "ministry-person") body.person = value;
@@ -2946,10 +2969,10 @@ function pickConsistent(button) {
 }
 
 function consistentFind(kind, label, directoryId, member) {
-  return `<form class="consistent-find" data-form="${kind}" data-id="${esc(directoryId)}" data-member="${esc(member)}" autocomplete="off">
-    <input class="consistent-find-input" type="text" name="consistent-filter" placeholder="${esc(label)}" aria-label="${esc(label)}" aria-autocomplete="list" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text" readonly>
+  return `<div class="consistent-find" data-form="${kind}" data-id="${esc(directoryId)}" data-member="${esc(member)}">
+    <input class="consistent-find-input" type="text" placeholder="${esc(label)}" aria-label="${esc(label)}" aria-autocomplete="list" role="combobox" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text" enterkeyhint="done" readonly>
     <div class="consistent-matches" hidden></div>
-  </form>`;
+  </div>`;
 }
 
 function consistentAssignmentRow(entry, item, kind) {
