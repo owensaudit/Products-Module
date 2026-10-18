@@ -586,6 +586,13 @@ body[data-page="youth"] .presidency-board .position {
   padding: 10px 12px 12px;
 }
 
+.month-cal:empty {
+  display: none;
+  border: 0;
+  padding: 0;
+  box-shadow: none;
+}
+
 .cal-nav {
   display: grid;
   grid-template-columns: 28px 1fr 28px;

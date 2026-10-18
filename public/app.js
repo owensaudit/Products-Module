@@ -1130,10 +1130,16 @@ async function api(path, options) {
 }
 
 async function start() {
+  const slowLoad = setTimeout(() => {
+    if (state) return;
+    const note = document.querySelector("#app .empty");
+    if (note) note.textContent = "Still loading on this connection…";
+  }, 8000);
   const config = await fetch("/api/config").then((response) => response.json()).catch(() => ({ auth: false }));
   authRequired = Boolean(config.auth);
   if (authRequired) await signIn(config.firebase);
   await refresh();
+  clearTimeout(slowLoad);
 }
 
 async function signIn(firebaseConfig) {
