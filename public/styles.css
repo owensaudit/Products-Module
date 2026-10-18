@@ -683,6 +683,9 @@ button.cal-day.is-open {
 .cal-dot.reschedule { background: #7dcea0; }
 .cal-dot.with_youth { background: #d98a2b; }
 .cal-dot.temporary { background: #1f7a8c; }
+.cal-dot.consistent { background: #2f6f4e; }
+.consistent-assignment { display: grid; gap: 4px; margin: 0 0 10px; }
+.consistent-assignment .appointment-row { margin: 0; }
 .cal-dot.notify { background: #c47b12; }
 
 .cal-num {

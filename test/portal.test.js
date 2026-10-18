@@ -39,7 +39,7 @@ import {
   setVisitStatus,
   slotsForMonth,
 } from "../lib/model.js";
-import { addDirectoryMember, addDirectoryVisit, addMinistryPerson, addTemporaryVisit, applyDirectory, applyMinisteringGroups, assignDirectoryHousehold, assignTemporaryHousehold, completeTemporaryVisit, directoryAddressKey, findDirectoryRecord, mergeDirectoryByAddress, moveDirectoryPerson, parseDirectory, removeDirectoryMember, removeDirectoryVisit, removeMinistryPerson, removeTemporaryHousehold, scheduleDirectoryTemporaryVisit, scheduleTemporaryVisit, setDirectoryCompanion, setDirectoryMan, setTemporaryCompanion, setTemporaryFamily, setYouthDay, setYouthHome, syncDirectoryMen, updateDirectoryHousehold } from "../lib/directory.js";
+import { addDirectoryMember, addDirectoryVisit, addMinistryPerson, addTemporaryVisit, applyDirectory, applyMinisteringGroups, assignDirectoryHousehold, assignTemporaryHousehold, completeTemporaryVisit, directoryAddressKey, findDirectoryRecord, logConsistentVisit, mergeDirectoryByAddress, moveDirectoryPerson, parseDirectory, removeDirectoryMember, removeDirectoryVisit, removeMinistryPerson, removeTemporaryHousehold, scheduleConsistentVisit, scheduleDirectoryTemporaryVisit, scheduleTemporaryVisit, setDirectoryCompanion, setDirectoryMan, setTemporaryCompanion, setTemporaryFamily, setYouthDay, setYouthHome, syncDirectoryMen, updateDirectoryHousehold } from "../lib/directory.js";
 import { brotherSheetToState, calendarMarks, canonicalRosterStatus, isArchiveStatus, rosterStatusKey } from "../lib/roster.js";
 import { reminderMessage } from "../public/reminder.js";
 import { emailAllowed, parseAllowlist } from "../lib/allowlist.js";
@@ -1930,6 +1930,105 @@ test("standing ministry households and people stay until changed and are not tem
   assert.deepEqual(state.directory[0].memberVisits.ben.map((item) => item.label), ["Standing house", "Other, Cam"]);
   assert.equal(state.temporaryVisits.length, 1);
   assert.deepEqual(state.directory[0].memberCompanions.ben, ["Keeper, Anthony", "Keeper, Sam"]);
+});
+
+test("a consistent assignment can be scheduled each quarter and a finished temporary visit leaves it alone", () => {
+  let state = {
+    ...emptyState(),
+    directory: [{
+      id: "dir_home",
+      name: "Sample, Ben",
+      members: ["Ben"],
+      address: "",
+      phone: "",
+      email: "",
+      memberCompanions: { ben: "Keeper, Anthony" },
+      memberVisits: { ben: [{ directoryId: "dir_keep", label: "Standing house" }] },
+      memberMinistryPeople: { ben: [{ directoryId: "dir_ada", member: "Ada", label: "Example, Ada" }] },
+    }, {
+      id: "dir_keep",
+      name: "Standing house",
+      members: ["Ann"],
+      address: "",
+      phone: "",
+      email: "",
+      memberCompanions: {},
+      memberVisits: {},
+    }, {
+      id: "dir_ada",
+      name: "Example, Ada",
+      members: ["Ada"],
+      address: "",
+      phone: "",
+      email: "",
+      memberCompanions: {},
+      memberVisits: {},
+    }, {
+      id: "dir_other",
+      name: "Other, Cam",
+      members: ["Cam"],
+      address: "",
+      phone: "",
+      email: "",
+      memberCompanions: {},
+      memberVisits: {},
+      memberYouthHome: { cam: true },
+    }],
+  };
+  state = scheduleConsistentVisit(state, {
+    directoryId: "dir_home",
+    member: "Ben",
+    kind: "household",
+    targetId: "dir_keep",
+    label: "Standing house",
+    date: "2026-10-21",
+    time: "19:00",
+  });
+  state = scheduleConsistentVisit(state, {
+    directoryId: "dir_home",
+    member: "Ben",
+    kind: "person",
+    targetId: "dir_ada",
+    person: "Ada",
+    label: "Example, Ada",
+    date: "2026-11-04",
+    time: "18:30",
+  });
+  assert.equal(state.directory[0].memberVisits.ben[0].meeting, "10/21 7:00 PM");
+  assert.equal(state.directory[0].memberVisits.ben[0].label, "Standing house");
+  assert.equal(state.directory[0].memberMinistryPeople.ben[0].scheduledDate, "2026-11-04");
+  assert.equal(state.directory[0].memberCompanions.ben, "Keeper, Anthony");
+  assert.equal(state.temporaryVisits.length, 0);
+  const shown = presentState(state, "2026-10", { includePrivate: false, today: "2026-10-18" });
+  assert.equal(shown.calendarMarks["2026-10-21"].kinds.includes("consistent"), true);
+  assert.equal(shown.calendarMarks["2026-11-04"].kinds.includes("consistent"), true);
+  state = logConsistentVisit(state, {
+    directoryId: "dir_home",
+    member: "Ben",
+    kind: "household",
+    targetId: "dir_keep",
+    label: "Standing house",
+    date: "2026-10-21",
+  });
+  assert.equal(state.directory[0].memberVisits.ben.length, 1);
+  assert.equal(state.directory[0].memberVisits.ben[0].label, "Standing house");
+  assert.equal(state.directory[0].memberVisits.ben[0].lastVisited, "2026-10-21");
+  assert.equal(state.directory[0].memberVisits.ben[0].meeting, undefined);
+  assert.equal(state.directory[0].memberMinistryPeople.ben[0].label, "Example, Ada");
+  assert.equal(state.directory[0].memberMinistryPeople.ben[0].scheduledDate, "2026-11-04");
+  state = assignTemporaryHousehold(state, {
+    adultDirectoryId: "dir_home",
+    adultMember: "Ben",
+    householdId: "dir_other",
+    month: "2026-10",
+  });
+  state = scheduleTemporaryVisit(state, { id: state.temporaryVisits[0].id, date: "2026-10-22", time: "19:00" });
+  state = completeTemporaryVisit(state, { id: state.temporaryVisits[0].id });
+  assert.equal(state.temporaryVisits[0].done, true);
+  assert.equal(state.directory[0].memberVisits.ben[0].label, "Standing house");
+  assert.equal(state.directory[0].memberVisits.ben[0].lastVisited, "2026-10-21");
+  assert.equal(state.directory[0].memberMinistryPeople.ben[0].label, "Example, Ada");
+  assert.equal(state.directory[0].memberCompanions.ben, "Keeper, Anthony");
 });
 
 test("every scheduled visit asks for a family notice two days before and the day before", () => {
