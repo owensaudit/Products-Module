@@ -339,6 +339,11 @@ app.addEventListener("change", (event) => {
 });
 
 app.addEventListener("input", (event) => {
+  const field = event.target;
+  if (field instanceof HTMLInputElement && field.classList.contains("consistent-find-input")) {
+    showConsistentMatches(field);
+    return;
+  }
   const area = event.target;
   if (!(area instanceof HTMLTextAreaElement) || area.name !== "body") return;
   area.dataset.caret = String(area.selectionStart);
@@ -358,6 +363,17 @@ app.addEventListener("input", (event) => {
 });
 
 app.addEventListener("click", (event) => {
+  const pick = event.target.closest("[data-action='consistent-pick']");
+  if (pick) {
+    pickConsistent(pick);
+    return;
+  }
+  if (!event.target.closest(".consistent-find")) {
+    document.querySelectorAll(".consistent-matches").forEach((menu) => {
+      menu.hidden = true;
+      menu.innerHTML = "";
+    });
+  }
   if (event.target.closest("select, input, textarea, a.address-pill")) return;
   const reminderLink = event.target.closest("a[data-reminder]");
   if (reminderLink) {
@@ -749,6 +765,11 @@ app.addEventListener("submit", (event) => {
   event.preventDefault();
   const data = new FormData(form);
   const kind = form.dataset.form;
+  if (kind === "directory-companion" || kind === "ministry-household" || kind === "ministry-person") {
+    const matches = [...form.querySelectorAll(".consistent-matches button[data-action='consistent-pick']")];
+    if (matches.length === 1) pickConsistent(matches[0]);
+    return;
+  }
   if (kind === "consistent-schedule") {
     post("/api/directory/consistent/schedule", {
       directoryId: form.dataset.id,
@@ -2819,8 +2840,7 @@ function ministryHouseholdChoices(entry) {
     .filter((row) => row.id !== entry.directoryId && !taken.has(row.id))
     .slice()
     .sort((a, b) => String(a.name).localeCompare(String(b.name), "en", { sensitivity: "base" }))
-    .map((row) => `<option value="${esc(row.id)}">${esc(row.name)}</option>`)
-    .join("");
+    .map((row) => ({ value: row.id, label: row.name }));
 }
 
 function ministryPersonChoices(entry) {
@@ -2828,8 +2848,7 @@ function ministryPersonChoices(entry) {
   return directoryPeople()
     .filter((person) => !directoryNameMatches(person.name, entry.name))
     .filter((person) => !taken.some((item) => directoryNameMatches(item.label, person.name)))
-    .map((person) => `<option value="${esc(person.name)}">${esc(person.name)}</option>`)
-    .join("");
+    .map((person) => ({ value: person.name, label: person.name }));
 }
 
 function consistentVisitCopy(item) {
@@ -2841,7 +2860,7 @@ function consistentVisitCopy(item) {
   return { text: `Last visited ${label}`, tone: "earlier" };
 }
 
-function companionAddOptions(entry) {
+function companionAddChoices(entry) {
   const saved = savedCompanionNames(entry);
   const names = directoryPeople()
     .map((person) => person.name)
@@ -2854,7 +2873,77 @@ function companionAddOptions(entry) {
     names.push(name);
   }
   names.sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
-  return [`<option value="">Companion</option>`, ...names.map((name) => `<option value="${esc(name)}">${esc(name)}</option>`)].join("");
+  return names.map((name) => ({ value: name, label: name }));
+}
+
+function consistentChoices(entry, kind) {
+  if (kind === "ministry-household") return ministryHouseholdChoices(entry);
+  if (kind === "ministry-person") return ministryPersonChoices(entry);
+  return companionAddChoices(entry);
+}
+
+function consistentNameHit(label, needle) {
+  const fold = (value) => String(value || "").trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ");
+  const raw = String(label || "");
+  const keys = [fold(raw)];
+  const comma = raw.indexOf(",");
+  if (comma !== -1) keys.push(fold(`${raw.slice(comma + 1)} ${raw.slice(0, comma)}`));
+  return keys.some((key) => key.includes(needle));
+}
+
+function ministryEntryFromForm(form) {
+  const record = (state?.directory || []).find((row) => row.id === form?.dataset.id);
+  if (!record) return null;
+  const member = form.dataset.member || "";
+  return { record, member, name: directoryPersonName(record, member), directoryId: record.id, household: record.name };
+}
+
+function showConsistentMatches(input) {
+  const form = input.form;
+  const menu = form?.querySelector(".consistent-matches");
+  if (!form || !menu) return;
+  const needle = input.value.trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ");
+  if (needle.length < 2) {
+    menu.hidden = true;
+    menu.innerHTML = "";
+    return;
+  }
+  document.querySelectorAll(".consistent-matches").forEach((other) => {
+    if (other !== menu) {
+      other.hidden = true;
+      other.innerHTML = "";
+    }
+  });
+  const entry = ministryEntryFromForm(form);
+  const hits = entry ? consistentChoices(entry, form.dataset.form).filter((item) => consistentNameHit(item.label, needle)) : [];
+  const shown = hits.slice(0, 6);
+  const buttons = shown.map((item) => `<button type="button" data-action="consistent-pick" data-value="${esc(item.value)}">${esc(item.label)}</button>`).join("");
+  const note = hits.length > shown.length ? `<p class="consistent-more">Type another letter</p>` : shown.length ? "" : `<p class="consistent-more">No matches</p>`;
+  menu.hidden = false;
+  menu.innerHTML = `${buttons}${note}`;
+}
+
+function pickConsistent(button) {
+  const form = button.closest("form");
+  const value = button.dataset.value;
+  if (!form || !value) return;
+  const kind = form.dataset.form;
+  const body = { directoryId: form.dataset.id, member: form.dataset.member };
+  const path = kind === "ministry-household" ? "/api/directory/visits" : kind === "ministry-person" ? "/api/directory/ministry-person" : "/api/directory/companion";
+  if (kind === "ministry-household") body.householdId = value;
+  else if (kind === "ministry-person") body.person = value;
+  else body.companion = value;
+  post(path, body).then((next) => {
+    state = next;
+    render();
+  }).catch(showError);
+}
+
+function consistentFind(kind, label, directoryId, member) {
+  return `<form class="consistent-find" data-form="${kind}" data-id="${esc(directoryId)}" data-member="${esc(member)}">
+    <input class="consistent-find-input" type="search" placeholder="${esc(label)}" aria-label="${esc(label)}" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search">
+    <div class="consistent-matches" hidden></div>
+  </form>`;
 }
 
 function consistentAssignmentRow(entry, item, kind) {
@@ -2890,15 +2979,9 @@ function standingMinistryBlock(entry) {
   const personRows = directoryMinistryPeople(entry).map((item) => consistentAssignmentRow(entry, item, "person")).join("");
   return `<div class="standing-ministry">
     <div class="consistent-add">
-      <form data-form="directory-companion" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}">
-        <select name="companion" aria-label="Companion">${companionAddOptions(entry)}</select>
-      </form>
-      <form data-form="ministry-household" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}">
-        <select name="household" aria-label="Consistent household"><option value="">Household</option>${ministryHouseholdChoices(entry)}</select>
-      </form>
-      <form data-form="ministry-person" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}">
-        <select name="person" aria-label="Consistent person"><option value="">Person</option>${ministryPersonChoices(entry)}</select>
-      </form>
+      ${consistentFind("directory-companion", "Companion", entry.directoryId, entry.member)}
+      ${consistentFind("ministry-household", "Household", entry.directoryId, entry.member)}
+      ${consistentFind("ministry-person", "Person", entry.directoryId, entry.member)}
       ${companions ? `<div class="consistent-names">${companions}</div>` : ""}
     </div>
     ${householdRows}

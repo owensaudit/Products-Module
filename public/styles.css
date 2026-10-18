@@ -699,7 +699,23 @@ button.cal-day.is-open {
   margin: 0 0 8px;
 }
 .consistent-add { display: grid; gap: 6px; }
-.consistent-add select { width: 100%; }
+.consistent-find { display: grid; gap: 4px; margin: 0; }
+.consistent-find input[type="search"] {
+  width: 100%;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 12px;
+}
+.consistent-matches { display: grid; gap: 4px; }
+.consistent-matches button {
+  text-align: left;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: white;
+  padding: 6px 10px;
+}
+.consistent-more { margin: 0; font-size: 12px; color: var(--muted); }
 .consistent-names { display: flex; flex-wrap: wrap; gap: 6px 10px; }
 .consistent-assignment { display: grid; gap: 6px; }
 .consistent-head {
