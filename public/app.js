@@ -338,6 +338,18 @@ app.addEventListener("change", (event) => {
   }
 });
 
+app.addEventListener("pointerdown", (event) => {
+  const field = event.target;
+  if (field instanceof HTMLInputElement && field.classList.contains("consistent-find-input")) field.removeAttribute("readonly");
+});
+
+app.addEventListener("focusin", (event) => {
+  const field = event.target;
+  if (!(field instanceof HTMLInputElement) || !field.classList.contains("consistent-find-input")) return;
+  field.removeAttribute("readonly");
+  showConsistentMatches(field);
+});
+
 app.addEventListener("input", (event) => {
   const field = event.target;
   if (field instanceof HTMLInputElement && field.classList.contains("consistent-find-input")) {
@@ -2903,11 +2915,6 @@ function showConsistentMatches(input) {
   const menu = form?.querySelector(".consistent-matches");
   if (!form || !menu) return;
   const needle = input.value.trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ");
-  if (needle.length < 2) {
-    menu.hidden = true;
-    menu.innerHTML = "";
-    return;
-  }
   document.querySelectorAll(".consistent-matches").forEach((other) => {
     if (other !== menu) {
       other.hidden = true;
@@ -2915,12 +2922,11 @@ function showConsistentMatches(input) {
     }
   });
   const entry = ministryEntryFromForm(form);
-  const hits = entry ? consistentChoices(entry, form.dataset.form).filter((item) => consistentNameHit(item.label, needle)) : [];
-  const shown = hits.slice(0, 6);
-  const buttons = shown.map((item) => `<button type="button" data-action="consistent-pick" data-value="${esc(item.value)}">${esc(item.label)}</button>`).join("");
-  const note = hits.length > shown.length ? `<p class="consistent-more">Type another letter</p>` : shown.length ? "" : `<p class="consistent-more">No matches</p>`;
+  const hits = entry ? consistentChoices(entry, form.dataset.form).filter((item) => !needle || consistentNameHit(item.label, needle)) : [];
   menu.hidden = false;
-  menu.innerHTML = `${buttons}${note}`;
+  menu.innerHTML = hits.length
+    ? hits.map((item) => `<button type="button" data-action="consistent-pick" data-value="${esc(item.value)}">${esc(item.label)}</button>`).join("")
+    : `<p class="consistent-more">No matches</p>`;
 }
 
 function pickConsistent(button) {
@@ -2940,8 +2946,8 @@ function pickConsistent(button) {
 }
 
 function consistentFind(kind, label, directoryId, member) {
-  return `<form class="consistent-find" data-form="${kind}" data-id="${esc(directoryId)}" data-member="${esc(member)}">
-    <input class="consistent-find-input" type="search" placeholder="${esc(label)}" aria-label="${esc(label)}" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search">
+  return `<form class="consistent-find" data-form="${kind}" data-id="${esc(directoryId)}" data-member="${esc(member)}" autocomplete="off">
+    <input class="consistent-find-input" type="text" name="consistent-filter" placeholder="${esc(label)}" aria-label="${esc(label)}" aria-autocomplete="list" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text" readonly>
     <div class="consistent-matches" hidden></div>
   </form>`;
 }

@@ -700,14 +700,20 @@ button.cal-day.is-open {
 }
 .consistent-add { display: grid; gap: 6px; }
 .consistent-find { display: grid; gap: 4px; margin: 0; }
-.consistent-find input[type="search"] {
+.consistent-find input[type="text"] {
   width: 100%;
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 6px 12px;
 }
-.consistent-matches { display: grid; gap: 4px; }
+.consistent-matches {
+  display: grid;
+  gap: 4px;
+  max-height: 11rem;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
 .consistent-matches button {
   text-align: left;
   border-radius: 10px;
