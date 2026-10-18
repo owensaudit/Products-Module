@@ -31,7 +31,7 @@ import {
   markVisitNotified,
 } from "./lib/model.js";
 import { emailAllowed, parseAllowlist } from "./lib/allowlist.js";
-import { addDirectoryMember, addDirectoryVisit, addTemporaryVisit, applyDirectory, assignDirectoryHousehold, assignTemporaryHousehold, completeTemporaryVisit, moveDirectoryPerson, parseDirectory, removeDirectoryMember, removeDirectoryVisit, removeTemporaryHousehold, scheduleDirectoryTemporaryVisit, scheduleTemporaryVisit, setDirectoryCompanion, setDirectoryMan, setTemporaryCompanion, setTemporaryFamily, setYouthDay, setYouthHome, syncDirectoryMen, updateDirectoryHousehold } from "./lib/directory.js";
+import { addDirectoryMember, addDirectoryVisit, addMinistryPerson, addTemporaryVisit, applyDirectory, assignDirectoryHousehold, assignTemporaryHousehold, completeTemporaryVisit, moveDirectoryPerson, parseDirectory, removeDirectoryMember, removeDirectoryVisit, removeMinistryPerson, removeTemporaryHousehold, scheduleDirectoryTemporaryVisit, scheduleTemporaryVisit, setDirectoryCompanion, setDirectoryMan, setTemporaryCompanion, setTemporaryFamily, setYouthDay, setYouthHome, syncDirectoryMen, updateDirectoryHousehold } from "./lib/directory.js";
 import { createStore } from "./lib/store.js";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -387,6 +387,18 @@ export function createPortalHandler(store, options = {}) {
 
         if (pathname === "/api/directory/visits/remove") {
           const next = await store.update((state) => removeDirectoryVisit(state, body));
+          sendJson(response, 200, presentState(next, month, viewOptions));
+          return;
+        }
+
+        if (pathname === "/api/directory/ministry-person") {
+          const next = await store.update((state) => addMinistryPerson(state, body));
+          sendJson(response, 200, presentState(next, month, viewOptions));
+          return;
+        }
+
+        if (pathname === "/api/directory/ministry-person/remove") {
+          const next = await store.update((state) => removeMinistryPerson(state, body));
           sendJson(response, 200, presentState(next, month, viewOptions));
           return;
         }

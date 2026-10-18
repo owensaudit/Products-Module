@@ -39,7 +39,7 @@ import {
   setVisitStatus,
   slotsForMonth,
 } from "../lib/model.js";
-import { addDirectoryMember, addDirectoryVisit, addTemporaryVisit, applyDirectory, applyMinisteringGroups, assignDirectoryHousehold, assignTemporaryHousehold, completeTemporaryVisit, directoryAddressKey, findDirectoryRecord, mergeDirectoryByAddress, moveDirectoryPerson, parseDirectory, removeDirectoryMember, removeDirectoryVisit, removeTemporaryHousehold, scheduleDirectoryTemporaryVisit, scheduleTemporaryVisit, setDirectoryCompanion, setDirectoryMan, setTemporaryCompanion, setTemporaryFamily, setYouthDay, setYouthHome, syncDirectoryMen, updateDirectoryHousehold } from "../lib/directory.js";
+import { addDirectoryMember, addDirectoryVisit, addMinistryPerson, addTemporaryVisit, applyDirectory, applyMinisteringGroups, assignDirectoryHousehold, assignTemporaryHousehold, completeTemporaryVisit, directoryAddressKey, findDirectoryRecord, mergeDirectoryByAddress, moveDirectoryPerson, parseDirectory, removeDirectoryMember, removeDirectoryVisit, removeMinistryPerson, removeTemporaryHousehold, scheduleDirectoryTemporaryVisit, scheduleTemporaryVisit, setDirectoryCompanion, setDirectoryMan, setTemporaryCompanion, setTemporaryFamily, setYouthDay, setYouthHome, syncDirectoryMen, updateDirectoryHousehold } from "../lib/directory.js";
 import { brotherSheetToState, calendarMarks, canonicalRosterStatus, isArchiveStatus, rosterStatusKey } from "../lib/roster.js";
 import { reminderMessage } from "../public/reminder.js";
 import { emailAllowed, parseAllowlist } from "../lib/allowlist.js";
@@ -1873,6 +1873,63 @@ test("a temporary household can be removed without touching the standing assignm
   state = removeDirectoryVisit(state, { directoryId: "dir_home", member: "Ben", householdId: "dir_extra" });
   assert.deepEqual(state.directory[0].memberVisits.ben.map((item) => item.label), ["Standing house"]);
   assert.equal(state.directory[0].memberCompanions.ben, "Keeper, Anthony");
+});
+
+test("standing ministry households and people stay until changed and are not temporary visits", () => {
+  const blank = { address: "", phone: "", email: "", memberCompanions: {}, memberVisits: {} };
+  let state = {
+    ...emptyState(),
+    directory: [{
+      id: "dir_home",
+      name: "Sample, Ben & Mel",
+      members: ["Ben", "Mel"],
+      ...blank,
+      memberCompanions: { ben: ["Keeper, Anthony", "Keeper, Sam"] },
+      memberVisits: { ben: [{ directoryId: "dir_keep", label: "Standing house" }] },
+    }, {
+      id: "dir_keep",
+      name: "Standing house",
+      members: ["Ann"],
+      ...blank,
+    }, {
+      id: "dir_other",
+      name: "Other, Cam",
+      members: ["Cam"],
+      ...blank,
+      memberYouthHome: { cam: true },
+    }, {
+      id: "dir_ada",
+      name: "Example, Ada",
+      members: ["Ada"],
+      ...blank,
+    }],
+  };
+  state = addDirectoryVisit(state, { directoryId: "dir_home", member: "Ben", householdId: "dir_other" });
+  assert.deepEqual(state.directory[0].memberVisits.ben.map((item) => item.label), ["Standing house", "Other, Cam"]);
+  assert.deepEqual(state.directory[0].memberCompanions.ben, ["Keeper, Anthony", "Keeper, Sam"]);
+  state = addMinistryPerson(state, { directoryId: "dir_home", member: "Ben", person: "Example, Ada" });
+  state = addMinistryPerson(state, { directoryId: "dir_home", member: "Ben", person: "Ada Example" });
+  assert.deepEqual(state.directory[0].memberMinistryPeople.ben, [{ directoryId: "dir_ada", member: "Ada", label: "Example, Ada" }]);
+  assert.equal(state.temporaryVisits.length, 0);
+  assert.throws(() => addMinistryPerson(state, { directoryId: "dir_home", member: "Ben", person: "Sample, Ben" }), /someone else/);
+  state = assignTemporaryHousehold(state, {
+    adultDirectoryId: "dir_home",
+    adultMember: "Ben",
+    householdId: "dir_other",
+    month: "2026-10",
+  });
+  assert.equal(state.temporaryVisits[0].familyName, "Other, Cam");
+  assert.deepEqual(state.directory[0].memberVisits.ben.map((item) => item.label), ["Standing house", "Other, Cam"]);
+  assert.deepEqual(state.directory[0].memberMinistryPeople.ben.map((item) => item.label), ["Example, Ada"]);
+  assert.deepEqual(state.directory[0].memberCompanions.ben, ["Keeper, Anthony", "Keeper, Sam"]);
+  const shown = presentState(state, "2026-10", { includePrivate: false });
+  assert.equal(shown.directory[0].memberMinistryPeople.ben[0].label, "Example, Ada");
+  assert.equal(shown.directory[0].address, "");
+  state = removeMinistryPerson(state, { directoryId: "dir_home", member: "Ben", householdId: "dir_ada", person: "Ada", label: "Example, Ada" });
+  assert.equal(state.directory[0].memberMinistryPeople.ben, undefined);
+  assert.deepEqual(state.directory[0].memberVisits.ben.map((item) => item.label), ["Standing house", "Other, Cam"]);
+  assert.equal(state.temporaryVisits.length, 1);
+  assert.deepEqual(state.directory[0].memberCompanions.ben, ["Keeper, Anthony", "Keeper, Sam"]);
 });
 
 test("every scheduled visit asks for a family notice two days before and the day before", () => {

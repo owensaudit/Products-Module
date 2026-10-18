@@ -155,6 +155,32 @@ app.addEventListener("change", (event) => {
     }).catch(showError);
     return;
   }
+  if (target instanceof HTMLSelectElement && target.form?.dataset.form === "ministry-household") {
+    const householdId = target.value;
+    if (!householdId) return;
+    post("/api/directory/visits", {
+      directoryId: target.form.dataset.id,
+      member: target.form.dataset.member,
+      householdId,
+    }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
+    return;
+  }
+  if (target instanceof HTMLSelectElement && target.form?.dataset.form === "ministry-person") {
+    const personName = target.value;
+    if (!personName) return;
+    post("/api/directory/ministry-person", {
+      directoryId: target.form.dataset.id,
+      member: target.form.dataset.member,
+      person: personName,
+    }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
+    return;
+  }
   if (target instanceof HTMLSelectElement && target.form?.dataset.form === "directory-companion") {
     post("/api/directory/companion", {
       directoryId: target.form.dataset.id,
@@ -586,6 +612,17 @@ app.addEventListener("click", (event) => {
     directoryAdding = true;
     directoryFocus = null;
     render();
+  } else if (action === "remove-ministry-person") {
+    post("/api/directory/ministry-person/remove", {
+      directoryId: button.dataset.id,
+      member: button.dataset.member,
+      householdId: button.dataset.household,
+      person: button.dataset.person,
+      label: button.dataset.label,
+    }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
   } else if (action === "remove-directory-visit") {
     post("/api/directory/visits/remove", {
       directoryId: button.dataset.id,
@@ -2727,10 +2764,65 @@ function directoryAssignedVisits(entry) {
 function directoryVisitLine(entry) {
   const saved = directorySavedVisits(entry);
   const extra = directoryVisitNames(entry.name).filter((name) => !saved.some((item) => directoryNameMatches(item.label, name)));
-  const savedRows = saved.map((item) => `<div class="companion-row"><button type="button" class="name-link" data-action="open-name" data-name="${esc(item.label)}" data-directory="${esc(entry.directoryId)}" data-member="${esc(entry.member)}">${esc(item.label)}</button></div>`).join("");
-  const extraRows = extra.length ? directoryNameLinks(extra, entry) : "";
-  if (!savedRows && !extraRows) return "";
-  return `<div class="companion-saved"><span>Visiting</span>${savedRows}${extraRows}</div>`;
+  if (!extra.length) return "";
+  return `<div class="companion-saved"><span>Visiting</span>${directoryNameLinks(extra, entry)}</div>`;
+}
+
+function directoryMinistryPeople(entry) {
+  const key = directoryMemberKey(entry?.member);
+  const saved = entry?.record?.memberMinistryPeople?.[key];
+  return Array.isArray(saved) ? saved : [];
+}
+
+function ministryHouseholdChoices(entry) {
+  const taken = new Set(directorySavedVisits(entry).map((item) => item.directoryId).filter(Boolean));
+  return (state?.directory || [])
+    .filter((row) => row.id !== entry.directoryId && !taken.has(row.id))
+    .slice()
+    .sort((a, b) => String(a.name).localeCompare(String(b.name), "en", { sensitivity: "base" }))
+    .map((row) => `<option value="${esc(row.id)}">${esc(row.name)}</option>`)
+    .join("");
+}
+
+function ministryPersonChoices(entry) {
+  const taken = directoryMinistryPeople(entry);
+  return directoryPeople()
+    .filter((person) => !directoryNameMatches(person.name, entry.name))
+    .filter((person) => !taken.some((item) => directoryNameMatches(item.label, person.name)))
+    .map((person) => `<option value="${esc(person.name)}">${esc(person.name)}</option>`)
+    .join("");
+}
+
+function standingMinistryBlock(entry) {
+  if (!entry?.record) return "";
+  const householdRows = directorySavedVisits(entry).map((item) => `<div class="companion-row">
+    <button type="button" class="name-link" data-action="open-name" data-name="${esc(item.label)}" data-directory="${esc(entry.directoryId)}" data-member="${esc(entry.member)}">${esc(item.label)}</button>
+    <button type="button" class="tiny" data-action="remove-directory-visit" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}" data-household="${esc(item.directoryId || "")}" data-label="${esc(item.label)}">Remove</button>
+  </div>`).join("");
+  const personRows = directoryMinistryPeople(entry).map((item) => `<div class="companion-row">
+    <button type="button" class="name-link" data-action="open-name" data-name="${esc(item.label)}" data-directory="${esc(entry.directoryId)}" data-member="${esc(entry.member)}">${esc(item.label)}</button>
+    <button type="button" class="tiny" data-action="remove-ministry-person" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}" data-household="${esc(item.directoryId || "")}" data-person="${esc(item.member || "")}" data-label="${esc(item.label)}">Remove</button>
+  </div>`).join("");
+  return `<div class="standing-ministry">
+    <form class="assign-row" data-form="ministry-household" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}">
+      <span>Ministry household</span>
+      <select name="household" aria-label="Ministry household"><option value="">—</option>${ministryHouseholdChoices(entry)}</select>
+    </form>
+    ${householdRows ? `<div class="companion-saved"><span>Ministry household</span>${householdRows}</div>` : ""}
+    <form class="assign-row" data-form="ministry-person" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}">
+      <span>Ministry person</span>
+      <select name="person" aria-label="Ministry person"><option value="">—</option>${ministryPersonChoices(entry)}</select>
+    </form>
+    ${personRows ? `<div class="companion-saved"><span>Ministry person</span>${personRows}</div>` : ""}
+  </div>`;
+}
+
+function ministerDirectoryEntry(person) {
+  const found = directoryEntryForMinister(person);
+  if (!found) return null;
+  const record = (state?.directory || []).find((row) => row.id === found.directoryId);
+  if (!record) return null;
+  return { record, member: found.member, name: found.name, directoryId: found.directoryId, household: record.name };
 }
 
 function scheduledTemporaryHouseholds(entry) {
@@ -3026,6 +3118,7 @@ function directoryPersonCard(entry) {
     </form>
     ${companionLinks}
     ${directoryTemporaryYouth(entry)}
+    ${standingMinistryBlock(entry)}
     <form class="assign-row temporary-pick" data-form="directory-temporary-schedule" data-id="${esc(record.id)}" data-member="${esc(entry.member)}">
       <span>Temporary household</span>
       <select name="visit" aria-label="Temporary household"><option value="">—</option>${youthRequestHouseholdOptions("", scheduledTemporaryHouseholds(entry).map((row) => row.familyDirectoryId))}</select>
@@ -3978,10 +4071,12 @@ function assignmentDetail(person) {
 function rosterDetail(person) {
   if (isYouthMember(person)) return youthMemberDetail(person);
   if (isYouthVisit(person)) return assignmentDetail(person);
+  const ministry = ministerDirectoryEntry(person);
   return `${cardBackButton()}${personNameField(person)}
     ${specialNotes(person)}
     ${householdLine(person)}
     ${companionLine(person)}
+    ${ministry ? standingMinistryBlock(ministry) : ""}
     <p class="status-row">${statusSelect(person)}${archiveControl(person)}${missionPill(person)}${person.rosterStatusKey === "scheduled" ? visitCheck(person) : ""}</p>
     ${ministeringVisitNote(person)}
     ${contactFields(person, false, true)}
