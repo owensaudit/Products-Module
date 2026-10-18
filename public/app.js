@@ -3914,7 +3914,7 @@ function rosterLine(person) {
   const bits = [];
   if (person.priesthood) bits.push(esc(person.priesthood));
   if (person.reachOutDate) bits.push(`Reach out ${esc(person.reachOutDate)}`);
-  if (person.appointment) bits.push(`Appt ${esc(person.appointment)}${placeMark(person.appointmentPlace)}`);
+  if (person.appointment && !visitAlreadyDone(person)) bits.push(`Appt ${esc(person.appointment)}${placeMark(person.appointmentPlace)}`);
   if (person.list === "youth" && person.assigned?.length) bits.push(esc(person.assigned.join(" · ")));
   if (person.visitYearReset && person.lastVisited) bits.push(`Year reset · ${esc(ministeringVisitSentence(person))}`);
   else if (person.lastVisited && person.list !== "youth" && !isYouthMember(person)) bits.push(esc(ministeringVisitSentence(person)));
@@ -4331,10 +4331,15 @@ function placeChoice(place, hidden = false) {
   return `<span class="place-choices" ${hidden ? "hidden" : ""}>${option("church", "Church", churchIcon())}${option("home", "Home", homeIcon())}${option("driveby", "Drive by", drivebyIcon())}</span>`;
 }
 
+function visitAlreadyDone(person) {
+  return person?.rosterStatusKey === "visited" || person?.rosterStatusKey === "reschedule_visited";
+}
+
 function planLine(person) {
   const key = person.rosterStatusKey;
   const where = placeMark(person.appointmentPlace);
   const told = person.sheetColumns?.["Apt Notified"] === "Yes" ? `<p class="notified">Notified</p>` : "";
+  if (visitAlreadyDone(person)) return person.reachOutDate ? `<p><strong>Reach out</strong> ${esc(person.reachOutDate)}</p>` : "";
   if (key === "reach_out" && person.reachOutDate) return `<p><strong>Reach out</strong> ${esc(person.reachOutDate)}</p>`;
   if (key === "scheduled" && person.appointment) return `<p class="plan-line"><strong>Scheduled Appt</strong> ${esc(person.appointment)}${where}</p>${told}`;
   if (key === "reschedule" && person.appointment) return `<p class="plan-line"><strong>Re-Schedule</strong> ${esc(person.appointment)}${where}</p>${told}`;
@@ -4346,6 +4351,7 @@ function planLine(person) {
 
 function planParts(person) {
   const key = person.rosterStatusKey;
+  if (visitAlreadyDone(person)) return { date: "", time: "", kind: "", place: "" };
   if (key === "reach_out" && person.reachOutDate) return { date: reachOutParts(person.reachOutDate), time: "", kind: "reach_out", place: "" };
   if (key === "driveby") {
     const parts = person.appointment ? appointmentParts(person.appointment) : { date: "", time: "" };

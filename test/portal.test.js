@@ -458,7 +458,9 @@ test("a brother sheet keeps names filterable and hides contact details", () => {
   assert.equal(view.people[0].rosterStatusKey, "visited");
   assert.equal(view.people[0].priesthood, "Elder");
   assert.equal(view.people[0].birthday, "01/01/1986");
-  assert.equal(view.people[0].appointment, "07/03 5:30 PM");
+  assert.equal(view.people[0].appointment, "");
+  assert.equal(view.people[0].appointmentPlace, "");
+  assert.equal(state.people[0].sheetColumns["Apt Date"], "07/03 5:30 PM");
   assert.equal(view.people[0].phone, "");
   assert.equal(view.people[0].email, "");
   assert.equal(view.people[1].rosterStatus, "Reach Out");
@@ -2178,10 +2180,14 @@ test("a ministering visit counts for one year and then returns to To Visit", () 
   state = setPersonStatus(state, "per_1", "Visited", { visitedOn: "2026-10-12" });
   assert.equal(state.people[0].sheetColumns.Status, "Visited");
   assert.equal(state.people[0].sheetColumns["Visited On"], "10/12/2025");
-  let view = presentState(state, "2026-10", { today: "2026-10-11" });
+  let   view = presentState(state, "2026-10", { today: "2026-10-11" });
   assert.equal(view.people[0].rosterStatusKey, "visited");
   assert.equal(view.people[0].visitYearReset, false);
   assert.equal(view.people[0].lastVisited, "10/12/2025");
+  assert.equal(view.people[0].appointment, "");
+  assert.equal(view.people[0].appointmentPlace, "");
+  assert.equal(state.people[0].sheetColumns["Apt Date"], "10/12/2025 7:00 PM");
+  assert.equal(state.people[0].sheetColumns["Apt Place"], "Home");
   view = presentState(state, "2026-10", { today: "2026-10-12" });
   assert.equal(view.people[0].rosterStatusKey, "none");
   assert.equal(view.people[0].rosterStatus, "");
