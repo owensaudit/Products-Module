@@ -3913,13 +3913,16 @@ function temporaryDutyBlock(person) {
 function rosterLine(person) {
   const bits = [];
   if (person.priesthood) bits.push(esc(person.priesthood));
-  if (person.reachOutDate) bits.push(`Reach out ${esc(person.reachOutDate)}`);
-  if (person.appointment && !visitAlreadyDone(person)) bits.push(`Appt ${esc(person.appointment)}${placeMark(person.appointmentPlace)}`);
+  const household = String(person.household || "").split("\n").map((line) => line.trim()).filter(Boolean)[0];
+  if (household && person.list !== "youth" && !isYouthMember(person)) bits.push(esc(household));
+  if (visitAlreadyDone(person)) bits.push("Visited");
+  else if (person.reachOutDate) bits.push(`Reach out ${esc(person.reachOutDate)}`);
+  else if (person.appointment) bits.push(`Appt ${esc(person.appointment)}${placeMark(person.appointmentPlace)}`);
   if (person.list === "youth" && person.assigned?.length) bits.push(esc(person.assigned.join(" · ")));
   if (person.visitYearReset && person.lastVisited) bits.push(`Year reset · ${esc(ministeringVisitSentence(person))}`);
   else if (person.lastVisited && person.list !== "youth" && !isYouthMember(person)) bits.push(esc(ministeringVisitSentence(person)));
   const touch = lastTouch(person);
-  if (touch) bits.push(esc(touch));
+  if (touch && !visitAlreadyDone(person)) bits.push(esc(touch));
   return bits.join(" · ") || esc(person.sheetName || "");
 }
 
@@ -4280,11 +4283,11 @@ function rosterDetail(person) {
   if (isYouthVisit(person)) return assignmentDetail(person);
   const ministry = ministerDirectoryEntry(person);
   return `${cardBackButton()}${personNameField(person)}
-    ${specialNotes(person)}
     ${householdLine(person)}
-    ${ministry ? standingMinistryBlock(ministry) : companionLine(person)}
     <p class="status-row">${statusSelect(person)}${archiveControl(person)}${missionPill(person)}${person.rosterStatusKey === "scheduled" ? visitCheck(person) : ""}</p>
     ${ministeringVisitNote(person)}
+    ${specialNotes(person)}
+    ${ministry ? standingMinistryBlock(ministry) : companionLine(person)}
     ${contactFields(person, false, true)}
     ${factsForm(person)}
     ${planLine(person)}
