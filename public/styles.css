@@ -392,10 +392,14 @@ button.title-link {
   color: white;
   border-color: var(--church-deep);
 }
-a.tiny.group-text {
+a.tiny.group-text,
+button.tiny[data-action="group-text"] {
   color: inherit;
   text-decoration: none;
   margin-left: auto;
+  padding: 6px 14px;
+  font-size: 16px;
+  line-height: 1.2;
 }
 
 .reply-form textarea { min-height: 44px; }

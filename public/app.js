@@ -77,8 +77,14 @@ function smsNumber(phone) {
   return "";
 }
 
+function personBySpokenName(name) {
+  const wanted = String(name || "").trim();
+  if (!wanted) return null;
+  return (state?.people || []).find((person) => directoryNameMatches(nameKey(person), wanted) || directoryNameMatches(person.displayName, wanted)) || null;
+}
+
 function phoneForName(name, explicit = "") {
-  return smsNumber(explicit) || smsNumber(findPersonByName(name)?.phone) || smsNumber(directoryPhoneForName(name));
+  return smsNumber(explicit) || smsNumber(personBySpokenName(name)?.phone);
 }
 
 function groupTextHref(numbers) {
