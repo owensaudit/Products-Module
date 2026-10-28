@@ -583,7 +583,10 @@ app.addEventListener("click", (event) => {
     detailForm = null;
     render();
   } else if (action === "view-all") {
-    if (page === "youth") youthList = "all";
+    if (page === "youth") {
+      youthList = "all";
+      clearYouthFocus();
+    }
     viewAll = true;
     archiveOpen = false;
     archiveChoicesFor = "";
@@ -595,7 +598,10 @@ app.addEventListener("click", (event) => {
     view = "people";
     render();
   } else if (action === "show-people") {
-    if (page === "youth") youthList = "visits";
+    if (page === "youth") {
+      youthList = "visits";
+      clearYouthFocus();
+    }
     viewAll = false;
     archiveOpen = false;
     archiveChoicesFor = "";
@@ -618,11 +624,14 @@ app.addEventListener("click", (event) => {
     dayFilter = "";
     assigneeFilter = "";
     officeFilter = "all";
-    selectedPersonId = null;
+    clearYouthFocus();
     view = "people";
     render();
   } else if (action === "archive") {
-    if (page === "youth" && youthList !== "scheduled") youthList = "visits";
+    if (page === "youth") {
+      if (youthList !== "scheduled") youthList = "visits";
+      clearYouthFocus();
+    }
     viewAll = false;
     archiveOpen = !archiveOpen;
     statusFilter = "all";
@@ -685,13 +694,16 @@ app.addEventListener("click", (event) => {
     if (current && !personMatchesFilters(current)) selectedPersonId = null;
     render();
   } else if (action === "open-companion") {
-    selectedCompanionName = button.dataset.name || "";
+    const name = button.dataset.name || "";
+    if (selectedCompanionName !== name || selectedPersonId) cardTrail.push(captureCard());
     selectedPersonId = null;
+    directoryFocus = null;
+    directoryAdding = false;
+    selectedCompanionName = name;
     detailForm = null;
     view = "people";
-    const narrow = window.matchMedia("(max-width: 800px)").matches;
     render();
-    if (narrow) document.querySelector("#companion-detail")?.scrollIntoView({ block: "start" });
+    scrollYouthSelection();
   } else if (action === "open-name") {
     openLinkedName(button.dataset.name, {
       personId: button.dataset.person || "",
@@ -708,14 +720,25 @@ app.addEventListener("click", (event) => {
     const spot = cardTrail.pop();
     if (spot) restoreCard(spot);
   } else if (action === "select-person") {
-    cardTrail = [];
+    const youthPick = page === "youth" && !dayFilter;
+    if (youthPick) {
+      if (selectedPersonId !== button.dataset.id) cardTrail.push(captureCard());
+      selectedCompanionName = "";
+      directoryFocus = null;
+      directoryAdding = false;
+    } else {
+      cardTrail = [];
+    }
     const pageTop = window.scrollY;
     selectedPersonId = button.dataset.id;
     view = "people";
     detailForm = null;
     render();
-    window.scrollTo(0, pageTop);
-    requestAnimationFrame(() => window.scrollTo(0, pageTop));
+    if (youthPick) scrollYouthSelection();
+    else {
+      window.scrollTo(0, pageTop);
+      requestAnimationFrame(() => window.scrollTo(0, pageTop));
+    }
   } else if (action === "form") {
     if (button.dataset.form === "add-person") return;
     detailForm = button.dataset.form;
@@ -769,6 +792,16 @@ app.addEventListener("click", (event) => {
     }).catch(showError);
   } else if (action === "open-scheduled-adult") {
     cardTrail.push(captureCard());
+    if (page === "youth") {
+      directoryAdding = false;
+      directoryFocus = { directoryId: button.dataset.id, member: button.dataset.member };
+      selectedPersonId = null;
+      selectedCompanionName = "";
+      inbox = "";
+      render();
+      scrollYouthSelection();
+      return;
+    }
     page = "directory";
     directoryAdding = false;
     directoryFocus = { directoryId: button.dataset.id, member: button.dataset.member };
@@ -2342,7 +2375,29 @@ function listTitle() {
   return "To Visit";
 }
 
+function clearYouthFocus() {
+  selectedPersonId = null;
+  selectedCompanionName = "";
+  directoryFocus = null;
+  directoryAdding = false;
+  cardTrail = [];
+}
+
+function youthOpenCard() {
+  if (page !== "youth" || dayFilter) return "";
+  if (youthList === "companions" && selectedCompanionName) return "companion";
+  if (youthList === "scheduled" && directoryFocus?.directoryId) return "directory";
+  if (selectedPersonId) return "person";
+  return "";
+}
+
 function peopleView() {
+  const youthOpen = youthOpenCard();
+  if (youthOpen) {
+    const id = youthOpen === "companion" ? "companion-detail" : "person-detail";
+    const body = youthOpen === "companion" ? companionDetail() : youthOpen === "directory" ? directoryDetail() : personDetail();
+    return `<section class="layout layout-single"><div class="card" id="${id}">${body}</div></section>`;
+  }
   const reminding = page !== "youth" && notifyList && !dayFilter;
   const scheduled = !reminding && showingScheduled();
   const youthLists = !reminding && showingYouthLists();
@@ -2789,6 +2844,7 @@ function captureCard(origin = {}) {
     youthList,
     view,
     dayFilter,
+    companionName: selectedCompanionName,
     scrollY: window.scrollY,
     listScroll: document.querySelector("#person-list")?.scrollTop || 0,
   };
@@ -2802,6 +2858,7 @@ function restoreCard(spot) {
   youthList = spot.youthList;
   view = spot.view || "people";
   if ("dayFilter" in spot) dayFilter = spot.dayFilter || "";
+  if ("companionName" in spot) selectedCompanionName = spot.companionName || "";
   detailForm = null;
   inbox = "";
   pendingListScroll = spot.listScroll || 0;
@@ -2932,12 +2989,24 @@ function scrollDetailCard() {
   });
 }
 
+function scrollYouthSelection() {
+  requestAnimationFrame(() => {
+    const summary = document.querySelector("#app .summary");
+    if (!summary) return;
+    const top = summary.getBoundingClientRect().top + window.scrollY;
+    window.scrollTo(0, Math.max(0, top - 8));
+  });
+}
+
 function openLeaderCard(personId) {
   const person = (state?.people || []).find((item) => item.id === personId);
   if (!person) return;
   const same = page === "youth" && selectedPersonId === person.id && view === "people" && !inbox;
   if (!same) {
     cardTrail.push(captureCard());
+    selectedCompanionName = "";
+    directoryFocus = null;
+    directoryAdding = false;
     selectedPersonId = person.id;
     view = "people";
     detailForm = null;
@@ -2946,7 +3015,7 @@ function openLeaderCard(personId) {
     archiveChoicesFor = "";
     render();
   }
-  scrollDetailCard();
+  scrollYouthSelection();
 }
 
 function directoryMemberKey(member) {
@@ -4467,7 +4536,7 @@ function companionDetail() {
     const visits = families.map((family) => youthAssignmentVisit(family)).join("");
     return `<section class="companion-schedule"><h3>with ${esc(pair.youth)}</h3>${visits || `<p class="empty">No families yet.</p>`}</section>`;
   }).join("");
-  return `<p class="muted">Companion</p><h2>${esc(group.name)}</h2><p class="muted">Schedule this companion with an assignment.</p>${blocks}`;
+  return `${cardBackButton()}<p class="muted">Companion</p><h2>${esc(group.name)}</h2><p class="muted">Schedule this companion with an assignment.</p>${blocks}`;
 }
 
 function youthAssignmentVisit(family) {
