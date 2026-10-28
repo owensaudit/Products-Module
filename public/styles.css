@@ -1717,31 +1717,12 @@ button.tiny.notify {
 .outreach-add input[type="date"],
 .outreach-edit input[type="date"],
 .outreach-add a[data-outreach-text],
-.outreach-add .outreach-body,
-.outreach-edit .outreach-sent,
+.outreach-edit a[data-outreach-text],
 .outreach-edit .remove-outreach {
   grid-column: 1 / -1;
 }
-.outreach-add a[data-outreach-text] { justify-self: start; text-decoration: none; }
-.outreach-body {
-  width: 100%;
-  min-height: 6.5rem;
-  resize: vertical;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: white;
-  padding: 10px 12px;
-  font: inherit;
-  line-height: 1.4;
-}
-.outreach-body[hidden] { display: none; }
-.outreach-sent {
-  margin: 0;
-  white-space: pre-wrap;
-  background: white;
-  border-radius: 12px;
-  padding: 8px 12px;
-}
+.outreach-add a[data-outreach-text],
+.outreach-edit a[data-outreach-text] { justify-self: start; text-decoration: none; }
 .remove-outreach {
   justify-self: start;
   white-space: nowrap;

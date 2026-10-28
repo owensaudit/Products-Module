@@ -99,70 +99,29 @@ function cardTextTarget(form) {
   return { name, phone: typed || String(person?.phone || "").trim() || directoryPhoneForName(name) };
 }
 
-function scheduleTextLink(name, phone, { follow = false } = {}) {
-  const href = textMessageHref(phone, name);
-  const hidden = follow || !href;
-  return `<a class="tiny" data-contact="text"${follow ? " data-follow" : ""} href="${href ? esc(href) : "#"}"${hidden ? " hidden" : ""}>Text</a>`;
-}
-
-function openTextMessage(link) {
-  const href = link?.getAttribute?.("href") || "";
-  if (!href.startsWith("sms:")) {
-    showError(new Error("Add a phone number on the card before texting"));
-    return;
-  }
-  window.location.href = href;
-}
-
 function quietAttrs() {
   return `autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-1p-ignore="true" data-lpignore="true" data-form-type="other"`;
 }
 
-function revealOutreachBody(row, { open = false } = {}) {
-  const body = row.querySelector(".outreach-body");
-  if (!body) return;
-  const person = state.people.find((item) => item.id === row.dataset.personId) || selectedPerson();
-  const name = nameKey(person || {});
-  const greeting = textOutreachGreeting(name);
-  body.dataset.greeting = greeting;
-  if (!body.value.startsWith(greeting)) body.value = `${greeting}${TEXT_OUTREACH_REST}`;
-  body.dataset.value = body.value;
-  body.hidden = false;
+function outreachTextLink(name, phone, key) {
+  const href = textMessageHref(phone, name);
+  const show = textOfferFor === key;
+  return `<a class="tiny" data-contact="text" data-outreach-text href="${href ? esc(href) : "#"}"${show ? "" : " hidden"}>Text</a>`;
+}
+
+function offerText(row) {
+  if (!row) return;
+  const personId = row.dataset.personId || selectedPersonId || "";
+  const key = `${personId}:${row.dataset.id || "new"}`;
+  const channel = row.querySelector("[name=channel]")?.value || "";
+  if (channel === "text") textOfferFor = key;
+  else if (textOfferFor === key) textOfferFor = "";
   const link = row.querySelector("a[data-outreach-text]");
-  const phone = cardTextTarget().phone;
-  const href = textMessageHref(phone, name, body.value);
-  if (link) {
-    link.hidden = !href;
-    link.href = href || "#";
-  }
-  if (open) openTextMessage(link);
-}
-
-function hideOutreachBody(row) {
-  const body = row.querySelector(".outreach-body");
-  if (body) body.hidden = true;
-}
-
-function enforceOutreachGreeting(body) {
-  const greeting = body.dataset.greeting || "";
-  if (!greeting) return;
-  if (!body.value.startsWith(greeting)) {
-    const tail = String(body.dataset.value || "").startsWith(greeting)
-      ? body.dataset.value.slice(greeting.length)
-      : TEXT_OUTREACH_REST;
-    body.value = greeting + tail;
-    body.setSelectionRange(greeting.length, greeting.length);
-  }
-  body.dataset.value = body.value;
-}
-
-function pinOutreachCaret(body) {
-  const greeting = body.dataset.greeting || "";
-  if (!greeting) return;
-  const start = body.selectionStart ?? 0;
-  const end = body.selectionEnd ?? 0;
-  if (start >= greeting.length && end >= greeting.length) return;
-  body.setSelectionRange(Math.max(start, greeting.length), Math.max(end, greeting.length));
+  if (!link) return;
+  const person = state?.people?.find((item) => item.id === personId) || selectedPerson();
+  const href = textMessageHref(cardTextTarget().phone, nameKey(person || {}));
+  link.href = href || "#";
+  link.hidden = textOfferFor !== key;
 }
 
 function saveOutreachAdd(row) {
@@ -171,25 +130,21 @@ function saveOutreachAdd(row) {
   const channel = row.querySelector("[name=channel]")?.value || "";
   const date = completeOutreachDate(row.querySelector("[name=date]")?.value || "");
   if (!channel || !date) return;
-  let notes = "";
-  if (channel === "text") {
-    const body = row.querySelector(".outreach-body");
-    if (!body || body.hidden) return;
-    enforceOutreachGreeting(body);
-    const greeting = body.dataset.greeting || "";
-    const value = body.value.trim();
-    if (!greeting || !value.startsWith(greeting) || !value.slice(greeting.length).trim()) return;
-    notes = value;
-  }
+  const personId = row.dataset.personId;
+  const offered = textOfferFor === `${personId}:new`;
   row.dataset.saving = "1";
   post("/api/outreach", {
-    personId: row.dataset.personId,
+    personId,
     by,
     channel,
     date,
     status: "contacted",
-    notes,
+    notes: "",
   }).then((next) => {
+    if (offered && channel === "text") {
+      const newest = [...(next.outreachAttempts || [])].reverse().find((item) => item.personId === personId && item.channel === "text");
+      textOfferFor = newest ? `${personId}:${newest.id}` : "";
+    }
     state = next;
     render();
   }).catch((error) => {
@@ -230,6 +185,7 @@ let cardTrail = [];
 let pendingListScroll = null;
 let pendingWindowScroll = null;
 let blankPlanFor = "";
+let textOfferFor = "";
 let focusReachOutDate = false;
 let inbox = "";
 let page = "elders";
@@ -446,6 +402,7 @@ app.addEventListener("change", (event) => {
   }
   const editRow = target.closest?.("[data-outreach-edit]");
   if (editRow) {
+    if (target instanceof HTMLSelectElement && target.name === "channel") offerText(editRow);
     const by = editRow.querySelector("[name=by]").value;
     const channel = editRow.querySelector("[name=channel]").value;
     const date = completeOutreachDate(editRow.querySelector("[name=date]").value);
@@ -460,14 +417,7 @@ app.addEventListener("change", (event) => {
   }
   const addRow = target.closest?.("[data-outreach-add]");
   if (addRow) {
-    if (target instanceof HTMLSelectElement && target.name === "channel") {
-      if (target.value === "text") {
-        revealOutreachBody(addRow, { open: true });
-        return;
-      }
-      addRow.querySelector("a[data-outreach-text]")?.setAttribute("hidden", "");
-      hideOutreachBody(addRow);
-    }
+    if (target instanceof HTMLSelectElement && target.name === "channel") offerText(addRow);
     if (target instanceof HTMLInputElement && target.name === "date" && !completeOutreachDate(target.value)) return;
     saveOutreachAdd(addRow);
     return;
@@ -513,15 +463,6 @@ if (window.visualViewport) {
 
 app.addEventListener("keydown", (event) => {
   const field = event.target;
-  if (field instanceof HTMLTextAreaElement && field.classList.contains("outreach-body")) {
-    const greeting = field.dataset.greeting || "";
-    const start = field.selectionStart ?? 0;
-    const end = field.selectionEnd ?? 0;
-    if (greeting && (event.key === "Backspace" || event.key === "Delete") && start <= greeting.length && end <= greeting.length) {
-      event.preventDefault();
-    }
-    return;
-  }
   if (!(field instanceof HTMLInputElement) || !field.classList.contains("consistent-find-input") || event.key !== "Enter") return;
   event.preventDefault();
   const matches = [...field.closest(".consistent-find")?.querySelectorAll("button[data-action='consistent-pick']") || []];
@@ -530,18 +471,6 @@ app.addEventListener("keydown", (event) => {
 
 app.addEventListener("input", (event) => {
   const field = event.target;
-  if (field instanceof HTMLTextAreaElement && field.classList.contains("outreach-body")) {
-    enforceOutreachGreeting(field);
-    const row = field.closest("[data-outreach-add]");
-    const link = row?.querySelector("a[data-outreach-text]");
-    if (link) {
-      const person = state.people.find((item) => item.id === row.dataset.personId) || selectedPerson();
-      const href = textMessageHref(cardTextTarget().phone, nameKey(person || {}), field.value);
-      link.hidden = !href;
-      link.href = href || "#";
-    }
-    return;
-  }
   if (field instanceof HTMLInputElement && field.classList.contains("consistent-find-input")) {
     showConsistentMatches(field);
     return;
@@ -574,7 +503,6 @@ app.addEventListener("click", (event) => {
     }
     return;
   }
-  if (event.target instanceof HTMLTextAreaElement && event.target.classList.contains("outreach-body")) pinOutreachCaret(event.target);
   const pick = event.target.closest("[data-action='consistent-pick']");
   if (pick) {
     pickConsistent(pick);
@@ -1255,12 +1183,6 @@ app.addEventListener("input", (event) => {
 });
 
 app.addEventListener("focusout", (event) => {
-  if (event.target instanceof HTMLTextAreaElement && event.target.classList.contains("outreach-body")) {
-    const row = event.target.closest("[data-outreach-add]");
-    const next = event.relatedTarget;
-    if (row && !(next instanceof Node && row.contains(next))) saveOutreachAdd(row);
-    return;
-  }
   const youthCompanion = event.target.closest?.("form[data-form='youth-companion'] [name=companion]");
   if (youthCompanion) {
     saveYouthCompanion(selectedPersonId, youthCompanion.value).catch(showError);
@@ -3190,7 +3112,6 @@ function consistentAssignmentRow(entry, item, kind) {
       <input name="date" type="date" aria-label="Quarter visit date for ${label}" required>
       <input name="time" type="time" aria-label="Quarter visit time for ${label}" required>
       <span class="consistent-actions">
-        ${scheduleTextLink(entry.name, String(entry.record?.phone || "").trim())}
         <button class="tiny primary" type="submit">Schedule</button>
         ${check}
         ${remove}
@@ -3521,7 +3442,6 @@ function directoryPersonCard(entry) {
       <select name="visit" aria-label="Temporary household"><option value="">—</option>${youthRequestHouseholdOptions("", scheduledTemporaryHouseholds(entry).map((row) => row.familyDirectoryId))}</select>
       <input name="date" type="date" data-follow hidden aria-label="Visit date">
       <input name="time" type="time" data-follow hidden aria-label="Visit time">
-      ${scheduleTextLink(entry.name, phone, { follow: true })}
       <button class="tiny primary" type="submit" data-follow hidden>Schedule</button>
     </form>
     <p class="muted">A temporary household is only for this visit. After it is checked off, it leaves the card. Consistent households and people stay.</p>
@@ -4257,7 +4177,6 @@ function youthMemberDetail(person) {
     <form class="appointment-row" data-form="youth-meeting">
       <input name="date" type="date" aria-label="Meeting date" required value="${esc(meetingParts(meeting).date)}">
       <input name="time" type="time" aria-label="Meeting time" required value="${esc(meetingParts(meeting).time)}">
-      ${scheduleTextLink(nameKey(person), String(person.phone || "").trim() || directoryPhoneForName(nameKey(person)))}
       <button class="tiny primary" type="submit">Schedule meeting</button>
     </form>
     <h3>Assignments</h3>
@@ -4449,7 +4368,6 @@ function youthAssignmentVisit(family) {
       <input name="date" type="date" aria-label="Visit date" required value="${esc(parts.date)}">
       <input name="time" type="time" aria-label="Visit time" required value="${esc(parts.time)}">
       ${temporaryCompanionChoices(temporaryCompanionName(family))}
-      ${scheduleTextLink(nameKey(family), String(family.phone || "").trim() || directoryPhoneForName(nameKey(family)))}
       <button class="tiny primary" type="submit">Schedule visit</button>
     </form>
     <button type="button" class="text-button" data-action="clear-assignment" data-id="${esc(family.id)}">Remove</button>
@@ -4650,7 +4568,6 @@ function planForm(person) {
       ${visitors.map((name) => `<option value="${esc(name)}">${esc(name)}</option>`).join("")}
     </select>
     ${placeChoice(current.place, visited)}
-    ${scheduleTextLink(nameKey(person), String(person.phone || "").trim() || directoryPhoneForName(nameKey(person)))}
     <button class="tiny primary" type="submit">${visited ? "Done" : "Schedule"}</button>
   </form>`;
 }
@@ -4762,12 +4679,9 @@ function syncContactLinks(form) {
     text.href = href || "";
   }
   const card = form.closest(".card") || form;
-  for (const link of card.querySelectorAll("a[data-contact=text]")) {
-    if (link === text) continue;
-    const custom = link.closest("[data-outreach-add]")?.querySelector(".outreach-body")?.value || "";
-    const href = textMessageHref(phone, cardTextTarget(form).name, custom);
-    link.href = href || "";
-    if (!link.hasAttribute("data-follow")) link.hidden = !href;
+  for (const link of card.querySelectorAll("a[data-outreach-text]")) {
+    const href = textMessageHref(phone, cardTextTarget(form).name);
+    link.href = href || "#";
   }
   if (mail) {
     mail.hidden = !email;
@@ -4948,6 +4862,7 @@ function outreachTable(attempts) {
   const person = selectedPerson();
   const members = leaderNamesFor(person).map((name) => ({ name }));
   const rows = attempts.map((attempt) => outreachEditRow(attempt)).join("");
+  const phone = String(person?.phone || "").trim() || directoryPhoneForName(nameKey(person || {}));
   return `<div class="cell-table">
     <div class="cell-row outreach-add" data-outreach-add data-person-id="${esc(person?.id || "")}">
       <select name="by" aria-label="Who" ${quietAttrs()}>
@@ -4962,8 +4877,7 @@ function outreachTable(attempts) {
         <option value="in_person">In person</option>
       </select>
       <input name="date" type="date" aria-label="Date" ${quietAttrs()}>
-      <a class="tiny" data-contact="text" data-outreach-text href="#" hidden>Text</a>
-      <textarea class="outreach-body quiet-field" hidden rows="4" aria-label="Text message" ${quietAttrs()} inputmode="text" enterkeyhint="done" readonly></textarea>
+      ${outreachTextLink(nameKey(person || {}), phone, `${person?.id || ""}:new`)}
     </div>
     ${rows}
   </div>`;
@@ -4976,10 +4890,9 @@ function outreachEditRow(attempt) {
   const channels = ["text", "phone", "email", "in_person"];
   if (attempt.channel === "driveby") channels.push("driveby");
   const option = (value, label, selected) => `<option value="${esc(value)}" ${selected ? "selected" : ""}>${esc(label)}</option>`;
-  const sent = attempt.channel === "text" && attempt.notes
-    ? `<p class="outreach-sent">${esc(attempt.notes)}</p>`
-    : "";
-  return `<div class="cell-row outreach-edit" data-outreach-edit data-id="${esc(attempt.id)}">
+  const person = selectedPerson();
+  const phone = String(person?.phone || "").trim() || directoryPhoneForName(nameKey(person || {}));
+  return `<div class="cell-row outreach-edit" data-outreach-edit data-id="${esc(attempt.id)}" data-person-id="${esc(person?.id || "")}">
     <select name="by" aria-label="Who" ${quietAttrs()}>
       ${option("", "—", !who)}
       ${names.map((name) => option(name, name, name === who)).join("")}
@@ -4988,7 +4901,7 @@ function outreachEditRow(attempt) {
       ${channels.map((key) => option(key, CHANNEL_LABELS[key] || key, key === attempt.channel)).join("")}
     </select>
     <input name="date" type="date" aria-label="Date" value="${esc(attempt.date || "")}" ${quietAttrs()}>
-    ${sent}
+    ${outreachTextLink(nameKey(person || {}), phone, `${person?.id || ""}:${attempt.id}`)}
     <button type="button" class="tiny ghost remove-outreach" data-action="delete-outreach" data-id="${esc(attempt.id)}">Remove</button>
   </div>`;
 }
