@@ -39,6 +39,109 @@ function completeOutreachDate(value) {
   return raw;
 }
 
+const TEXT_OUTREACH_REST = "The EQ presidency would like to meet with you. Thank you.";
+
+function spokenLastName(name) {
+  let text = String(name || "")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/&amp;/gi, " ")
+    .replace(/&/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text) return "";
+  const comma = text.indexOf(",");
+  if (comma !== -1) text = text.slice(0, comma);
+  else {
+    const parts = text.split(" ").filter(Boolean);
+    text = parts.length ? parts[parts.length - 1] : "";
+  }
+  return text.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9.'-]+$/g, "").trim();
+}
+
+function textOutreachGreeting(name) {
+  const last = spokenLastName(name);
+  return last ? `Brother ${last}, ` : "Brother, ";
+}
+
+function quietAttrs() {
+  return `autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-1p-ignore="true" data-lpignore="true" data-form-type="other"`;
+}
+
+function revealOutreachBody(row) {
+  const body = row.querySelector(".outreach-body");
+  if (!body) return;
+  const person = state.people.find((item) => item.id === row.dataset.personId) || selectedPerson();
+  const greeting = textOutreachGreeting(nameKey(person || {}));
+  body.dataset.greeting = greeting;
+  if (!body.value.startsWith(greeting)) body.value = `${greeting}${TEXT_OUTREACH_REST}`;
+  body.dataset.value = body.value;
+  body.hidden = false;
+  body.removeAttribute("readonly");
+  body.focus();
+  const end = body.value.length;
+  body.setSelectionRange(end, end);
+}
+
+function hideOutreachBody(row) {
+  const body = row.querySelector(".outreach-body");
+  if (body) body.hidden = true;
+}
+
+function enforceOutreachGreeting(body) {
+  const greeting = body.dataset.greeting || "";
+  if (!greeting) return;
+  if (!body.value.startsWith(greeting)) {
+    const tail = String(body.dataset.value || "").startsWith(greeting)
+      ? body.dataset.value.slice(greeting.length)
+      : TEXT_OUTREACH_REST;
+    body.value = greeting + tail;
+    body.setSelectionRange(greeting.length, greeting.length);
+  }
+  body.dataset.value = body.value;
+}
+
+function pinOutreachCaret(body) {
+  const greeting = body.dataset.greeting || "";
+  if (!greeting) return;
+  const start = body.selectionStart ?? 0;
+  const end = body.selectionEnd ?? 0;
+  if (start >= greeting.length && end >= greeting.length) return;
+  body.setSelectionRange(Math.max(start, greeting.length), Math.max(end, greeting.length));
+}
+
+function saveOutreachAdd(row) {
+  if (!row || row.dataset.saving === "1") return;
+  const by = row.querySelector("[name=by]")?.value || "";
+  const channel = row.querySelector("[name=channel]")?.value || "";
+  const date = completeOutreachDate(row.querySelector("[name=date]")?.value || "");
+  if (!channel || !date) return;
+  let notes = "";
+  if (channel === "text") {
+    const body = row.querySelector(".outreach-body");
+    if (!body || body.hidden) return;
+    enforceOutreachGreeting(body);
+    const greeting = body.dataset.greeting || "";
+    const value = body.value.trim();
+    if (!greeting || !value.startsWith(greeting) || !value.slice(greeting.length).trim()) return;
+    notes = value;
+  }
+  row.dataset.saving = "1";
+  post("/api/outreach", {
+    personId: row.dataset.personId,
+    by,
+    channel,
+    date,
+    status: "contacted",
+    notes,
+  }).then((next) => {
+    state = next;
+    render();
+  }).catch((error) => {
+    delete row.dataset.saving;
+    showError(error);
+  });
+}
+
 function formatPhone(value) {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
@@ -301,24 +404,15 @@ app.addEventListener("change", (event) => {
   }
   const addRow = target.closest?.("[data-outreach-add]");
   if (addRow) {
-    const by = addRow.querySelector("[name=by]").value;
-    const channel = addRow.querySelector("[name=channel]").value;
-    const date = completeOutreachDate(addRow.querySelector("[name=date]").value);
-    if (!channel || !date || addRow.dataset.saving === "1") return;
-    addRow.dataset.saving = "1";
-    post("/api/outreach", {
-      personId: addRow.dataset.personId,
-      by,
-      channel,
-      date,
-      status: "contacted",
-    }).then((next) => {
-      state = next;
-      render();
-    }).catch((error) => {
-      delete addRow.dataset.saving;
-      showError(error);
-    });
+    if (target instanceof HTMLSelectElement && target.name === "channel") {
+      if (target.value === "text") {
+        revealOutreachBody(addRow);
+        return;
+      }
+      hideOutreachBody(addRow);
+    }
+    if (target instanceof HTMLInputElement && target.name === "date" && !completeOutreachDate(target.value)) return;
+    saveOutreachAdd(addRow);
     return;
   }
   if (target.closest?.("form[data-form='facts']")) {
@@ -341,10 +435,12 @@ app.addEventListener("change", (event) => {
 app.addEventListener("pointerdown", (event) => {
   const field = event.target;
   if (field instanceof HTMLInputElement && field.classList.contains("consistent-find-input")) field.removeAttribute("readonly");
+  if (field instanceof HTMLTextAreaElement && field.classList.contains("quiet-field")) field.removeAttribute("readonly");
 });
 
 app.addEventListener("focusin", (event) => {
   const field = event.target;
+  if (field instanceof HTMLTextAreaElement && field.classList.contains("quiet-field")) field.removeAttribute("readonly");
   if (!(field instanceof HTMLInputElement) || !field.classList.contains("consistent-find-input")) return;
   field.removeAttribute("readonly");
   showConsistentMatches(field);
@@ -360,6 +456,15 @@ if (window.visualViewport) {
 
 app.addEventListener("keydown", (event) => {
   const field = event.target;
+  if (field instanceof HTMLTextAreaElement && field.classList.contains("outreach-body")) {
+    const greeting = field.dataset.greeting || "";
+    const start = field.selectionStart ?? 0;
+    const end = field.selectionEnd ?? 0;
+    if (greeting && (event.key === "Backspace" || event.key === "Delete") && start <= greeting.length && end <= greeting.length) {
+      event.preventDefault();
+    }
+    return;
+  }
   if (!(field instanceof HTMLInputElement) || !field.classList.contains("consistent-find-input") || event.key !== "Enter") return;
   event.preventDefault();
   const matches = [...field.closest(".consistent-find")?.querySelectorAll("button[data-action='consistent-pick']") || []];
@@ -368,12 +473,16 @@ app.addEventListener("keydown", (event) => {
 
 app.addEventListener("input", (event) => {
   const field = event.target;
+  if (field instanceof HTMLTextAreaElement && field.classList.contains("outreach-body")) {
+    enforceOutreachGreeting(field);
+    return;
+  }
   if (field instanceof HTMLInputElement && field.classList.contains("consistent-find-input")) {
     showConsistentMatches(field);
     return;
   }
   const area = event.target;
-  if (!(area instanceof HTMLTextAreaElement) || area.name !== "body") return;
+  if (!(area instanceof HTMLTextAreaElement)) return;
   area.dataset.caret = String(area.selectionStart);
   const typed = area.value.slice(0, area.selectionStart);
   const match = typed.match(/@([^@\n]*)$/);
@@ -391,6 +500,7 @@ app.addEventListener("input", (event) => {
 });
 
 app.addEventListener("click", (event) => {
+  if (event.target instanceof HTMLTextAreaElement && event.target.classList.contains("outreach-body")) pinOutreachCaret(event.target);
   const pick = event.target.closest("[data-action='consistent-pick']");
   if (pick) {
     pickConsistent(pick);
@@ -414,7 +524,7 @@ app.addEventListener("click", (event) => {
   const action = button.dataset.action;
   if (action !== "show-notify" && action !== "confirm-notified") notifyList = false;
   if (action === "mention") {
-    const area = button.closest("form")?.querySelector("textarea[name=body]");
+    const area = button.closest("form")?.querySelector("textarea");
     if (!area) return;
     const caret = Number(area.dataset.caret ?? area.selectionStart);
     const name = button.dataset.name;
@@ -1004,18 +1114,18 @@ app.addEventListener("submit", (event) => {
     post("/api/comments", {
       targetType: data.get("targetType"),
       targetId: data.get("targetId"),
-      body: data.get("body"),
+      body: form.querySelector("textarea")?.value || "",
     }).then(() => {
       detailForm = detailForm === "comment" ? null : detailForm;
       render();
     }).catch(showError);
   } else if (kind === "edit-comment") {
-    post(`/api/comments/${data.get("id")}`, { body: data.get("body") }).then(() => {
+    post(`/api/comments/${data.get("id")}`, { body: form.querySelector("textarea")?.value || "" }).then(() => {
       editingCommentId = "";
       render();
     }).catch(showError);
   } else if (kind === "reply") {
-    post("/api/comments", { parentId: data.get("parentId"), body: data.get("body") }).then(() => {
+    post("/api/comments", { parentId: data.get("parentId"), body: form.querySelector("textarea")?.value || "" }).then(() => {
       editingCommentId = "";
       render();
     }).catch(showError);
@@ -1071,6 +1181,12 @@ app.addEventListener("input", (event) => {
 });
 
 app.addEventListener("focusout", (event) => {
+  if (event.target instanceof HTMLTextAreaElement && event.target.classList.contains("outreach-body")) {
+    const row = event.target.closest("[data-outreach-add]");
+    const next = event.relatedTarget;
+    if (row && !(next instanceof Node && row.contains(next))) saveOutreachAdd(row);
+    return;
+  }
   const youthCompanion = event.target.closest?.("form[data-form='youth-companion'] [name=companion]");
   if (youthCompanion) {
     saveYouthCompanion(selectedPersonId, youthCompanion.value).catch(showError);
@@ -4746,18 +4862,19 @@ function outreachTable(attempts) {
   const rows = attempts.map((attempt) => outreachEditRow(attempt)).join("");
   return `<div class="cell-table">
     <div class="cell-row outreach-add" data-outreach-add data-person-id="${esc(person?.id || "")}">
-      <select name="by" aria-label="Who">
+      <select name="by" aria-label="Who" ${quietAttrs()}>
         <option value="">Who</option>
         ${members.map((member) => `<option value="${esc(member.name)}">${esc(member.name)}</option>`).join("")}
       </select>
-      <select name="channel" aria-label="How">
+      <select name="channel" aria-label="How" ${quietAttrs()}>
         <option value="">How</option>
         <option value="text">Text</option>
         <option value="phone">Call</option>
         <option value="email">Email</option>
         <option value="in_person">In person</option>
       </select>
-      <input name="date" type="date" aria-label="Date">
+      <input name="date" type="date" aria-label="Date" ${quietAttrs()}>
+      <textarea class="outreach-body quiet-field" hidden rows="4" aria-label="Text message" ${quietAttrs()} inputmode="text" enterkeyhint="done" readonly></textarea>
     </div>
     ${rows}
   </div>`;
@@ -4770,15 +4887,19 @@ function outreachEditRow(attempt) {
   const channels = ["text", "phone", "email", "in_person"];
   if (attempt.channel === "driveby") channels.push("driveby");
   const option = (value, label, selected) => `<option value="${esc(value)}" ${selected ? "selected" : ""}>${esc(label)}</option>`;
+  const sent = attempt.channel === "text" && attempt.notes
+    ? `<p class="outreach-sent">${esc(attempt.notes)}</p>`
+    : "";
   return `<div class="cell-row outreach-edit" data-outreach-edit data-id="${esc(attempt.id)}">
-    <select name="by" aria-label="Who">
+    <select name="by" aria-label="Who" ${quietAttrs()}>
       ${option("", "—", !who)}
       ${names.map((name) => option(name, name, name === who)).join("")}
     </select>
-    <select name="channel" aria-label="How">
+    <select name="channel" aria-label="How" ${quietAttrs()}>
       ${channels.map((key) => option(key, CHANNEL_LABELS[key] || key, key === attempt.channel)).join("")}
     </select>
-    <input name="date" type="date" aria-label="Date" value="${esc(attempt.date || "")}">
+    <input name="date" type="date" aria-label="Date" value="${esc(attempt.date || "")}" ${quietAttrs()}>
+    ${sent}
     <button type="button" class="tiny ghost remove-outreach" data-action="delete-outreach" data-id="${esc(attempt.id)}">Remove</button>
   </div>`;
 }
@@ -4815,9 +4936,9 @@ function commentNeedsAnswer(comment) {
 
 function commentBody(comment) {
   if (editingCommentId === comment.id) {
-    return `<form class="stack" data-form="edit-comment">
+    return `<form class="stack" data-form="edit-comment" autocomplete="off">
       <input type="hidden" name="id" value="${esc(comment.id)}">
-      <label>Correct this note <textarea name="body" required>${esc(comment.body)}</textarea></label>
+      <label>Correct this note <textarea class="quiet-field" required ${quietAttrs()} inputmode="text" enterkeyhint="done" readonly>${esc(comment.body)}</textarea></label>
       <div class="mention-menu" hidden></div>
       <div class="comment-actions">
         <button class="tiny primary" type="submit">Save</button>
@@ -4833,9 +4954,9 @@ function commentBody(comment) {
 }
 
 function answerTools(commentId) {
-  return `<form class="stack reply-form" data-form="reply">
+  return `<form class="stack reply-form" data-form="reply" autocomplete="off">
     <input type="hidden" name="parentId" value="${esc(commentId)}">
-    <label>Response <textarea name="body" required placeholder="Write a response"></textarea></label>
+    <label>Response <textarea class="quiet-field" required placeholder="Write a response" ${quietAttrs()} inputmode="text" enterkeyhint="done" readonly></textarea></label>
     <div class="mention-menu" hidden></div>
     <div class="comment-actions">
       <button class="tiny primary" type="submit">Respond</button>
@@ -4854,10 +4975,10 @@ function mentionHtml(body) {
 }
 
 function commentForm(targetType, targetId) {
-  return `<form class="stack" data-form="comment">
+  return `<form class="stack" data-form="comment" autocomplete="off">
     <input type="hidden" name="targetType" value="${esc(targetType)}">
     <input type="hidden" name="targetId" value="${esc(targetId)}">
-    <label>Comment <textarea name="body" required placeholder="Write a note. Type @ to ask someone a question."></textarea></label>
+    <label>Comment <textarea class="quiet-field" required placeholder="Write a note. Type @ to ask someone a question." ${quietAttrs()} inputmode="text" enterkeyhint="done" readonly></textarea></label>
     <div class="mention-menu" hidden></div>
     <button class="primary" type="submit">Add comment</button>
   </form>`;

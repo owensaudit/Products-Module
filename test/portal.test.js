@@ -21,6 +21,8 @@ import {
   logOutreach,
   removeOutreach,
   updateOutreach,
+  spokenLastName,
+  textOutreachDraft,
   setAppointment,
   setReachOutDate,
   setPersonContact,
@@ -2377,4 +2379,49 @@ test("a ministering card can state who visited and the date", () => {
   const youth = state.people.find((person) => person.displayName === "Youth, Pat");
   assert.throws(() => recordMinisteringVisit(state, youth.id, { by: "Mark Lillenberg", date: "2026-10-14" }, ids), /ministering brother/);
   assert.equal(state.people.find((person) => person.displayName === "Wang, Henry").sheetColumns.Companion, "Delahunty, Andy");
+});
+
+test("a text outreach starts with Brother and the last name and leaves visits alone", () => {
+  assert.equal(spokenLastName("Mike Convey"), "Convey");
+  assert.equal(spokenLastName("Convey, Mike"), "Convey");
+  assert.equal(textOutreachDraft("Mike Convey"), "Brother Convey, The EQ presidency would like to meet with you. Thank you.");
+  assert.equal(textOutreachDraft("Convey, Mike"), "Brother Convey, The EQ presidency would like to meet with you. Thank you.");
+  const visit = { id: "vis_1", personId: "per_1", date: "2026-10-14", status: "completed", slotKey: "wed-1900", slotLabel: "7:00 pm" };
+  let state = {
+    ...emptyState(),
+    people: [{ id: "per_1", displayName: "Mike Convey", sheetName: "Convey, Mike", phone: "", email: "", household: "", notes: "", sheetColumns: {}, createdAt: "2026-10-28T12:00:00.000Z", updatedAt: "2026-10-28T12:00:00.000Z" }],
+    visits: [visit],
+  };
+  const before = state.visits;
+  state = logOutreach(state, {
+    personId: "per_1",
+    channel: "text",
+    date: "2026-10-28",
+    status: "contacted",
+    by: "Josh Owens",
+    notes: "Brother Convey, The EQ presidency would like to meet with you. Thank you.",
+  }, deps());
+  assert.equal(state.outreachAttempts[0].notes, "Brother Convey, The EQ presidency would like to meet with you. Thank you.");
+  assert.equal(state.outreachAttempts[0].channel, "text");
+  assert.equal(state.visits, before);
+  assert.equal(state.visits[0].date, "2026-10-14");
+  assert.equal(state.visits[0].status, "completed");
+  const rewritten = logOutreach(state, {
+    personId: "per_1",
+    channel: "text",
+    date: "2026-05-11",
+    status: "contacted",
+    notes: "Can we meet this week?",
+  }, deps());
+  assert.equal(rewritten.outreachAttempts[1].notes, "Brother Convey, Can we meet this week?");
+  assert.equal(rewritten.visits.length, 1);
+  assert.equal(rewritten.visits[0].id, "vis_1");
+  const call = logOutreach(state, {
+    personId: "per_1",
+    channel: "phone",
+    date: "2026-05-04",
+    status: "contacted",
+  }, deps());
+  assert.equal(call.outreachAttempts.at(-1).notes, "");
+  assert.equal(call.visits.length, 1);
 });
