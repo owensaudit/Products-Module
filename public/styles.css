@@ -1714,15 +1714,36 @@ button.tiny.notify {
   min-width: 0;
   max-width: 100%;
 }
-.outreach-add input[type="date"],
-.outreach-edit input[type="date"],
-.outreach-edit .remove-outreach {
+.outreach-add input[type="date"] {
   grid-column: 1 / -1;
+}
+.outreach-edit {
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
+}
+.outreach-pick {
+  grid-row: 1;
+  grid-column: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 36px;
+}
+.outreach-pick input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+.outreach-edit input[type="date"] {
+  grid-column: 2 / -1;
 }
 .remove-outreach {
   justify-self: start;
   white-space: nowrap;
   width: fit-content;
+}
+.remove-outreach:disabled {
+  opacity: 0.45;
 }
 
 .outreach-add select,

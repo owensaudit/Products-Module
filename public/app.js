@@ -169,6 +169,7 @@ let cardTrail = [];
 let pendingListScroll = null;
 let pendingWindowScroll = null;
 let blankPlanFor = "";
+const outreachPicks = new Set();
 let focusReachOutDate = false;
 let inbox = "";
 let page = "elders";
@@ -216,6 +217,13 @@ if (monthInput) {
 
 app.addEventListener("change", (event) => {
   const target = event.target;
+  if (target instanceof HTMLInputElement && target.dataset.outreachPick === "1") {
+    if (target.checked) outreachPicks.add(target.value);
+    else outreachPicks.delete(target.value);
+    const button = target.closest(".cell-table")?.querySelector("[data-action='delete-selected-outreach']");
+    if (button) button.disabled = !target.closest(".cell-table").querySelector("[data-outreach-pick]:checked");
+    return;
+  }
   if (target.form?.dataset.form === "plan" && target.name === "kind") {
     syncPlanKind(target.form);
     return;
@@ -712,10 +720,14 @@ app.addEventListener("click", (event) => {
       editingCommentId = "";
       render();
     }).catch(showError);
-  } else if (action === "delete-outreach") {
-    if (!confirm("Remove this outreach?")) return;
-    post(`/api/outreach/${button.dataset.id}/delete`, {}).then((next) => {
-      state = next;
+  } else if (action === "delete-selected-outreach") {
+    const ids = [...document.querySelectorAll(".cell-table [data-outreach-pick]:checked")].map((input) => input.value).filter(Boolean);
+    if (!ids.length) return;
+    const label = ids.length === 1 ? "Remove this outreach?" : `Remove ${ids.length} outreach rows?`;
+    if (!confirm(label)) return;
+    ids.reduce((job, id) => job.then(() => post(`/api/outreach/${id}/delete`, {})), Promise.resolve()).then((next) => {
+      if (next) state = next;
+      for (const id of ids) outreachPicks.delete(id);
       render();
     }).catch(showError);
   } else if (action === "delete-comment") {
@@ -4840,6 +4852,10 @@ function outreachTable(attempts) {
   const person = selectedPerson();
   const members = leaderNamesFor(person).map((name) => ({ name }));
   const rows = attempts.map((attempt) => outreachEditRow(attempt)).join("");
+  const picked = attempts.some((attempt) => outreachPicks.has(attempt.id));
+  const remove = rows
+    ? `<button type="button" class="tiny ghost remove-outreach" data-action="delete-selected-outreach" ${picked ? "" : "disabled"}>Remove</button>`
+    : "";
   return `<div class="cell-table">
     <div class="cell-row outreach-add" data-outreach-add data-person-id="${esc(person?.id || "")}">
       <select name="by" aria-label="Who" ${quietAttrs()}>
@@ -4856,6 +4872,7 @@ function outreachTable(attempts) {
       <input name="date" type="date" aria-label="Date" ${quietAttrs()}>
     </div>
     ${rows}
+    ${remove}
   </div>`;
 }
 
@@ -4866,7 +4883,9 @@ function outreachEditRow(attempt) {
   const channels = ["text", "phone", "email", "in_person"];
   if (attempt.channel === "driveby") channels.push("driveby");
   const option = (value, label, selected) => `<option value="${esc(value)}" ${selected ? "selected" : ""}>${esc(label)}</option>`;
+  const picked = outreachPicks.has(attempt.id);
   return `<div class="cell-row outreach-edit" data-outreach-edit data-id="${esc(attempt.id)}" data-person-id="${esc(selectedPerson()?.id || "")}">
+    <label class="outreach-pick"><input type="checkbox" data-outreach-pick="1" value="${esc(attempt.id)}" ${picked ? "checked" : ""} aria-label="Select this outreach"></label>
     <select name="by" aria-label="Who" ${quietAttrs()}>
       ${option("", "—", !who)}
       ${names.map((name) => option(name, name, name === who)).join("")}
@@ -4875,7 +4894,6 @@ function outreachEditRow(attempt) {
       ${channels.map((key) => option(key, CHANNEL_LABELS[key] || key, key === attempt.channel)).join("")}
     </select>
     <input name="date" type="date" aria-label="Date" value="${esc(attempt.date || "")}" ${quietAttrs()}>
-    <button type="button" class="tiny ghost remove-outreach" data-action="delete-outreach" data-id="${esc(attempt.id)}">Remove</button>
   </div>`;
 }
 
