@@ -23,6 +23,7 @@ import {
   updateOutreach,
   spokenLastName,
   textOutreachDraft,
+  textMessageHref,
   setAppointment,
   setReachOutDate,
   setPersonContact,
@@ -2386,6 +2387,8 @@ test("a text outreach starts with Brother and the last name and leaves visits al
   assert.equal(spokenLastName("Convey, Mike"), "Convey");
   assert.equal(textOutreachDraft("Mike Convey"), "Brother Convey, The EQ presidency would like to meet with you. Thank you.");
   assert.equal(textOutreachDraft("Convey, Mike"), "Brother Convey, The EQ presidency would like to meet with you. Thank you.");
+  assert.equal(textMessageHref("(555) 010-2000", "Convey, Mike"), `sms:(555) 010-2000?&body=${encodeURIComponent("Brother Convey, The EQ presidency would like to meet with you. Thank you.")}`);
+  assert.equal(textMessageHref("", "Convey, Mike"), "");
   const visit = { id: "vis_1", personId: "per_1", date: "2026-10-14", status: "completed", slotKey: "wed-1900", slotLabel: "7:00 pm" };
   let state = {
     ...emptyState(),

@@ -1716,11 +1716,13 @@ button.tiny.notify {
 }
 .outreach-add input[type="date"],
 .outreach-edit input[type="date"],
+.outreach-add a[data-outreach-text],
 .outreach-add .outreach-body,
 .outreach-edit .outreach-sent,
 .outreach-edit .remove-outreach {
   grid-column: 1 / -1;
 }
+.outreach-add a[data-outreach-text] { justify-self: start; text-decoration: none; }
 .outreach-body {
   width: 100%;
   min-height: 6.5rem;
