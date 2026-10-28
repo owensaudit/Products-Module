@@ -700,6 +700,8 @@ app.addEventListener("click", (event) => {
     });
   } else if (action === "open-notice") {
     openNoticeCard(button.dataset.person, button.dataset.name);
+  } else if (action === "open-leader") {
+    openLeaderCard(button.dataset.id);
   } else if (action === "group-text") {
     showError(new Error("Add a phone number before texting"));
   } else if (action === "card-back") {
@@ -2930,6 +2932,23 @@ function scrollDetailCard() {
   });
 }
 
+function openLeaderCard(personId) {
+  const person = (state?.people || []).find((item) => item.id === personId);
+  if (!person) return;
+  const same = page === "youth" && selectedPersonId === person.id && view === "people" && !inbox;
+  if (!same) {
+    cardTrail.push(captureCard());
+    selectedPersonId = person.id;
+    view = "people";
+    detailForm = null;
+    directoryAdding = false;
+    inbox = "";
+    archiveChoicesFor = "";
+    render();
+  }
+  scrollDetailCard();
+}
+
 function directoryMemberKey(member) {
   return String(member || "").replace(/\s+/g, " ").trim().toLowerCase().replace(/\./g, "");
 }
@@ -3904,8 +3923,8 @@ function youthEntryButton(entry, quorum = "") {
     </div>`;
   }
   const place = entry.quorum === "teachers" ? "Teachers" : "Priests";
-  const person = findPersonByName(entry.name);
-  const open = person ? ` data-action="select-person" data-id="${esc(person.id)}" aria-current="${person.id === selectedPersonId}"` : "";
+  const person = personBySpokenName(entry.name);
+  const open = person ? ` data-action="open-leader" data-id="${esc(person.id)}" aria-current="${person.id === selectedPersonId ? "true" : "false"}"` : "";
   return `<div class="person leader-row${tone}${hasCompanionPair(entry.name) ? " has-companion" : ""}"${open}><strong>${esc(entry.name)}</strong>${companionPill(entry.name)}<small>${esc(entry.role)}${entry.role ? ` · ${place}` : place}</small>${ministeringLines(entry.name)}</div>`;
 }
 
