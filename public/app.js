@@ -208,6 +208,7 @@ let commentFor = "";
 let editingCommentId = "";
 let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let selectedPersonId = null;
+let cardSolo = false;
 let selectedSlotId = null;
 let detailForm = null;
 let importPreview = null;
@@ -449,8 +450,7 @@ app.addEventListener("change", (event) => {
     notifyList = false;
     dayFilter = "";
     view = "people";
-    const current = selectedPerson();
-    if (current && !personMatchesFilters(current)) selectedPersonId = null;
+    clearYouthFocus();
     render();
   }
 });
@@ -583,10 +583,8 @@ app.addEventListener("click", (event) => {
     detailForm = null;
     render();
   } else if (action === "view-all") {
-    if (page === "youth") {
-      youthList = "all";
-      clearYouthFocus();
-    }
+    if (page === "youth") youthList = "all";
+    clearYouthFocus();
     viewAll = true;
     archiveOpen = false;
     archiveChoicesFor = "";
@@ -598,10 +596,8 @@ app.addEventListener("click", (event) => {
     view = "people";
     render();
   } else if (action === "show-people") {
-    if (page === "youth") {
-      youthList = "visits";
-      clearYouthFocus();
-    }
+    if (page === "youth") youthList = "visits";
+    clearYouthFocus();
     viewAll = false;
     archiveOpen = false;
     archiveChoicesFor = "";
@@ -628,10 +624,8 @@ app.addEventListener("click", (event) => {
     view = "people";
     render();
   } else if (action === "archive") {
-    if (page === "youth") {
-      if (youthList !== "scheduled") youthList = "visits";
-      clearYouthFocus();
-    }
+    if (page === "youth" && youthList !== "scheduled") youthList = "visits";
+    clearYouthFocus();
     viewAll = false;
     archiveOpen = !archiveOpen;
     statusFilter = "all";
@@ -671,7 +665,7 @@ app.addEventListener("click", (event) => {
     assigneeFilter = "";
     officeFilter = "all";
     search = "";
-    selectedPersonId = null;
+    clearYouthFocus();
     detailForm = null;
     view = "people";
     render();
@@ -690,8 +684,7 @@ app.addEventListener("click", (event) => {
     dayFilter = "";
     assigneeFilter = "";
     view = "people";
-    const current = selectedPerson();
-    if (current && !personMatchesFilters(current)) selectedPersonId = null;
+    clearYouthFocus();
     render();
   } else if (action === "open-companion") {
     const name = button.dataset.name || "";
@@ -720,21 +713,23 @@ app.addEventListener("click", (event) => {
     const spot = cardTrail.pop();
     if (spot) restoreCard(spot);
   } else if (action === "select-person") {
-    const youthPick = page === "youth" && !dayFilter;
-    if (youthPick) {
-      if (selectedPersonId !== button.dataset.id) cardTrail.push(captureCard());
+    const keepList = page === "youth" && Boolean(dayFilter);
+    if (!keepList) {
+      if (!cardSolo || selectedPersonId !== button.dataset.id) cardTrail.push(captureCard());
+      cardSolo = true;
       selectedCompanionName = "";
       directoryFocus = null;
       directoryAdding = false;
     } else {
       cardTrail = [];
+      cardSolo = false;
     }
     const pageTop = window.scrollY;
     selectedPersonId = button.dataset.id;
     view = "people";
     detailForm = null;
     render();
-    if (youthPick) scrollYouthSelection();
+    if (!keepList) scrollYouthSelection();
     else {
       window.scrollTo(0, pageTop);
       requestAnimationFrame(() => window.scrollTo(0, pageTop));
@@ -805,29 +800,28 @@ app.addEventListener("click", (event) => {
     page = "directory";
     directoryAdding = false;
     directoryFocus = { directoryId: button.dataset.id, member: button.dataset.member };
+    cardSolo = true;
     inbox = "";
     render();
-    if (window.matchMedia("(max-width: 800px)").matches) {
-      const current = document.querySelector(`#person-list .person[data-id="${CSS.escape(button.dataset.id)}"][data-member="${CSS.escape(button.dataset.member)}"]`);
-      current?.scrollIntoView({ block: "start" });
-    }
+    scrollYouthSelection();
   } else if (action === "open-directory-person") {
-    cardTrail = [];
+    const nextFocus = { directoryId: button.dataset.id, member: button.dataset.member };
+    const same = page === "directory" && cardSolo && directoryFocus?.directoryId === nextFocus.directoryId && directoryFocus?.member === nextFocus.member;
+    if (!same) cardTrail.push(captureCard());
     page = "directory";
     directoryAdding = false;
-    const nextFocus = { directoryId: button.dataset.id, member: button.dataset.member };
-    const same = directoryFocus?.directoryId === nextFocus.directoryId && directoryFocus?.member === nextFocus.member;
-    const narrow = window.matchMedia("(max-width: 800px)").matches;
-    directoryFocus = same && narrow ? null : nextFocus;
+    directoryFocus = nextFocus;
+    cardSolo = true;
+    inbox = "";
     render();
-    if (narrow) {
-      const current = document.querySelector(`#person-list .person[data-id="${CSS.escape(nextFocus.directoryId)}"][data-member="${CSS.escape(nextFocus.member)}"]`);
-      current?.scrollIntoView({ block: "start" });
-    }
+    scrollYouthSelection();
   } else if (action === "directory-add") {
+    cardTrail.push(captureCard());
     directoryAdding = true;
     directoryFocus = null;
+    cardSolo = true;
     render();
+    scrollYouthSelection();
   } else if (action === "log-consistent-visit") {
     post("/api/directory/consistent/visit", {
       directoryId: button.dataset.id,
@@ -921,6 +915,9 @@ app.addEventListener("click", (event) => {
     }).catch(showError);
   } else if (action === "directory-filter") {
     directoryFocus = null;
+    directoryAdding = false;
+    cardSolo = false;
+    cardTrail = [];
     const next = button.dataset.filter || "all";
     if (next === "all") {
       directoryFilter = "all";
@@ -1541,6 +1538,7 @@ presidencyHost?.addEventListener("click", (event) => {
     youthGroup = button.dataset.quorum;
   }
   assigneeFilter = assigneeFilter === name ? "" : name;
+  clearYouthFocus();
   notifyList = false;
   viewAll = false;
   archiveOpen = false;
@@ -1602,6 +1600,7 @@ function openPage(next) {
   assigneeFilter = "";
   dayFilter = "";
   view = "people";
+  cardSolo = false;
   if (next === "youth") officeFilter = "all";
   if (next !== "directory") {
     directoryFocus = null;
@@ -2103,6 +2102,7 @@ function openCalendarDay(iso) {
   search = "";
   view = "people";
   detailForm = null;
+  cardSolo = false;
   selectedPersonId = people[0]?.id || null;
   render();
   const current = document.querySelector("#person-list .person[aria-current='true']");
@@ -2380,6 +2380,7 @@ function clearYouthFocus() {
   selectedCompanionName = "";
   directoryFocus = null;
   directoryAdding = false;
+  cardSolo = false;
   cardTrail = [];
 }
 
@@ -2397,6 +2398,9 @@ function peopleView() {
     const id = youthOpen === "companion" ? "companion-detail" : "person-detail";
     const body = youthOpen === "companion" ? companionDetail() : youthOpen === "directory" ? directoryDetail() : personDetail();
     return `<section class="layout layout-single"><div class="card" id="${id}">${body}</div></section>`;
+  }
+  if (cardSolo && selectedPersonId && page !== "youth") {
+    return `<section class="layout layout-single"><div class="card" id="person-detail">${personDetail()}</div></section>`;
   }
   const reminding = page !== "youth" && notifyList && !dayFilter;
   const scheduled = !reminding && showingScheduled();
@@ -2845,6 +2849,15 @@ function captureCard(origin = {}) {
     view,
     dayFilter,
     companionName: selectedCompanionName,
+    cardSolo,
+    statusFilter,
+    archiveOpen,
+    viewAll,
+    search,
+    officeFilter,
+    assigneeFilter,
+    notifyList,
+    directoryFilter,
     scrollY: window.scrollY,
     listScroll: document.querySelector("#person-list")?.scrollTop || 0,
   };
@@ -2859,6 +2872,15 @@ function restoreCard(spot) {
   view = spot.view || "people";
   if ("dayFilter" in spot) dayFilter = spot.dayFilter || "";
   if ("companionName" in spot) selectedCompanionName = spot.companionName || "";
+  if ("cardSolo" in spot) cardSolo = Boolean(spot.cardSolo);
+  if ("statusFilter" in spot) statusFilter = spot.statusFilter || "all";
+  if ("archiveOpen" in spot) archiveOpen = Boolean(spot.archiveOpen);
+  if ("viewAll" in spot) viewAll = Boolean(spot.viewAll);
+  if ("search" in spot) search = spot.search || "";
+  if ("officeFilter" in spot) officeFilter = spot.officeFilter || "all";
+  if ("assigneeFilter" in spot) assigneeFilter = spot.assigneeFilter || "";
+  if ("notifyList" in spot) notifyList = Boolean(spot.notifyList);
+  if ("directoryFilter" in spot) directoryFilter = spot.directoryFilter || "all";
   detailForm = null;
   inbox = "";
   pendingListScroll = spot.listScroll || 0;
@@ -3732,7 +3754,7 @@ function directoryNameLinks(names, entry) {
 }
 
 function directoryAddForm() {
-  return `<form class="stack" data-form="directory-add">
+  return `${cardBackButton()}<form class="stack" data-form="directory-add">
       <input class="person-name" name="name" required autocomplete="off" placeholder="Name" aria-label="Name">
       <label class="youth-home">
         <input type="checkbox" name="man">
@@ -3800,7 +3822,11 @@ function directorySummary() {
 function directoryView() {
   const rows = directoryVisibleEntries();
   const noun = rows.length === 1 ? "person" : "people";
-  const showDetail = directoryAdding || Boolean(directoryFocusedEntry());
+  const entry = directoryFocusedEntry();
+  if (cardSolo && (entry || directoryAdding)) {
+    return `${directorySummary()}<section class="layout layout-single"><div class="card" id="person-detail">${directoryDetail()}</div></section>`;
+  }
+  const showDetail = directoryAdding || Boolean(entry);
   return `<section class="layout${showDetail ? "" : " layout-single"}">
     <div class="card">
       <div class="row">
