@@ -392,6 +392,11 @@ button.title-link {
   color: white;
   border-color: var(--church-deep);
 }
+a.tiny.group-text {
+  color: inherit;
+  text-decoration: none;
+  margin-left: auto;
+}
 
 .reply-form textarea { min-height: 44px; }
 

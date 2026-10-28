@@ -70,6 +70,25 @@ function textMessageHref(phone, name, body = "") {
   return `sms:${number}?&body=${encodeURIComponent(message)}`;
 }
 
+function smsNumber(phone) {
+  const digits = String(phone || "").replace(/\D/g, "");
+  if (digits.length === 10) return digits;
+  if (digits.length === 11 && digits.startsWith("1")) return digits;
+  return "";
+}
+
+function phoneForName(name, explicit = "") {
+  return smsNumber(explicit) || smsNumber(findPersonByName(name)?.phone) || smsNumber(directoryPhoneForName(name));
+}
+
+function groupTextHref(numbers) {
+  if (!numbers.length) return "";
+  const ios = typeof navigator !== "undefined" && /iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+  const list = numbers.join(",");
+  if (ios) return `sms://open?addresses=${list}&body=`;
+  return `sms:${list}?&body=`;
+}
+
 function directoryPhoneForName(name) {
   const needle = String(name || "").trim();
   if (!needle) return "";
@@ -675,6 +694,8 @@ app.addEventListener("click", (event) => {
     });
   } else if (action === "open-notice") {
     openNoticeCard(button.dataset.person, button.dataset.name);
+  } else if (action === "group-text") {
+    showError(new Error("Add a phone number before texting"));
   } else if (action === "card-back") {
     const spot = cardTrail.pop();
     if (spot) restoreCard(spot);
@@ -2342,6 +2363,7 @@ function peopleView() {
     <div class="card" id="people-card">
       <div class="row">
         <h2>${esc(title)}</h2>
+        ${youthGroupTextControl()}
       </div>
       <p class="muted">${total} ${state.rosterMode ? noun : "in this list"}</p>
       <input id="search" class="search" type="search" placeholder="Search by name" value="${esc(search)}" aria-label="Search by name">
@@ -2583,6 +2605,45 @@ function assignmentListMarkup() {
   const people = visibleAssignments();
   if (!people.length) return `<p class="empty">No assignments${search.trim() ? " match this search" : ""}.</p>`;
   return `<div class="ministering-cards assignment-cards">${people.map((person) => roleCard(person, "Assignment")).join("")}</div>`;
+}
+
+function youthTextRows() {
+  if (page !== "youth" || dayFilter) return [];
+  if (showingScheduled()) return scheduledRows();
+  if (showingAssignments()) return visibleAssignments();
+  if (showingYouthLists()) return youthVisibleEntries();
+  return filteredPeople();
+}
+
+function phonesInRow(row) {
+  if (!row || typeof row !== "object") return [];
+  if (row.kind === "leader") return [phoneForName(row.name, row.phone)];
+  if (row.person) return [phoneForName(nameKey(row.person), row.person.phone)];
+  if (Array.isArray(row.pairs) && row.name) return [phoneForName(row.name)];
+  if (row.adultName || row.familyName) return [phoneForName(row.adultName), phoneForName(row.youthName)];
+  if (row.id) return [phoneForName(nameKey(row), row.phone)];
+  return [];
+}
+
+function youthGroupPhones() {
+  const seen = new Set();
+  const numbers = [];
+  for (const row of youthTextRows()) {
+    for (const number of phonesInRow(row)) {
+      if (!number || seen.has(number)) continue;
+      seen.add(number);
+      numbers.push(number);
+    }
+  }
+  return numbers;
+}
+
+function youthGroupTextControl() {
+  if (page !== "youth" || dayFilter || !youthTextRows().length) return "";
+  const href = groupTextHref(youthGroupPhones());
+  if (!href) return `<button type="button" class="tiny" data-action="group-text">Text</button>`;
+  const count = youthGroupPhones().length;
+  return `<a class="tiny group-text" data-contact="text" href="${esc(href)}" aria-label="Text ${count} ${count === 1 ? "person" : "people"}">Text</a>`;
 }
 
 function youthListTitle() {
@@ -3721,6 +3782,7 @@ function youthLeaders() {
         kind: "leader",
         name,
         role: String(row.role || "").trim(),
+        phone: String(row.phone || "").trim(),
         section: row.section || "",
         quorum,
         index,
