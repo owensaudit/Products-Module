@@ -673,6 +673,8 @@ app.addEventListener("click", (event) => {
       directoryId: button.dataset.directory || "",
       member: button.dataset.member || "",
     });
+  } else if (action === "open-notice") {
+    openNoticeCard(button.dataset.person, button.dataset.name);
   } else if (action === "card-back") {
     const spot = cardTrail.pop();
     if (spot) restoreCard(spot);
@@ -2345,7 +2347,7 @@ function peopleView() {
       <input id="search" class="search" type="search" placeholder="Search by name" value="${esc(search)}" aria-label="Search by name">
       <div id="person-list" class="person-list">${markup}</div>
     </div>
-    ${showDetail ? `<div class="card"${companionOpen ? ` id="companion-detail"` : ""}>${companionOpen ? companionDetail() : personDetail()}</div>` : ""}
+    ${showDetail ? `<div class="card" id="${companionOpen ? "companion-detail" : "person-detail"}">${companionOpen ? companionDetail() : personDetail()}</div>` : ""}
   </section>`;
 }
 
@@ -2471,11 +2473,12 @@ function notifyCard(row) {
   const email = String(brother?.email || "").trim();
   const textHref = phone ? `sms:${phone}?&body=${encodeURIComponent(script)}` : "";
   const line = [row.who, row.visitLabel].filter(Boolean).join(" · ");
+  const openName = adultName || row.family || "";
   return `<article class="notify-row">
-    <span class="notify-copy">
+    <button type="button" class="notify-copy" data-action="open-notice" data-person="${esc(brother?.id || "")}" data-name="${esc(openName)}">
       <strong>${esc(row.family)}</strong>
       ${line ? `<small>${esc(line)}</small>` : ""}
-    </span>
+    </button>
     <span class="notify-actions">
       <a class="tiny" data-reminder="email" target="_blank" rel="noopener" href="${esc(gmailHref(email, script))}">Email</a>
       <a class="tiny" data-reminder="call" href="${phone ? esc(`tel:${phone}`) : "#"}">Call</a>
@@ -2716,6 +2719,7 @@ function captureCard(origin = {}) {
     member: origin.member || directoryFocus?.member || "",
     youthList,
     view,
+    dayFilter,
     scrollY: window.scrollY,
     listScroll: document.querySelector("#person-list")?.scrollTop || 0,
   };
@@ -2728,6 +2732,7 @@ function restoreCard(spot) {
   directoryAdding = false;
   youthList = spot.youthList;
   view = spot.view || "people";
+  if ("dayFilter" in spot) dayFilter = spot.dayFilter || "";
   detailForm = null;
   inbox = "";
   pendingListScroll = spot.listScroll || 0;
@@ -2826,6 +2831,36 @@ function openLinkedName(label, hint) {
   }
   pendingWindowScroll = 0;
   render();
+}
+
+function openNoticeCard(personId, name) {
+  const person = (state?.people || []).find((item) => item.id === personId);
+  if (!person) {
+    openLinkedName(name, { personId: personId || "" });
+    scrollDetailCard();
+    return;
+  }
+  const nextPage = rosterPageFor(person);
+  const same = page === nextPage && selectedPersonId === person.id && view === "people" && !inbox;
+  if (!same) {
+    cardTrail.push(captureCard());
+    page = nextPage;
+    selectedPersonId = person.id;
+    view = "people";
+    detailForm = null;
+    directoryAdding = false;
+    inbox = "";
+    archiveChoicesFor = "";
+    render();
+  }
+  scrollDetailCard();
+}
+
+function scrollDetailCard() {
+  if (!window.matchMedia("(max-width: 800px)").matches) return;
+  requestAnimationFrame(() => {
+    document.querySelector("#person-detail, #companion-detail")?.scrollIntoView({ block: "start" });
+  });
 }
 
 function directoryMemberKey(member) {
@@ -3622,7 +3657,7 @@ function directoryView() {
       <input id="search" class="search" type="search" placeholder="Search by last name" value="${esc(search)}" aria-label="Search by last name">
       <div id="person-list" class="person-list directory-list">${directoryListMarkup(rows)}</div>
     </div>
-    ${showDetail ? `<div class="card">${directoryDetail()}</div>` : ""}
+    ${showDetail ? `<div class="card" id="person-detail">${directoryDetail()}</div>` : ""}
   </section>`;
 }
 

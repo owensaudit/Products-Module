@@ -1524,21 +1524,28 @@ button.mark-visited {
 .notify-day { display: grid; gap: 8px; margin-bottom: 10px; }
 .notify-row {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   flex-wrap: wrap;
   gap: 8px 10px;
   width: 100%;
-  padding: 8px 10px;
+  padding: 0;
   border: 1px solid #e4d3b0;
   border-radius: 12px;
   background: #fff8ec;
   color: inherit;
   text-align: left;
 }
-.notify-copy { display: grid; gap: 2px; min-width: 0; flex: 1 1 12rem; }
+.notify-copy { display: grid; gap: 2px; min-width: 0; flex: 1 1 12rem; align-content: center; }
+button.notify-copy {
+  border: 0;
+  background: transparent;
+  padding: 8px 10px;
+  text-align: left;
+}
+.notify-copy strong { font-weight: 700; }
 .notify-copy small,
 .notify-row small { margin-left: 0; color: #6b5a3e; }
-.notify-actions { display: flex; align-items: center; gap: 6px; flex: none; margin-left: auto; }
+.notify-actions { display: flex; align-items: center; gap: 6px; flex: none; margin-left: auto; padding: 8px 10px 8px 0; }
 .notify-actions a.tiny { color: inherit; text-decoration: none; }
 .notify-actions .mark-visited { position: static; }
 .reminder { margin: 6px 0 10px; }
