@@ -39,7 +39,7 @@ function completeOutreachDate(value) {
   return raw;
 }
 
-const TEXT_OUTREACH_REST = "The EQ presidency would like to meet with you. Thank you.";
+const TEXT_OUTREACH_REST = "The Prune Hill Elders Quorum Presidency would like to visit with you. Are you available any Wednesday around 7pm or Sunday before or after church? We are more than happy to stop by your house or meet at church.";
 
 function spokenLastName(name) {
   let text = String(name || "")

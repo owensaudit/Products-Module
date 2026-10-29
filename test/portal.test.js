@@ -2387,9 +2387,10 @@ test("a ministering card can state who visited and the date", () => {
 test("a text outreach starts with Brother and the last name and leaves visits alone", () => {
   assert.equal(spokenLastName("Mike Convey"), "Convey");
   assert.equal(spokenLastName("Convey, Mike"), "Convey");
-  assert.equal(textOutreachDraft("Mike Convey"), "Brother Convey, The EQ presidency would like to meet with you. Thank you.");
-  assert.equal(textOutreachDraft("Convey, Mike"), "Brother Convey, The EQ presidency would like to meet with you. Thank you.");
-  assert.equal(textMessageHref("(555) 010-2000", "Convey, Mike"), `sms:(555) 010-2000?&body=${encodeURIComponent("Brother Convey, The EQ presidency would like to meet with you. Thank you.")}`);
+  const outreach = "Brother Convey, The Prune Hill Elders Quorum Presidency would like to visit with you. Are you available any Wednesday around 7pm or Sunday before or after church? We are more than happy to stop by your house or meet at church.";
+  assert.equal(textOutreachDraft("Mike Convey"), outreach);
+  assert.equal(textOutreachDraft("Convey, Mike"), outreach);
+  assert.equal(textMessageHref("(555) 010-2000", "Convey, Mike"), `sms:(555) 010-2000?&body=${encodeURIComponent(outreach)}`);
   assert.equal(textMessageHref("", "Convey, Mike"), "");
   const visit = { id: "vis_1", personId: "per_1", date: "2026-10-14", status: "completed", slotKey: "wed-1900", slotLabel: "7:00 pm" };
   let state = {
@@ -2404,9 +2405,9 @@ test("a text outreach starts with Brother and the last name and leaves visits al
     date: "2026-10-28",
     status: "contacted",
     by: "Josh Owens",
-    notes: "Brother Convey, The EQ presidency would like to meet with you. Thank you.",
+    notes: outreach,
   }, deps());
-  assert.equal(state.outreachAttempts[0].notes, "Brother Convey, The EQ presidency would like to meet with you. Thank you.");
+  assert.equal(state.outreachAttempts[0].notes, outreach);
   assert.equal(state.outreachAttempts[0].channel, "text");
   assert.equal(state.visits, before);
   assert.equal(state.visits[0].date, "2026-10-14");
