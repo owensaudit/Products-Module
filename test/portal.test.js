@@ -48,7 +48,7 @@ import { reminderMessage } from "../public/reminder.js";
 import { emailAllowed, parseAllowlist } from "../lib/allowlist.js";
 import { createStore } from "../lib/store.js";
 import { stateFromRecord } from "../lib/cloud-store.js";
-import { completeLeaderOuting, removeLeaderOuting, scheduleLeaderOuting } from "../lib/leader-outings.js";
+import { completeLeaderOuting, removeLeaderOuting, scheduleLeaderOuting, scheduleMinisterOuting } from "../lib/leader-outings.js";
 import { PortalError } from "../lib/model.js";
 import { createPortalHandler, createPortalServer } from "../server.js";
 
@@ -2553,4 +2553,61 @@ test("a youth leader outing is temporary and leaves the consistent companion and
   assert.equal(recorded.leaderOutings[0].id, saved.leaderOutings[0].id);
   assert.equal(recorded.extraSecret, undefined);
   assert.equal(recorded.directory[0].memberCompanions.glen, "Keeper, Anthony");
+});
+
+test("a minister temporary visit keeps the consistent companion and households", () => {
+  const brother = (id, name) => ({
+    id,
+    displayName: name,
+    sheetName: name,
+    phone: "",
+    email: "",
+    household: "",
+    notes: "",
+    group: "",
+    sheetColumns: { Brother: name },
+    createdAt: "2026-10-01T00:00:00.000Z",
+    updatedAt: "2026-10-01T00:00:00.000Z",
+  });
+  let state = {
+    ...emptyState(),
+    people: [brother("per_lane", "Lane, Sue"), brother("per_keeper", "Keeper, Anthony")],
+    directory: [
+      {
+        id: "dir_lane",
+        name: "Lane",
+        members: ["Sue"],
+        address: "",
+        phone: "",
+        email: "",
+        memberCompanions: { sue: "Keeper, Anthony" },
+        memberVisits: { sue: [{ directoryId: "dir_elm", label: "Elm" }] },
+        memberMinistryPeople: {},
+      },
+      { id: "dir_elm", name: "Elm", members: ["Ned"], address: "", phone: "", email: "", memberCompanions: {}, memberVisits: {}, memberMinistryPeople: {} },
+      { id: "dir_fig", name: "Fig", members: ["Otto"], address: "", phone: "", email: "", memberCompanions: {}, memberVisits: {}, memberMinistryPeople: {} },
+    ],
+  };
+  const before = JSON.parse(JSON.stringify(state.directory));
+  assert.throws(() => scheduleMinisterOuting(state, { personId: "per_lane", companion: "", householdId: "dir_fig", date: "2026-11-03", time: "10:15" }), /temporary companion/);
+  assert.throws(() => scheduleMinisterOuting(state, { personId: "per_lane", companion: "Lane, Sue", householdId: "dir_fig", date: "2026-11-03", time: "10:15" }), /temporary companion/);
+  assert.throws(() => scheduleMinisterOuting(state, { personId: "per_lane", companion: "Keeper, Anthony", householdId: "dir_fig", personDirectoryId: "dir_elm", personMember: "Ned", date: "2026-11-03", time: "10:15" }), /not both/);
+  state = scheduleMinisterOuting(state, {
+    personId: "per_lane",
+    companion: "Anthony Keeper",
+    householdId: "dir_fig",
+    date: "2026-11-03",
+    time: "10:15",
+  });
+  assert.equal(state.leaderOutings.length, 1);
+  assert.equal(state.leaderOutings[0].quorum, "brother");
+  assert.deepEqual(state.leaderOutings[0].companions, ["Keeper, Anthony"]);
+  assert.equal(state.leaderOutings[0].targetLabel, "Fig");
+  assert.deepEqual(state.directory, before);
+  const view = presentState(state, "2026-11", { today: "2026-10-28" });
+  assert.equal(view.leaderOutings[0].quorum, "brother");
+  state = completeLeaderOuting(state, { id: state.leaderOutings[0].id, date: "2026-11-03" });
+  assert.equal(state.leaderOutings[0].done, true);
+  assert.deepEqual(state.leaderOutings[0].visitors, ["Lane, Sue", "Keeper, Anthony"]);
+  assert.deepEqual(state.directory, before);
 });

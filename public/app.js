@@ -284,7 +284,7 @@ app.addEventListener("change", (event) => {
     }
     return;
   }
-  if (target.form?.dataset.form === "leader-outing" && (target.name === "household" || target.name === "person")) {
+  if ((target.form?.dataset.form === "leader-outing" || target.form?.dataset.form === "minister-outing") && (target.name === "household" || target.name === "person")) {
     const otherName = target.name === "household" ? "person" : "household";
     const other = target.form.querySelector(`[name="${otherName}"]`);
     if (target.value && other) other.value = "";
@@ -1093,6 +1093,31 @@ app.addEventListener("submit", (event) => {
       personId: form.dataset.person,
       quorum,
       companions,
+      householdId,
+      personDirectoryId: personDirectoryId || "",
+      personMember: personMember || "",
+      date,
+      time,
+    }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
+    return;
+  }
+  if (kind === "minister-outing") {
+    const companion = String(data.get("companion") || "").trim();
+    const householdId = String(data.get("household") || "").trim();
+    const personValue = String(data.get("person") || "").trim();
+    const [personDirectoryId, personMember] = personValue.split("|");
+    const date = String(data.get("date") || "");
+    const time = String(data.get("time") || "");
+    if (!companion || !date || !time || (!householdId && !personValue) || (householdId && personValue)) {
+      showError(new Error("Choose a temporary companion, a household or a person, and a date and time"));
+      return;
+    }
+    post("/api/ministering/temporary", {
+      personId: form.dataset.person,
+      companion,
       householdId,
       personDirectoryId: personDirectoryId || "",
       personMember: personMember || "",
@@ -3418,6 +3443,21 @@ function pickConsistent(button) {
   }).catch(showError);
 }
 
+function householdCallLink(directoryId) {
+  const record = (state?.directory || []).find((row) => row.id === directoryId);
+  const phone = String(record?.phone || "").trim();
+  if (!phone) return "";
+  return `<a class="tiny" data-contact="call" href="tel:${esc(phone)}">Call</a>`;
+}
+
+function consistentSelect(kind, label, directoryId, member, choices) {
+  const options = choices.map((item) => `<option value="${esc(item.value)}">${esc(item.label)}</option>`).join("");
+  return `<form class="consistent-select" data-form="${kind}" data-id="${esc(directoryId)}" data-member="${esc(member)}">
+    <span>${esc(label)}</span>
+    <select aria-label="${esc(label)}"><option value="">—</option>${options}</select>
+  </form>`;
+}
+
 function consistentFind(kind, label, directoryId, member) {
   return `<div class="consistent-find" data-form="${kind}" data-id="${esc(directoryId)}" data-member="${esc(member)}">
     <input class="consistent-find-input" type="text" placeholder="${esc(label)}" aria-label="${esc(label)}" aria-autocomplete="list" role="combobox" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text" enterkeyhint="done" readonly>
@@ -3434,13 +3474,15 @@ function consistentAssignmentRow(entry, item, kind) {
     ? `<button type="button" class="tiny" data-action="remove-ministry-person" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}" data-household="${target}" data-person="${person}" data-label="${label}">Remove</button>`
     : `<button type="button" class="tiny" data-action="remove-directory-visit" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}" data-household="${target}" data-label="${label}">Remove</button>`;
   const scheduled = /^\d{4}-\d{2}-\d{2}$/.test(item.scheduledDate || "");
+  const call = householdCallLink(item.directoryId);
   const check = `<button type="button" class="mark-visited" data-action="log-consistent-visit" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}" data-kind="${kind}" data-target="${target}" data-person="${person}" data-label="${label}" aria-label="Log this quarter's visit for ${label}">✓</button>`;
+  const actions = `<span class="consistent-actions">${call}${check}${remove}</span>`;
   const controls = scheduled
-    ? `<span class="consistent-actions">${check}${remove}</span>`
+    ? actions
     : `<div class="consistent-when" data-kind="${kind}" data-target="${target}" data-person="${person}" data-label="${label}">
       <input name="date" type="date" aria-label="Quarter visit date for ${label}">
       <input name="time" type="time" aria-label="Quarter visit time for ${label}">
-      <span class="consistent-actions">${check}${remove}</span>
+      ${actions}
     </div>`;
   return `<div class="consistent-assignment">
     <div class="consistent-head">
@@ -3511,9 +3553,9 @@ function outingArchiveLine(row) {
 
 function leaderOutingOpenRow(row) {
   const companions = (row.companions || []).filter(Boolean).join(" and ");
-  const place = row.quorum === "teachers" ? "Teachers" : "Priests";
+  const place = row.quorum === "teachers" ? "Teachers" : row.quorum === "priests" ? "Priests" : "";
   return `<div class="leader-outing-row">
-    <p><strong>${esc(companions)}</strong> <span class="muted">${esc(place)}</span></p>
+    <p><strong>${esc(companions)}</strong>${place ? ` <span class="muted">${esc(place)}</span>` : ""}</p>
     <p>${esc(row.targetLabel)}${row.meeting ? ` · ${esc(row.meeting)}` : ""}</p>
     <div class="leader-outing-actions">
       <button type="button" class="mark-visited" data-action="complete-leader-outing" data-id="${esc(row.id)}" aria-label="Mark outing done">✓</button>
@@ -3522,13 +3564,14 @@ function leaderOutingOpenRow(row) {
   </div>`;
 }
 
-function leaderOutingBlock(person) {
+function leaderOutingBlock(person, options = {}) {
   if (!isYouthLeader(person)) return "";
-  const rows = leaderOutingsFor(person);
+  const rows = leaderOutingsFor(person).filter((row) => row.quorum !== "brother");
   const open = rows.filter((row) => !row.done).sort((a, b) => String(a.meetingDate).localeCompare(String(b.meetingDate)) || String(a.meetingTime).localeCompare(String(b.meetingTime)));
   const done = rows.filter((row) => row.done).sort((a, b) => String(b.meetingDate).localeCompare(String(a.meetingDate)) || String(b.meetingTime).localeCompare(String(a.meetingTime)));
+  const heading = options.heading !== false ? `<h3>Temporary visit</h3>` : "";
   return `<section class="leader-outing">
-    <h3>Temporary visit</h3>
+    ${heading}
     <form data-form="leader-outing" data-person="${esc(person.id)}">
       <div class="quorum-choice">
         <label><input type="radio" name="quorum" value="priests" checked> Priests</label>
@@ -3570,16 +3613,55 @@ function standingMinistryBlock(entry) {
     ? `<div class="schedule-once"><button type="button" class="tiny primary" data-action="schedule-consistent">Schedule</button></div>`
     : "";
   return `<div class="standing-ministry" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}">
-    <div class="consistent-add">
-      ${consistentFind("directory-companion", "Companion", entry.directoryId, entry.member)}
-      ${consistentFind("ministry-household", "Household", entry.directoryId, entry.member)}
-      ${consistentFind("ministry-person", "Person", entry.directoryId, entry.member)}
-      ${companions ? `<div class="consistent-names">${companions}</div>` : ""}
-    </div>
+    ${consistentSelect("directory-companion", "Companion", entry.directoryId, entry.member, companionAddChoices(entry))}
+    ${companions ? `<div class="consistent-names">${companions}</div>` : ""}
+    ${consistentSelect("ministry-household", "Household", entry.directoryId, entry.member, ministryHouseholdChoices(entry))}
+    ${consistentSelect("ministry-person", "Person", entry.directoryId, entry.member, ministryPersonChoices(entry))}
     ${householdRows}
     ${personRows}
     ${schedule}
   </div>`;
+}
+
+function ministerCompanionOptions(person) {
+  const names = [];
+  const add = (name) => {
+    const text = String(name || "").trim();
+    if (!text || names.some((item) => directoryNameMatches(item, text))) return;
+    if (directoryNameMatches(text, nameKey(person)) || directoryNameMatches(text, person.displayName)) return;
+    names.push(text);
+  };
+  for (const other of eldersPeople()) {
+    if (other.id === person.id) continue;
+    add(nameKey(other));
+  }
+  for (const member of state?.presidency || []) add(member.name);
+  names.sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
+  return `<option value="">—</option>${names.map((name) => `<option value="${esc(name)}">${esc(name)}</option>`).join("")}`;
+}
+
+function ministerOutingForm(person) {
+  return `<form class="minister-outing" data-form="minister-outing" data-person="${esc(person.id)}">
+    <label>Temporary companion <select name="companion" aria-label="Temporary companion" required>${ministerCompanionOptions(person)}</select></label>
+    <label>Temporary household <select name="household" aria-label="Temporary household">${outingHouseholdOptions()}</select></label>
+    <label>Or a person <select name="person" aria-label="Or a person">${outingPersonOptions(person)}</select></label>
+    <div class="appointment-row">
+      <input name="date" type="date" aria-label="Temporary visit date" required>
+      <input name="time" type="time" aria-label="Temporary visit time" required>
+      <button class="tiny primary" type="submit">Schedule temporary visit</button>
+    </div>
+  </form>`;
+}
+
+function ministerOutingRows(person) {
+  const rows = leaderOutingsFor(person).filter((row) => row.quorum === "brother");
+  const open = rows.filter((row) => !row.done).sort((a, b) => String(a.meetingDate).localeCompare(String(b.meetingDate)) || String(a.meetingTime).localeCompare(String(b.meetingTime)));
+  const done = rows.filter((row) => row.done).sort((a, b) => String(b.meetingDate).localeCompare(String(a.meetingDate)) || String(b.meetingTime).localeCompare(String(a.meetingTime)));
+  return `${open.map(leaderOutingOpenRow).join("")}${done.map((row) => `<p class="leader-outing-archive">${esc(outingArchiveLine(row))}</p>`).join("")}`;
+}
+
+function cardSegment(title, body) {
+  return `<section class="card-segment"><h3>${esc(title)}</h3>${body}</section>`;
 }
 
 function ministerDirectoryEntry(person) {
@@ -4847,15 +4929,14 @@ function rosterDetail(person) {
   if (isYouthMember(person)) return youthMemberDetail(person);
   if (isYouthVisit(person)) return assignmentDetail(person);
   const ministry = ministerDirectoryEntry(person);
-  return `${cardBackButton()}${personNameField(person)}
+  const personSegment = `${personNameField(person)}
     ${householdLine(person)}
-    <p class="status-row">${statusSelect(person)}${archiveControl(person)}${missionPill(person)}${person.rosterStatusKey === "scheduled" ? visitCheck(person) : ""}</p>
-    ${ministeringVisitNote(person)}
-    ${specialNotes(person)}
-    ${ministry ? standingMinistryBlock(ministry) : companionLine(person)}
-    ${leaderOutingBlock(person)}
     ${contactFields(person, false, true)}
     ${factsForm(person)}
+    ${specialNotes(person)}`;
+  const consistentSegment = ministry ? standingMinistryBlock(ministry) : companionLine(person);
+  const presidencySegment = `<p class="status-row">${statusSelect(person)}${archiveControl(person)}${missionPill(person)}${person.rosterStatusKey === "scheduled" ? visitCheck(person) : ""}</p>
+    ${ministeringVisitNote(person)}
     ${planLine(person)}
     ${temporaryDutyBlock(person)}
     ${assignmentFields(person)}
@@ -4865,6 +4946,12 @@ function rosterDetail(person) {
     <h3>Comments${person.commentCount ? ` <span class="muted">${person.commentCount}</span>` : ""}</h3>
     ${commentList("person", person.id)}
     ${commentForm("person", person.id)}`;
+  const temporarySegment = `${ministerOutingForm(person)}${ministerOutingRows(person)}${leaderOutingBlock(person, { heading: false })}`;
+  return `${cardBackButton()}
+    ${cardSegment("Person", personSegment)}
+    ${cardSegment("Consistent visits", consistentSegment)}
+    ${cardSegment("Presidency visit", presidencySegment)}
+    ${cardSegment("Temporary visit", temporarySegment)}`;
 }
 
 function churchIcon() {

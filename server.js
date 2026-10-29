@@ -32,7 +32,7 @@ import {
 } from "./lib/model.js";
 import { emailAllowed, parseAllowlist } from "./lib/allowlist.js";
 import { addDirectoryMember, addDirectoryVisit, addMinistryPerson, addTemporaryVisit, applyDirectory, assignDirectoryHousehold, assignTemporaryHousehold, completeTemporaryVisit, logConsistentVisit, moveDirectoryPerson, parseDirectory, removeDirectoryMember, removeDirectoryVisit, removeMinistryPerson, removeTemporaryHousehold, scheduleConsistentVisit, scheduleDirectoryTemporaryVisit, scheduleTemporaryVisit, setDirectoryCompanion, setDirectoryMan, setTemporaryCompanion, setTemporaryFamily, setYouthDay, setYouthHome, syncDirectoryMen, updateDirectoryHousehold } from "./lib/directory.js";
-import { completeLeaderOuting, removeLeaderOuting, scheduleLeaderOuting } from "./lib/leader-outings.js";
+import { completeLeaderOuting, removeLeaderOuting, scheduleLeaderOuting, scheduleMinisterOuting } from "./lib/leader-outings.js";
 import { createStore } from "./lib/store.js";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -502,6 +502,12 @@ export function createPortalHandler(store, options = {}) {
 
         if (pathname === "/api/youth/leader-outing") {
           const next = await store.update((state) => scheduleLeaderOuting(state, body));
+          sendJson(response, 201, presentState(next, month, viewOptions));
+          return;
+        }
+
+        if (pathname === "/api/ministering/temporary") {
+          const next = await store.update((state) => scheduleMinisterOuting(state, body));
           sendJson(response, 201, presentState(next, month, viewOptions));
           return;
         }

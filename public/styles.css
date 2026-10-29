@@ -819,6 +819,36 @@ button.cal-day.is-open {
 }
 .consistent-actions .mark-visited { position: static; flex: none; }
 .schedule-once { display: flex; justify-content: flex-end; margin: 4px 0 8px; }
+.card-segment {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #f6f7f4;
+}
+.card-segment > h3:first-child {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--church);
+}
+.card-segment .contact-fields,
+.card-segment .consistent-assignment,
+.card-segment .leader-outing { background: #fff; }
+.consistent-select { display: grid; gap: 4px; margin: 0; }
+.consistent-select span { font-size: 12px; font-weight: 700; color: var(--muted); }
+.consistent-select select,
+.minister-outing select {
+  width: 100%;
+  box-sizing: border-box;
+}
+.minister-outing { display: grid; gap: 8px; }
+.minister-outing label { display: grid; gap: 4px; font-size: 13px; }
 .cal-dot.notify { background: #c47b12; }
 
 .cal-num {
