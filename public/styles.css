@@ -818,6 +818,7 @@ button.cal-day.is-open {
   gap: 8px;
 }
 .consistent-actions .mark-visited { position: static; flex: none; }
+.schedule-once { display: flex; justify-content: flex-end; margin: 4px 0 8px; }
 .cal-dot.notify { background: #c47b12; }
 
 .cal-num {
@@ -1386,10 +1387,13 @@ a.address-pill {
 }
 .assignment-visit .appointment-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: center;
+  gap: 6px 8px;
   margin: 0;
 }
+.assignment-visit .appointment-row .responded { justify-self: start; }
+.assignment-visit .appointment-row .text-button { justify-self: end; }
 .assignment-visit .appointment-row input[type="date"],
 .assignment-visit .appointment-row input[type="time"] {
   width: 100%;

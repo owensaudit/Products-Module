@@ -670,6 +670,54 @@ app.addEventListener("click", (event) => {
       state = next;
       render();
     }).catch(showError);
+  } else if (action === "schedule-consistent") {
+    const block = button.closest(".standing-ministry");
+    const ready = [];
+    const partial = [];
+    for (const row of block?.querySelectorAll(".consistent-when") || []) {
+      const date = row.querySelector("[name=date]")?.value || "";
+      const time = row.querySelector("[name=time]")?.value || "";
+      const label = row.dataset.label || "that visit";
+      if (date && time) {
+        ready.push({
+          directoryId: block.dataset.id,
+          member: block.dataset.member,
+          kind: row.dataset.kind,
+          targetId: row.dataset.target,
+          person: row.dataset.person || "",
+          label,
+          date,
+          time,
+        });
+      } else if (date || time) partial.push(label);
+    }
+    if (partial.length || !ready.length) {
+      showError(new Error(partial.length ? "Add both a date and a time" : "Add a date and time"));
+      return;
+    }
+    ready.reduce((chain, body) => chain.then(() => post("/api/directory/consistent/schedule", body)), Promise.resolve())
+      .then(() => render())
+      .catch(showError);
+  } else if (action === "schedule-assignments") {
+    const list = button.closest(".assignment-schedule-list");
+    const ready = [];
+    const partial = [];
+    for (const row of list?.querySelectorAll("[data-assignment-schedule]") || []) {
+      const date = row.querySelector("[name=date]")?.value || "";
+      const time = row.querySelector("[name=time]")?.value || "";
+      if (date && time) ready.push({ id: row.dataset.assignmentSchedule, date, time });
+      else if (date || time) partial.push(row.dataset.assignmentSchedule);
+    }
+    if (partial.length || !ready.length) {
+      showError(new Error(partial.length ? "Add both a date and a time" : "Add a date and time"));
+      return;
+    }
+    ready.reduce((chain, row) => chain.then(() => post(`/api/people/${row.id}/contact`, {
+      visitDate: { date: row.date, time: row.time },
+      visitedOn: clientToday(),
+    })), Promise.resolve())
+      .then(() => render())
+      .catch(showError);
   } else if (action === "complete-leader-outing") {
     post("/api/youth/leader-outing/complete", { id: button.dataset.id, date: clientToday() }).then((next) => {
       state = next;
@@ -3389,15 +3437,11 @@ function consistentAssignmentRow(entry, item, kind) {
   const check = `<button type="button" class="mark-visited" data-action="log-consistent-visit" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}" data-kind="${kind}" data-target="${target}" data-person="${person}" data-label="${label}" aria-label="Log this quarter's visit for ${label}">✓</button>`;
   const controls = scheduled
     ? `<span class="consistent-actions">${check}${remove}</span>`
-    : `<form class="consistent-when" data-form="consistent-schedule" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}" data-kind="${kind}" data-target="${target}" data-person="${person}" data-label="${label}">
-      <input name="date" type="date" aria-label="Quarter visit date for ${label}" required>
-      <input name="time" type="time" aria-label="Quarter visit time for ${label}" required>
-      <span class="consistent-actions">
-        <button class="tiny primary" type="submit">Schedule</button>
-        ${check}
-        ${remove}
-      </span>
-    </form>`;
+    : `<div class="consistent-when" data-kind="${kind}" data-target="${target}" data-person="${person}" data-label="${label}">
+      <input name="date" type="date" aria-label="Quarter visit date for ${label}">
+      <input name="time" type="time" aria-label="Quarter visit time for ${label}">
+      <span class="consistent-actions">${check}${remove}</span>
+    </div>`;
   return `<div class="consistent-assignment">
     <div class="consistent-head">
       <button type="button" class="name-link" data-action="open-name" data-name="${label}" data-directory="${esc(entry.directoryId)}" data-member="${esc(entry.member)}">${label}</button>
@@ -3511,12 +3555,21 @@ function leaderOutingBlock(person) {
   </section>`;
 }
 
+function consistentRowOpen(item) {
+  return !/^\d{4}-\d{2}-\d{2}$/.test(item?.scheduledDate || "");
+}
+
 function standingMinistryBlock(entry) {
   if (!entry?.record) return "";
   const companions = savedCompanionNames(entry).map((name) => `<span class="name-link">${esc(name)}</span>`).join("");
-  const householdRows = directorySavedVisits(entry).map((item) => consistentAssignmentRow(entry, item, "household")).join("");
-  const personRows = directoryMinistryPeople(entry).map((item) => consistentAssignmentRow(entry, item, "person")).join("");
-  return `<div class="standing-ministry">
+  const households = directorySavedVisits(entry);
+  const people = directoryMinistryPeople(entry);
+  const householdRows = households.map((item) => consistentAssignmentRow(entry, item, "household")).join("");
+  const personRows = people.map((item) => consistentAssignmentRow(entry, item, "person")).join("");
+  const schedule = [...households, ...people].some(consistentRowOpen)
+    ? `<div class="schedule-once"><button type="button" class="tiny primary" data-action="schedule-consistent">Schedule</button></div>`
+    : "";
+  return `<div class="standing-ministry" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}">
     <div class="consistent-add">
       ${consistentFind("directory-companion", "Companion", entry.directoryId, entry.member)}
       ${consistentFind("ministry-household", "Household", entry.directoryId, entry.member)}
@@ -3525,6 +3578,7 @@ function standingMinistryBlock(entry) {
     </div>
     ${householdRows}
     ${personRows}
+    ${schedule}
   </div>`;
 }
 
@@ -4571,7 +4625,7 @@ function youthMemberDetail(person) {
     </form>
     <h3>Assignments</h3>
     <p class="muted">${responded} of ${families.length} responded</p>
-    ${families.map((family) => youthAssignmentVisit(family)).join("")}
+    ${assignmentScheduleList(families)}
     ${leaderOutingBlock(person)}
     <h3>Outreach</h3>
     ${attemptList(person)}
@@ -4738,13 +4792,20 @@ function companionDetail() {
   const blocks = group.pairs.map((pair) => {
     const youth = youthMembers().find((person) => directoryNameMatches(nameKey(person), pair.youth));
     const families = youth ? ministeringForYouth(nameKey(youth)).families : [];
-    const visits = families.map((family) => youthAssignmentVisit(family)).join("");
-    return `<section class="companion-schedule"><h3>with ${esc(pair.youth)}</h3>${visits || `<p class="empty">No families yet.</p>`}</section>`;
+    return `<section class="companion-schedule"><h3>with ${esc(pair.youth)}</h3>${assignmentScheduleList(families) || `<p class="empty">No families yet.</p>`}</section>`;
   }).join("");
   const person = personBySpokenName(group.name);
   return `${cardBackButton()}<p class="muted">Companion</p><h2>${esc(group.name)}</h2>
     ${blocks}
     ${person ? leaderOutingBlock(person) : ""}`;
+}
+
+function assignmentScheduleList(families) {
+  if (!families.length) return "";
+  return `<div class="assignment-schedule-list">
+    ${families.map((family) => youthAssignmentVisit(family)).join("")}
+    <div class="schedule-once"><button type="button" class="tiny primary" data-action="schedule-assignments">Schedule</button></div>
+  </div>`;
 }
 
 function youthAssignmentVisit(family) {
@@ -4756,13 +4817,12 @@ function youthAssignmentVisit(family) {
       <input data-assignment-id="${esc(family.id)}" value="${esc(nameKey(family))}" aria-label="Assignment">
       <button type="button" class="mark-visited" data-action="log-assignment-visit" data-id="${esc(family.id)}" aria-label="Log this visit">✓</button>
     </div>
-    <form class="appointment-row" data-form="assignment-visit" data-id="${esc(family.id)}">
-      <input name="date" type="date" aria-label="Visit date" required value="${esc(parts.date)}">
-      <input name="time" type="time" aria-label="Visit time" required value="${esc(parts.time)}">
-      <button class="tiny primary" type="submit">Schedule</button>
+    <div class="appointment-row" data-assignment-schedule="${esc(family.id)}">
+      <input name="date" type="date" aria-label="Visit date" value="${esc(parts.date)}">
+      <input name="time" type="time" aria-label="Visit time" value="${esc(parts.time)}">
       <label class="responded"><input type="checkbox" data-response-id="${esc(family.id)}" ${responded ? "checked" : ""}> Responded</label>
       <button type="button" class="text-button" data-action="clear-assignment" data-id="${esc(family.id)}">Remove</button>
-    </form>
+    </div>
     ${visit && family.sheetColumns?.["Visit Notified"] === "Yes" ? `<p class="notified">Notified</p>` : ""}
   </div>`;
 }
