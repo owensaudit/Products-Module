@@ -2981,6 +2981,16 @@ function householdLine(person) {
   return `<div class="household-line"><span>Household</span>${names}</div>`;
 }
 
+function personHouseholdField(person) {
+  const entry = ministerDirectoryEntry(person);
+  const names = linkedNameButtons(person?.household, `data-person="${esc(person?.id || "")}"`);
+  if (!entry) return householdLine(person);
+  return `<form class="assign-row household-membership" data-form="directory-home" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}">
+    <span>Household</span>
+    <select name="household" aria-label="Household">${directoryHouseholdOptions(entry.directoryId)}</select>
+  </form>${names ? `<div class="household-line">${names}</div>` : ""}`;
+}
+
 function cardBackButton() {
   if (!cardTrail.length) return "";
   return `<button type="button" class="ghost card-back" data-action="card-back">Back</button>`;
@@ -3936,7 +3946,7 @@ function directoryPersonCard(entry) {
     ${status ? `<p class="status-row">${status}</p>` : ""}
     <form class="assign-row" data-form="directory-home" data-id="${esc(record.id)}" data-member="${esc(entry.member)}">
       <span>Household</span>
-      <select name="household" aria-label="Household">${directorySharesHousehold(entry) ? "" : `<option value="">—</option>`}${directoryHouseholdOptions(directorySharesHousehold(entry) ? record.id : "", true)}</select>
+      <select name="household" aria-label="Household">${directoryHouseholdOptions(record.id)}</select>
     </form>
     <form class="contact-fields" data-form="directory-contact" data-id="${esc(record.id)}">
       <label class="wide">Address
@@ -4931,7 +4941,7 @@ function rosterDetail(person) {
   if (isYouthVisit(person)) return assignmentDetail(person);
   const ministry = ministerDirectoryEntry(person);
   const personSegment = `${personNameField(person)}
-    ${householdLine(person)}
+    ${personHouseholdField(person)}
     ${contactFields(person, false, true)}
     ${factsForm(person)}
     ${specialNotes(person)}`;
