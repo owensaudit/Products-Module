@@ -3443,11 +3443,12 @@ function pickConsistent(button) {
   }).catch(showError);
 }
 
-function householdCallLink(directoryId) {
+function householdVisitLinks(directoryId, label) {
   const record = (state?.directory || []).find((row) => row.id === directoryId);
   const phone = String(record?.phone || "").trim();
   if (!phone) return "";
-  return `<a class="tiny" data-contact="call" href="tel:${esc(phone)}">Call</a>`;
+  const text = `sms:${phone}?&body=`;
+  return `<a class="tiny" data-contact="call" href="tel:${esc(phone)}">Call</a><a class="tiny" data-contact="text" href="${esc(text)}" aria-label="Text ${esc(label)}">Text</a>`;
 }
 
 function consistentSelect(kind, label, directoryId, member, choices) {
@@ -3474,7 +3475,7 @@ function consistentAssignmentRow(entry, item, kind) {
     ? `<button type="button" class="tiny" data-action="remove-ministry-person" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}" data-household="${target}" data-person="${person}" data-label="${label}">Remove</button>`
     : `<button type="button" class="tiny" data-action="remove-directory-visit" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}" data-household="${target}" data-label="${label}">Remove</button>`;
   const scheduled = /^\d{4}-\d{2}-\d{2}$/.test(item.scheduledDate || "");
-  const call = householdCallLink(item.directoryId);
+  const call = householdVisitLinks(item.directoryId, item.label || "");
   const check = `<button type="button" class="mark-visited" data-action="log-consistent-visit" data-id="${esc(entry.directoryId)}" data-member="${esc(entry.member)}" data-kind="${kind}" data-target="${target}" data-person="${person}" data-label="${label}" aria-label="Log this quarter's visit for ${label}">✓</button>`;
   const actions = `<span class="consistent-actions">${call}${check}${remove}</span>`;
   const controls = scheduled
