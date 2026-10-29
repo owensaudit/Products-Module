@@ -275,6 +275,21 @@ app.addEventListener("change", (event) => {
     syncContactLinks(form);
     return;
   }
+  if (target.form?.dataset.form === "leader-outing" && target.name === "quorum") {
+    const form = target.form;
+    for (const panel of form.querySelectorAll("[data-quorum-panel]")) {
+      const open = panel.dataset.quorumPanel === target.value;
+      panel.hidden = !open;
+      for (const field of panel.querySelectorAll("select")) field.disabled = !open;
+    }
+    return;
+  }
+  if (target.form?.dataset.form === "leader-outing" && (target.name === "household" || target.name === "person")) {
+    const otherName = target.name === "household" ? "person" : "household";
+    const other = target.form.querySelector(`[name="${otherName}"]`);
+    if (target.value && other) other.value = "";
+    return;
+  }
   if (target instanceof HTMLSelectElement && target.form?.dataset.form === "temporary-youth") {
     post("/api/youth/temporary/companion", {
       adultDirectoryId: target.form.dataset.id,
@@ -655,6 +670,16 @@ app.addEventListener("click", (event) => {
       state = next;
       render();
     }).catch(showError);
+  } else if (action === "complete-leader-outing") {
+    post("/api/youth/leader-outing/complete", { id: button.dataset.id, date: clientToday() }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
+  } else if (action === "remove-leader-outing") {
+    post("/api/youth/leader-outing/remove", { id: button.dataset.id }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
   } else if (action === "show-notify") {
     notifyList = true;
     viewAll = false;
@@ -997,6 +1022,34 @@ app.addEventListener("submit", (event) => {
       date,
       time,
       month: currentMonth(),
+    }).then((next) => {
+      state = next;
+      render();
+    }).catch(showError);
+    return;
+  }
+  if (kind === "leader-outing") {
+    const quorum = String(data.get("quorum") || "priests");
+    const panel = form.querySelector(`[data-quorum-panel="${quorum}"]`);
+    const companions = [...(panel?.querySelectorAll("select") || [])].map((field) => String(field.value || "").trim()).filter(Boolean);
+    const householdId = String(data.get("household") || "").trim();
+    const personValue = String(data.get("person") || "").trim();
+    const [personDirectoryId, personMember] = personValue.split("|");
+    const date = String(data.get("date") || "");
+    const time = String(data.get("time") || "");
+    if (!companions.length || !date || !time || (!householdId && !personValue) || (householdId && personValue)) {
+      showError(new Error("Choose one or two companions, a household or a person, and a date and time"));
+      return;
+    }
+    post("/api/youth/leader-outing", {
+      personId: form.dataset.person,
+      quorum,
+      companions,
+      householdId,
+      personDirectoryId: personDirectoryId || "",
+      personMember: personMember || "",
+      date,
+      time,
     }).then((next) => {
       state = next;
       render();
@@ -1990,7 +2043,7 @@ function renderCalendar() {
     if (notices.length && !kinds.includes("notify")) kinds.push("notify");
     const people = mark.people || [];
     const dots = kinds.map((kind) => {
-      const label = kind === "scheduled" ? "Scheduled" : kind === "reschedule" ? "Re-Schedule" : kind === "driveby" ? "Drive by" : kind === "with_youth" ? "With youth" : kind === "temporary" ? "Temporary visit" : kind === "consistent" ? "Consistent visit" : kind === "notify" ? "Notify families" : "Reach out";
+      const label = kind === "scheduled" ? "Scheduled" : kind === "reschedule" ? "Re-Schedule" : kind === "driveby" ? "Drive by" : kind === "with_youth" ? "With youth" : kind === "temporary" ? "Temporary visit" : kind === "outing" ? "Temporary outing" : kind === "consistent" ? "Consistent visit" : kind === "notify" ? "Notify families" : "Reach out";
       return `<span class="cal-dot ${kind}" title="${label}"></span>`;
     }).join("");
     const described = [`${title} ${day}`];
@@ -2000,12 +2053,13 @@ function renderCalendar() {
     if (kinds.includes("driveby")) described.push("drive by");
     if (kinds.includes("with_youth")) described.push("with youth");
     if (kinds.includes("temporary")) described.push("temporary visit");
+    if (kinds.includes("outing")) described.push("temporary outing");
     if (kinds.includes("consistent")) described.push("consistent visit");
     if (kinds.includes("notify")) described.push("notify families");
     const today = viewingNow && day === now.getDate() ? " is-today" : "";
     const open = dayFilter === iso ? " is-open" : "";
     const inner = `<span class="cal-marks">${dots}</span><span class="cal-num">${day}</span>`;
-    if (people.length || kinds.includes("with_youth") || kinds.includes("temporary") || kinds.includes("notify")) {
+    if (people.length || kinds.includes("with_youth") || kinds.includes("temporary") || kinds.includes("outing") || kinds.includes("notify")) {
       described.push("show the brothers for this day");
       cells.push(`<button type="button" class="cal-day${today}${open}" data-action="open-day" data-date="${iso}" data-marks="${esc(kinds.join(" "))}" aria-pressed="${dayFilter === iso}" aria-label="${esc(described.join(", "))}">${inner}</button>`);
     } else {
@@ -2082,11 +2136,12 @@ function openCalendarDay(iso) {
   const volunteers = youthHelpForDay(iso);
   const fromDirectory = page === "directory";
   const temporary = temporaryVisitsOn(iso);
+  const outings = leaderOutingsOn(iso);
   const notices = noticesOn(iso);
   if (volunteers.length) page = "youth";
   else if (fromDirectory) page = "elders";
   const people = peopleForDay(iso);
-  if (!people.length && !volunteers.length && !temporary.length && !notices.length) {
+  if (!people.length && !volunteers.length && !temporary.length && !outings.length && !notices.length) {
     if (fromDirectory) page = "directory";
     return;
   }
@@ -2410,7 +2465,7 @@ function peopleView() {
   const brotherMatches = page === "youth" && !reminding && !scheduled ? matchingMinisteringBrothers() : [];
   const title = reminding ? "Notify" : scheduled ? (archiveOpen ? "Archive" : "Scheduled") : assignments ? "Assignments" : youthLists ? youthListTitle() : listTitle();
   const helpCount = !reminding && page === "youth" && dayFilter ? youthHelpForDay(dayFilter).length : 0;
-  const dayCount = !reminding && !scheduled && !youthLists && !assignments && dayFilter ? temporaryVisitsOn(dayFilter).length : 0;
+  const dayCount = !reminding && !scheduled && !youthLists && !assignments && dayFilter ? temporaryVisitsOn(dayFilter).length + leaderOutingsOn(dayFilter).length : 0;
   const noticeCount = !reminding && !scheduled && !youthLists && !assignments && dayFilter ? noticesOn(dayFilter).length : 0;
   const reminderCount = reminding ? visibleReminders().length : 0;
   const total = reminderCount + (scheduled ? scheduledRows().length : assignments ? visibleAssignments().length : youthLists ? youthVisibleEntries().length : people.length) + brotherMatches.length + helpCount + dayCount + noticeCount;
@@ -2651,7 +2706,25 @@ function temporaryDayMarkup(iso) {
     }
     group.rows.push(row);
   }
-  return groups.map((group) => scheduledCard(group.rows)).join("");
+  return groups.map((group) => scheduledCard(group.rows)).join("") + leaderOutingDayMarkup(iso);
+}
+
+function leaderOutingsOn(iso) {
+  return (state?.leaderOutings || []).filter((row) => !row.done && row.meetingDate === iso);
+}
+
+function leaderOutingDayMarkup(iso) {
+  return leaderOutingsOn(iso).map((row) => {
+    const companions = (row.companions || []).filter(Boolean).join(" · ");
+    const person = (state?.people || []).find((item) => item.id === row.leaderPersonId);
+    const action = person ? ` data-action="select-person" data-id="${esc(person.id)}"` : "";
+    const when = [companions, row.targetLabel, row.meeting].filter(Boolean).join(" · ");
+    return `<div class="person scheduled leader-outing-day"${action}>
+      <span class="role-kicker">Temporary outing</span>
+      <strong>${esc(row.leaderName)}</strong>
+      <small>${esc(when)}</small>
+    </div>`;
+  }).join("");
 }
 
 function visibleAssignments() {
@@ -3331,6 +3404,111 @@ function consistentAssignmentRow(entry, item, kind) {
     </div>
     ${controls}
   </div>`;
+}
+
+function isYouthLeader(person) {
+  if (!person) return false;
+  return youthLeaders().some((entry) => directoryNameMatches(entry.name, nameKey(person)) || directoryNameMatches(entry.name, person.displayName));
+}
+
+function leaderOutingsFor(person) {
+  return (state?.leaderOutings || []).filter((row) => row.leaderPersonId === person.id || directoryNameMatches(row.leaderName, nameKey(person)) || directoryNameMatches(row.leaderName, person.displayName));
+}
+
+function quorumCompanionNames(quorum, leader) {
+  return youthMembers(quorum)
+    .filter((person) => person.id !== leader.id && !directoryNameMatches(nameKey(person), nameKey(leader)))
+    .map((person) => nameKey(person))
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
+}
+
+function outingCompanionSelect(quorum, leader, which, disabled) {
+  const label = which === "second" ? "Second companion" : "Companion";
+  const names = quorumCompanionNames(quorum, leader);
+  const off = disabled ? " disabled" : "";
+  return `<label>${label} <select aria-label="${label}"${off}><option value="">—</option>${names.map((name) => `<option value="${esc(name)}">${esc(name)}</option>`).join("")}</select></label>`;
+}
+
+function outingHouseholdOptions() {
+  const rows = (state?.directory || []).slice().sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "en", { sensitivity: "base" }));
+  return `<option value="">—</option>${rows.map((row) => `<option value="${esc(row.id)}">${esc(row.name || "Household")}</option>`).join("")}`;
+}
+
+function outingPersonOptions(leader) {
+  const people = directoryEntries().filter((entry) => !directoryNameMatches(entry.name, nameKey(leader)) && !directoryNameMatches(entry.name, leader.displayName));
+  return `<option value="">—</option>${people.map((entry) => `<option value="${esc(`${entry.directoryId}|${entry.member}`)}">${esc(entry.name)}</option>`).join("")}`;
+}
+
+function joinedNames(names) {
+  const list = names.filter(Boolean);
+  if (list.length <= 1) return list[0] || "";
+  if (list.length === 2) return `${list[0]} and ${list[1]}`;
+  return `${list.slice(0, -1).join(", ")}, and ${list[list.length - 1]}`;
+}
+
+function outingQuarterLabel(row) {
+  const quarter = row.quarter || quarterKey(row.meetingDate);
+  if (quarter && quarter === quarterKey(clientToday())) return "this quarter";
+  const match = String(quarter || "").match(/^(\d{4})-(\d)$/);
+  if (match) return `Q${match[2]} ${match[1]}`;
+  return "that quarter";
+}
+
+function outingArchiveLine(row) {
+  const visited = (row.visitedPeople || []).filter(Boolean);
+  const names = visited.length ? visited : [row.targetLabel].filter(Boolean);
+  const went = (row.visitors || []).filter(Boolean);
+  const visitors = went.length ? went : [row.leaderName, ...(row.companions || [])].filter(Boolean);
+  const verb = names.length === 1 ? "was" : "were";
+  return `${joinedNames(names)} ${verb} visited ${outingQuarterLabel(row)}. ${joinedNames(visitors)} went.`;
+}
+
+function leaderOutingOpenRow(row) {
+  const companions = (row.companions || []).filter(Boolean).join(" and ");
+  const place = row.quorum === "teachers" ? "Teachers" : "Priests";
+  return `<div class="leader-outing-row">
+    <p><strong>${esc(companions)}</strong> <span class="muted">${esc(place)}</span></p>
+    <p>${esc(row.targetLabel)}${row.meeting ? ` · ${esc(row.meeting)}` : ""}</p>
+    <div class="leader-outing-actions">
+      <button type="button" class="mark-visited" data-action="complete-leader-outing" data-id="${esc(row.id)}" aria-label="Mark outing done">✓</button>
+      <button type="button" class="text-button" data-action="remove-leader-outing" data-id="${esc(row.id)}">Remove</button>
+    </div>
+  </div>`;
+}
+
+function leaderOutingBlock(person) {
+  if (!isYouthLeader(person)) return "";
+  const rows = leaderOutingsFor(person);
+  const open = rows.filter((row) => !row.done).sort((a, b) => String(a.meetingDate).localeCompare(String(b.meetingDate)) || String(a.meetingTime).localeCompare(String(b.meetingTime)));
+  const done = rows.filter((row) => row.done).sort((a, b) => String(b.meetingDate).localeCompare(String(a.meetingDate)) || String(b.meetingTime).localeCompare(String(a.meetingTime)));
+  return `<section class="leader-outing">
+    <h3>Temporary outing</h3>
+    <p class="muted">Take one or two priests, or one or two teachers, and a household or a person. These visits change often. This does not change the consistent companion or the consistent households and people. Marking it done keeps who went and who was visited that quarter.</p>
+    <form data-form="leader-outing" data-person="${esc(person.id)}">
+      <div class="quorum-choice">
+        <label><input type="radio" name="quorum" value="priests" checked> Priests</label>
+        <label><input type="radio" name="quorum" value="teachers"> Teachers</label>
+      </div>
+      <div data-quorum-panel="priests">
+        ${outingCompanionSelect("priests", person, "first", false)}
+        ${outingCompanionSelect("priests", person, "second", false)}
+      </div>
+      <div data-quorum-panel="teachers" hidden>
+        ${outingCompanionSelect("teachers", person, "first", true)}
+        ${outingCompanionSelect("teachers", person, "second", true)}
+      </div>
+      <label>Household <select name="household" aria-label="Household">${outingHouseholdOptions()}</select></label>
+      <label>Person <select name="person" aria-label="Person">${outingPersonOptions(person)}</select></label>
+      <div class="appointment-row">
+        <input name="date" type="date" aria-label="Outing date" required>
+        <input name="time" type="time" aria-label="Outing time" required>
+        <button class="tiny primary" type="submit">Schedule outing</button>
+      </div>
+    </form>
+    ${open.map(leaderOutingOpenRow).join("")}
+    ${done.map((row) => `<p class="leader-outing-archive">${esc(outingArchiveLine(row))}</p>`).join("")}
+  </section>`;
 }
 
 function standingMinistryBlock(entry) {
@@ -4383,6 +4561,7 @@ function youthMemberDetail(person) {
     <form class="companion-row" data-form="youth-companion">
       <label>Companion <select name="companion" aria-label="Companion">${ministeringBrotherOptions(companion)}</select></label>
     </form>
+    ${leaderOutingBlock(person)}
     <h3>Youth ministry meeting</h3>
     <p class="muted">Meet with ${companionLink} to see which assignments respond, then give a date and time to visit.</p>
     ${meeting ? `<p class="plan-line"><strong>Meeting</strong> ${esc(meeting)}${companion ? ` with ${companionLink}` : ""}</p>` : ""}
@@ -4612,6 +4791,7 @@ function rosterDetail(person) {
     ${ministeringVisitNote(person)}
     ${specialNotes(person)}
     ${ministry ? standingMinistryBlock(ministry) : companionLine(person)}
+    ${leaderOutingBlock(person)}
     ${contactFields(person, false, true)}
     ${factsForm(person)}
     ${planLine(person)}

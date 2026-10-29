@@ -32,6 +32,7 @@ import {
 } from "./lib/model.js";
 import { emailAllowed, parseAllowlist } from "./lib/allowlist.js";
 import { addDirectoryMember, addDirectoryVisit, addMinistryPerson, addTemporaryVisit, applyDirectory, assignDirectoryHousehold, assignTemporaryHousehold, completeTemporaryVisit, logConsistentVisit, moveDirectoryPerson, parseDirectory, removeDirectoryMember, removeDirectoryVisit, removeMinistryPerson, removeTemporaryHousehold, scheduleConsistentVisit, scheduleDirectoryTemporaryVisit, scheduleTemporaryVisit, setDirectoryCompanion, setDirectoryMan, setTemporaryCompanion, setTemporaryFamily, setYouthDay, setYouthHome, syncDirectoryMen, updateDirectoryHousehold } from "./lib/directory.js";
+import { completeLeaderOuting, removeLeaderOuting, scheduleLeaderOuting } from "./lib/leader-outings.js";
 import { createStore } from "./lib/store.js";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -495,6 +496,24 @@ export function createPortalHandler(store, options = {}) {
 
         if (pathname === "/api/youth/temporary/complete") {
           const next = await store.update((state) => completeTemporaryVisit(state, body));
+          sendJson(response, 200, presentState(next, month, viewOptions));
+          return;
+        }
+
+        if (pathname === "/api/youth/leader-outing") {
+          const next = await store.update((state) => scheduleLeaderOuting(state, body));
+          sendJson(response, 201, presentState(next, month, viewOptions));
+          return;
+        }
+
+        if (pathname === "/api/youth/leader-outing/complete") {
+          const next = await store.update((state) => completeLeaderOuting(state, body));
+          sendJson(response, 200, presentState(next, month, viewOptions));
+          return;
+        }
+
+        if (pathname === "/api/youth/leader-outing/remove") {
+          const next = await store.update((state) => removeLeaderOuting(state, body));
           sendJson(response, 200, presentState(next, month, viewOptions));
           return;
         }

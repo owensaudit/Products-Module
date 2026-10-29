@@ -699,7 +699,41 @@ button.cal-day.is-open {
 .cal-dot.reschedule { background: #7dcea0; }
 .cal-dot.with_youth { background: #d98a2b; }
 .cal-dot.temporary { background: #1f7a8c; }
+.cal-dot.outing { background: #6b4c9a; }
 .cal-dot.consistent { background: #2f6f4e; }
+.leader-outing {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  margin: 0 0 12px;
+  display: grid;
+  gap: 8px;
+}
+.leader-outing h3,
+.leader-outing p { margin: 0; }
+.leader-outing form { display: grid; gap: 8px; }
+.leader-outing [data-quorum-panel] { display: grid; gap: 8px; }
+.leader-outing [data-quorum-panel][hidden] { display: none; }
+.leader-outing [data-quorum-panel] label { display: grid; gap: 4px; font-size: 13px; }
+.leader-outing .quorum-choice { display: flex; gap: 14px; flex-wrap: wrap; }
+.leader-outing .quorum-choice label { display: flex; align-items: center; gap: 6px; }
+.leader-outing form > label { display: grid; gap: 4px; font-size: 13px; }
+.leader-outing select {
+  width: 100%;
+  box-sizing: border-box;
+}
+.leader-outing-row,
+.leader-outing-archive {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+.leader-outing-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+.leader-outing-day .role-kicker { grid-column: 1 / -1; }
 .consistent-add,
 .consistent-assignment {
   border: 1px solid var(--line);
