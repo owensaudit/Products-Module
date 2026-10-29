@@ -5407,7 +5407,7 @@ function outreachTable(attempts) {
     <div class="cell-row outreach-add" data-outreach-add data-person-id="${esc(person?.id || "")}">
       <select name="by" aria-label="Who" ${quietAttrs()}>
         <option value="">Who</option>
-        ${members.map((member) => `<option value="${esc(member.name)}">${esc(member.name)}</option>`).join("")}
+        ${members.map((member) => `<option value="${esc(member.name)}">${esc(brotherGivenName(member.name) || member.name)}</option>`).join("")}
       </select>
       <select name="channel" aria-label="How" ${quietAttrs()}>
         <option value="">How</option>
@@ -5435,7 +5435,7 @@ function outreachEditRow(attempt) {
     <label class="outreach-pick"><input type="checkbox" data-outreach-pick="1" value="${esc(attempt.id)}" ${picked ? "checked" : ""} aria-label="Select this outreach"></label>
     <select name="by" aria-label="Who" ${quietAttrs()}>
       ${option("", "—", !who)}
-      ${names.map((name) => option(name, name, name === who)).join("")}
+      ${names.map((name) => option(name, brotherGivenName(name) || name, name === who)).join("")}
     </select>
     <select name="channel" aria-label="How" ${quietAttrs()}>
       ${channels.map((key) => option(key, CHANNEL_LABELS[key] || key, key === attempt.channel)).join("")}
