@@ -84,19 +84,6 @@ body {
 
 .church-mark { width: 46px; height: 64px; flex: none; }
 
-.church-name {
-  margin: 0;
-  display: grid;
-  line-height: 1.05;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  font-weight: 600;
-}
-
-.church-name span { font-size: 11px; }
-
-.church-name strong { font-size: 18px; font-weight: 700; letter-spacing: 0.06em; }
-
 button, input, select, textarea { font: inherit; color: inherit; }
 
 button { cursor: pointer; }
