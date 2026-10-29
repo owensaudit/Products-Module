@@ -3485,7 +3485,6 @@ function leaderOutingBlock(person) {
   const done = rows.filter((row) => row.done).sort((a, b) => String(b.meetingDate).localeCompare(String(a.meetingDate)) || String(b.meetingTime).localeCompare(String(a.meetingTime)));
   return `<section class="leader-outing">
     <h3>Temporary visit</h3>
-    <p class="muted">Separate from the consistent companion and the consistent households. For one day, choose a temporary companion and a temporary household. Checking it off archives only this visit.</p>
     <form data-form="leader-outing" data-person="${esc(person.id)}">
       <div class="quorum-choice">
         <label><input type="radio" name="quorum" value="priests" checked> Priests</label>
@@ -4559,13 +4558,9 @@ function youthMemberDetail(person) {
     ${householdLine(person)}
     ${contactFields(person, false, true)}
     ${factsForm(person)}
-    <section class="consistent-companion">
-      <h3>Consistent</h3>
-      <p class="muted">Standing companion and these assignments. Schedule and check these visits here.</p>
-      <form class="companion-row" data-form="youth-companion">
-        <label>Companion <select name="companion" aria-label="Companion">${ministeringBrotherOptions(companion)}</select></label>
-      </form>
-    </section>
+    <form class="companion-row" data-form="youth-companion">
+      <label>Companion <select name="companion" aria-label="Companion">${ministeringBrotherOptions(companion)}</select></label>
+    </form>
     <h3>Youth ministry meeting</h3>
     <p class="muted">Meet with ${companionLink} to see which assignments respond, then give a date and time to visit.</p>
     ${meeting ? `<p class="plan-line"><strong>Meeting</strong> ${esc(meeting)}${companion ? ` with ${companionLink}` : ""}</p>` : ""}
@@ -4748,11 +4743,7 @@ function companionDetail() {
   }).join("");
   const person = personBySpokenName(group.name);
   return `${cardBackButton()}<p class="muted">Companion</p><h2>${esc(group.name)}</h2>
-    <section class="consistent-companion">
-      <h3>Consistent</h3>
-      <p class="muted">Standing companion and these households. Schedule and check these visits here.</p>
-      ${blocks}
-    </section>
+    ${blocks}
     ${person ? leaderOutingBlock(person) : ""}`;
 }
 
@@ -4761,18 +4752,18 @@ function youthAssignmentVisit(family) {
   const visit = family.sheetColumns?.["Visit Date"] || "";
   const parts = meetingParts(visit);
   return `<div class="assignment-visit${responded ? " is-responded" : ""}">
-    <input data-assignment-id="${esc(family.id)}" value="${esc(nameKey(family))}" aria-label="Assignment">
-    <button type="button" class="name-link" data-action="open-name" data-name="${esc(nameKey(family))}" data-person="${esc(family.id)}">${esc(nameKey(family))}</button>
-    <label class="responded"><input type="checkbox" data-response-id="${esc(family.id)}" ${responded ? "checked" : ""}> Responded</label>
-    ${companionScheduleNote(family)}
-    ${visit ? `<p class="plan-line"><strong>Visit</strong> ${esc(visit)}</p>${family.sheetColumns?.["Visit Notified"] === "Yes" ? `<p class="notified">Notified</p>` : ""}` : ""}
-    ${assignmentVisitMarkup(family)}
+    <div class="assignment-line">
+      <input data-assignment-id="${esc(family.id)}" value="${esc(nameKey(family))}" aria-label="Assignment">
+      <button type="button" class="mark-visited" data-action="log-assignment-visit" data-id="${esc(family.id)}" aria-label="Log this visit">✓</button>
+    </div>
     <form class="appointment-row" data-form="assignment-visit" data-id="${esc(family.id)}">
       <input name="date" type="date" aria-label="Visit date" required value="${esc(parts.date)}">
       <input name="time" type="time" aria-label="Visit time" required value="${esc(parts.time)}">
-      <button class="tiny primary" type="submit">Schedule visit</button>
+      <button class="tiny primary" type="submit">Schedule</button>
+      <label class="responded"><input type="checkbox" data-response-id="${esc(family.id)}" ${responded ? "checked" : ""}> Responded</label>
+      <button type="button" class="text-button" data-action="clear-assignment" data-id="${esc(family.id)}">Remove</button>
     </form>
-    <button type="button" class="text-button" data-action="clear-assignment" data-id="${esc(family.id)}">Remove</button>
+    ${visit && family.sheetColumns?.["Visit Notified"] === "Yes" ? `<p class="notified">Notified</p>` : ""}
   </div>`;
 }
 
@@ -4801,7 +4792,7 @@ function rosterDetail(person) {
     <p class="status-row">${statusSelect(person)}${archiveControl(person)}${missionPill(person)}${person.rosterStatusKey === "scheduled" ? visitCheck(person) : ""}</p>
     ${ministeringVisitNote(person)}
     ${specialNotes(person)}
-    ${ministry ? `<section class="consistent-companion"><h3>Consistent</h3><p class="muted">Standing companion, households, and people. Schedule and check these visits here.</p>${standingMinistryBlock(ministry)}</section>` : companionLine(person)}
+    ${ministry ? standingMinistryBlock(ministry) : companionLine(person)}
     ${leaderOutingBlock(person)}
     ${contactFields(person, false, true)}
     ${factsForm(person)}
