@@ -214,17 +214,17 @@ test("a phone number and email can be saved on a person", () => {
   assert.equal(state.people[0].phone, "");
   state = setPersonContact(state, "per_1", { priesthood: "High Priest", age: " 46 ", birthday: "26 Jun 1979" });
   assert.equal(state.people[0].sheetColumns.Priesthood, "High Priest");
-  assert.equal(state.people[0].sheetColumns.Age, "46");
-  assert.equal(state.people[0].sheetColumns.Birthday, "06/26/1979");
+  assert.equal(state.people[0].sheetColumns.Age, undefined);
+  assert.equal(state.people[0].sheetColumns.Birthday, undefined);
   assert.equal(state.people[0].notes, "Knock first");
-  const profile = presentState(state, "2026-09");
+  state.people[0].sheetColumns = { ...state.people[0].sheetColumns, Age: "46", Birthday: "06/26/1979" };
+  const profile = presentState(state, "2026-09", { includePrivate: true });
   assert.equal(profile.people[0].priesthood, "High Priest");
-  assert.equal(profile.people[0].age, "46");
-  assert.equal(profile.people[0].birthday, "06/26/1979");
-  state = setPersonContact(state, "per_1", { birthday: "3 Jun 1996" });
-  assert.equal(state.people[0].sheetColumns.Birthday, "06/03/1996");
-  state = setPersonContact(state, "per_1", { birthday: "6/3/1996" });
-  assert.equal(presentState(state, "2026-09").people[0].birthday, "06/03/1996");
+  assert.equal(profile.people[0].age, undefined);
+  assert.equal(profile.people[0].birthday, undefined);
+  assert.equal(profile.people[0].sheetColumns.Age, undefined);
+  assert.equal(profile.people[0].sheetColumns.Birthday, undefined);
+  assert.equal(JSON.stringify(profile).includes("06/26/1979"), false);
   state = setPersonContact(state, "per_1", { priesthood: "" });
   assert.equal(state.people[0].sheetColumns.Priesthood, undefined);
   assert.equal(state.people[0].sheetColumns.Age, "46");
@@ -462,7 +462,14 @@ test("a brother sheet keeps names filterable and hides contact details", () => {
   assert.equal(view.rosterMode, true);
   assert.equal(view.people[0].rosterStatusKey, "visited");
   assert.equal(view.people[0].priesthood, "Elder");
-  assert.equal(view.people[0].birthday, "01/01/1986");
+  assert.equal(view.people[0].age, undefined);
+  assert.equal(view.people[0].birthday, undefined);
+  assert.equal(view.people[0].sheetColumns.Age, undefined);
+  assert.equal(view.people[0].sheetColumns.Birthday, undefined);
+  assert.equal(state.people[0].sheetColumns.Age, undefined);
+  assert.equal(state.people[0].sheetColumns.Birthday, undefined);
+  assert.equal(JSON.stringify(view).includes("01/01/1986"), false);
+  assert.equal(JSON.stringify(view).includes("1 Jan 1986"), false);
   assert.equal(view.people[0].appointment, "");
   assert.equal(view.people[0].appointmentPlace, "");
   assert.equal(state.people[0].sheetColumns["Apt Date"], "07/03 5:30 PM");
@@ -683,12 +690,12 @@ test("a youth member keeps a quorum and a blank leadership name", async () => {
     phone: "555-0101",
     email: "ada@example.com",
     group: "priests",
-    sheetColumns: { Brother: "Example, Ada", Birthday: "14 Mar 2010", Priesthood: "Priest" },
+    sheetColumns: { Brother: "Example, Ada", Priesthood: "Priest" },
   }, deps());
   state = addPerson(state, {
     displayName: "Sample, Bea",
     group: "teachers",
-    sheetColumns: { Brother: "Sample, Bea", Birthday: "4 Oct 2011", Priesthood: "Teacher" },
+    sheetColumns: { Brother: "Sample, Bea", Priesthood: "Teacher" },
   }, deps());
   state = setYouthLeadership(state, {
     priests: [
@@ -710,7 +717,8 @@ test("a youth member keeps a quorum and a blank leadership name", async () => {
   const priests = view.people.filter((person) => person.group === "priests");
   assert.equal(priests.length, 1);
   assert.equal(priests[0].sheetName, "Example, Ada");
-  assert.equal(priests[0].birthday, "03/14/2010");
+  assert.equal(priests[0].birthday, undefined);
+  assert.equal(priests[0].age, undefined);
   assert.equal(priests[0].rosterStatus, "");
   assert.equal(priests[0].phone, "555-0101");
   assert.equal(view.youthLeadership.priests[0].name, "Sample, Bea");

@@ -1777,8 +1777,6 @@ function readContactDraft() {
     household: card.querySelector("form[data-form='contact'] [name=household]")?.value ?? "",
     address: card.querySelector("form[data-form='contact'] [name=address]")?.value ?? "",
     priesthood: card.querySelector("form[data-form='facts'] [name=priesthood]")?.value ?? "",
-    age: card.querySelector("form[data-form='facts'] [name=age]")?.value ?? "",
-    birthday: card.querySelector("form[data-form='facts'] [name=birthday]")?.value ?? "",
     start: field.selectionStart,
     end: field.selectionEnd,
   };
@@ -1795,8 +1793,6 @@ function restoreContactDraft(draft) {
   const household = card.querySelector("form[data-form='contact'] [name=household]");
   const address = card.querySelector("form[data-form='contact'] [name=address]");
   const priesthood = card.querySelector("form[data-form='facts'] [name=priesthood]");
-  const age = card.querySelector("form[data-form='facts'] [name=age]");
-  const birthday = card.querySelector("form[data-form='facts'] [name=birthday]");
   if (name) name.value = draft.name;
   if (notes) notes.value = draft.notes;
   if (phone) phone.value = draft.phone;
@@ -1804,8 +1800,6 @@ function restoreContactDraft(draft) {
   if (household) household.value = draft.household;
   if (address) address.value = draft.address;
   if (priesthood) priesthood.value = draft.priesthood;
-  if (age) age.value = draft.age;
-  if (birthday) birthday.value = draft.birthday;
   const contact = card.querySelector("form[data-form='contact']");
   if (contact) syncContactLinks(contact);
   const field = card.querySelector(`[name="${draft.field}"]`);
@@ -1932,18 +1926,16 @@ function saveContactFields() {
   const household = householdInput ? householdInput.value.trim() : "";
   const address = addressInput ? addressInput.value.trim() : "";
   const priesthood = card.querySelector("form[data-form='facts'] [name=priesthood]")?.value.trim() ?? "";
-  const age = card.querySelector("form[data-form='facts'] [name=age]")?.value.trim() ?? "";
-  const birthday = card.querySelector("form[data-form='facts'] [name=birthday]")?.value.trim() ?? "";
   const person = selectedPerson();
   const currentName = person ? nameKey(person) : "";
   if (!typedName && nameInput && currentName) nameInput.value = currentName;
-  const payload = { notes, phone, email, priesthood, age, birthday };
+  const payload = { notes, phone, email, priesthood };
   if (householdInput) payload.household = household;
   if (addressInput) payload.address = address;
   if (typedName && typedName !== currentName) payload.name = typedName;
   const sameHousehold = !householdInput || household === (person?.household || "");
   const sameAddress = !addressInput || address === (person?.sheetColumns?.Address || "");
-  if (person && !payload.name && sameHousehold && sameAddress && notes === (person.notes || "") && phone === (person.phone || "") && email === (person.email || "") && priesthood === (person.priesthood || "") && age === (person.age || "") && birthday === (person.birthday || "")) return;
+  if (person && !payload.name && sameHousehold && sameAddress && notes === (person.notes || "") && phone === (person.phone || "") && email === (person.email || "") && priesthood === (person.priesthood || "")) return;
   post(`/api/people/${selectedPersonId}/contact`, payload).then((next) => {
     state = next;
     render();
@@ -5157,8 +5149,6 @@ function factsForm(person) {
         ${offices.map(option).join("")}
       </select>
     </label>
-    <label>Age <input name="age" inputmode="numeric" autocomplete="off" value="${esc(person.age || "")}" aria-label="Age"></label>
-    <label>Birthday <input name="birthday" autocomplete="off" value="${esc(person.birthday || "")}" aria-label="Birthday"></label>
   </form>`;
 }
 

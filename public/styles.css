@@ -989,9 +989,6 @@ button.assign-count[aria-pressed="true"] {
   box-shadow: none;
 }
 
-.facts-row input[name="age"] { width: 4.5rem; }
-.facts-row input[name="birthday"] { width: 8.5rem; }
-
 .presidency-board input::placeholder {
   color: #8aa0a8;
   opacity: 1;
