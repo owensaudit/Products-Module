@@ -1133,11 +1133,12 @@ app.addEventListener("submit", (event) => {
     return;
   }
   if (kind === "assignment-visit") {
-    post(`/api/people/${form.dataset.id}/contact`, {
+    const visit = {
       visitDate: { date: data.get("date"), time: data.get("time") },
       visitedOn: clientToday(),
-      temporaryCompanion: data.get("temporaryCompanion") || "",
-    }).then(render).catch(showError);
+    };
+    if (form.querySelector("[name=temporaryCompanion]")) visit.temporaryCompanion = data.get("temporaryCompanion") || "";
+    post(`/api/people/${form.dataset.id}/contact`, visit).then(render).catch(showError);
     return;
   }
   if (kind === "outreach") {
@@ -2720,7 +2721,7 @@ function leaderOutingDayMarkup(iso) {
     const action = person ? ` data-action="select-person" data-id="${esc(person.id)}"` : "";
     const when = [companions, row.targetLabel, row.meeting].filter(Boolean).join(" · ");
     return `<div class="person scheduled leader-outing-day"${action}>
-      <span class="role-kicker">Temporary outing</span>
+      <span class="role-kicker">Temporary visit</span>
       <strong>${esc(row.leaderName)}</strong>
       <small>${esc(when)}</small>
     </div>`;
@@ -3424,7 +3425,7 @@ function quorumCompanionNames(quorum, leader) {
 }
 
 function outingCompanionSelect(quorum, leader, which, disabled) {
-  const label = which === "second" ? "Second companion" : "Companion";
+  const label = which === "second" ? "Second temporary companion" : "Temporary companion";
   const names = quorumCompanionNames(quorum, leader);
   const off = disabled ? " disabled" : "";
   return `<label>${label} <select aria-label="${label}"${off}><option value="">—</option>${names.map((name) => `<option value="${esc(name)}">${esc(name)}</option>`).join("")}</select></label>`;
@@ -3483,8 +3484,8 @@ function leaderOutingBlock(person) {
   const open = rows.filter((row) => !row.done).sort((a, b) => String(a.meetingDate).localeCompare(String(b.meetingDate)) || String(a.meetingTime).localeCompare(String(b.meetingTime)));
   const done = rows.filter((row) => row.done).sort((a, b) => String(b.meetingDate).localeCompare(String(a.meetingDate)) || String(b.meetingTime).localeCompare(String(a.meetingTime)));
   return `<section class="leader-outing">
-    <h3>Temporary outing</h3>
-    <p class="muted">Take one or two priests, or one or two teachers, and a household or a person. These visits change often. This does not change the consistent companion or the consistent households and people. Marking it done keeps who went and who was visited that quarter.</p>
+    <h3>Temporary visit</h3>
+    <p class="muted">Separate from the consistent companion and the consistent households. For one day, choose a temporary companion and a temporary household. Checking it off archives only this visit.</p>
     <form data-form="leader-outing" data-person="${esc(person.id)}">
       <div class="quorum-choice">
         <label><input type="radio" name="quorum" value="priests" checked> Priests</label>
@@ -3498,12 +3499,12 @@ function leaderOutingBlock(person) {
         ${outingCompanionSelect("teachers", person, "first", true)}
         ${outingCompanionSelect("teachers", person, "second", true)}
       </div>
-      <label>Household <select name="household" aria-label="Household">${outingHouseholdOptions()}</select></label>
-      <label>Person <select name="person" aria-label="Person">${outingPersonOptions(person)}</select></label>
+      <label>Temporary household <select name="household" aria-label="Temporary household">${outingHouseholdOptions()}</select></label>
+      <label>Or a person <select name="person" aria-label="Or a person">${outingPersonOptions(person)}</select></label>
       <div class="appointment-row">
-        <input name="date" type="date" aria-label="Outing date" required>
-        <input name="time" type="time" aria-label="Outing time" required>
-        <button class="tiny primary" type="submit">Schedule outing</button>
+        <input name="date" type="date" aria-label="Temporary visit date" required>
+        <input name="time" type="time" aria-label="Temporary visit time" required>
+        <button class="tiny primary" type="submit">Schedule temporary visit</button>
       </div>
     </form>
     ${open.map(leaderOutingOpenRow).join("")}
@@ -4558,10 +4559,13 @@ function youthMemberDetail(person) {
     ${householdLine(person)}
     ${contactFields(person, false, true)}
     ${factsForm(person)}
-    <form class="companion-row" data-form="youth-companion">
-      <label>Companion <select name="companion" aria-label="Companion">${ministeringBrotherOptions(companion)}</select></label>
-    </form>
-    ${leaderOutingBlock(person)}
+    <section class="consistent-companion">
+      <h3>Consistent</h3>
+      <p class="muted">Standing companion and these assignments. Schedule and check these visits here.</p>
+      <form class="companion-row" data-form="youth-companion">
+        <label>Companion <select name="companion" aria-label="Companion">${ministeringBrotherOptions(companion)}</select></label>
+      </form>
+    </section>
     <h3>Youth ministry meeting</h3>
     <p class="muted">Meet with ${companionLink} to see which assignments respond, then give a date and time to visit.</p>
     ${meeting ? `<p class="plan-line"><strong>Meeting</strong> ${esc(meeting)}${companion ? ` with ${companionLink}` : ""}</p>` : ""}
@@ -4573,6 +4577,7 @@ function youthMemberDetail(person) {
     <h3>Assignments</h3>
     <p class="muted">${responded} of ${families.length} responded</p>
     ${families.map((family) => youthAssignmentVisit(family)).join("")}
+    ${leaderOutingBlock(person)}
     <h3>Outreach</h3>
     ${attemptList(person)}
     <h3>Comments${person.commentCount ? ` <span class="muted">${person.commentCount}</span>` : ""}</h3>
@@ -4741,7 +4746,14 @@ function companionDetail() {
     const visits = families.map((family) => youthAssignmentVisit(family)).join("");
     return `<section class="companion-schedule"><h3>with ${esc(pair.youth)}</h3>${visits || `<p class="empty">No families yet.</p>`}</section>`;
   }).join("");
-  return `${cardBackButton()}<p class="muted">Companion</p><h2>${esc(group.name)}</h2><p class="muted">Schedule this companion with an assignment.</p>${blocks}`;
+  const person = personBySpokenName(group.name);
+  return `${cardBackButton()}<p class="muted">Companion</p><h2>${esc(group.name)}</h2>
+    <section class="consistent-companion">
+      <h3>Consistent</h3>
+      <p class="muted">Standing companion and these households. Schedule and check these visits here.</p>
+      ${blocks}
+    </section>
+    ${person ? leaderOutingBlock(person) : ""}`;
 }
 
 function youthAssignmentVisit(family) {
@@ -4758,7 +4770,6 @@ function youthAssignmentVisit(family) {
     <form class="appointment-row" data-form="assignment-visit" data-id="${esc(family.id)}">
       <input name="date" type="date" aria-label="Visit date" required value="${esc(parts.date)}">
       <input name="time" type="time" aria-label="Visit time" required value="${esc(parts.time)}">
-      ${temporaryCompanionChoices(temporaryCompanionName(family))}
       <button class="tiny primary" type="submit">Schedule visit</button>
     </form>
     <button type="button" class="text-button" data-action="clear-assignment" data-id="${esc(family.id)}">Remove</button>
@@ -4790,7 +4801,7 @@ function rosterDetail(person) {
     <p class="status-row">${statusSelect(person)}${archiveControl(person)}${missionPill(person)}${person.rosterStatusKey === "scheduled" ? visitCheck(person) : ""}</p>
     ${ministeringVisitNote(person)}
     ${specialNotes(person)}
-    ${ministry ? standingMinistryBlock(ministry) : companionLine(person)}
+    ${ministry ? `<section class="consistent-companion"><h3>Consistent</h3><p class="muted">Standing companion, households, and people. Schedule and check these visits here.</p>${standingMinistryBlock(ministry)}</section>` : companionLine(person)}
     ${leaderOutingBlock(person)}
     ${contactFields(person, false, true)}
     ${factsForm(person)}

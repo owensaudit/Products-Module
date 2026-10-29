@@ -701,6 +701,7 @@ button.cal-day.is-open {
 .cal-dot.temporary { background: #1f7a8c; }
 .cal-dot.outing { background: #6b4c9a; }
 .cal-dot.consistent { background: #2f6f4e; }
+.consistent-companion,
 .leader-outing {
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -709,8 +710,10 @@ button.cal-day.is-open {
   display: grid;
   gap: 8px;
 }
+.consistent-companion h3,
 .leader-outing h3,
-.leader-outing p { margin: 0; }
+.leader-outing p,
+.consistent-companion > p { margin: 0; }
 .leader-outing form { display: grid; gap: 8px; }
 .leader-outing [data-quorum-panel] { display: grid; gap: 8px; }
 .leader-outing [data-quorum-panel][hidden] { display: none; }
