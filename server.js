@@ -29,8 +29,10 @@ import {
   setPersonStatus,
   setVisitStatus,
   markVisitNotified,
+  setFrozen,
 } from "./lib/model.js";
 import { emailAllowed, parseAllowlist } from "./lib/allowlist.js";
+import { freezeLocked, freezePowers } from "./lib/freeze.js";
 import { addDirectoryMember, addDirectoryVisit, addMinistryPerson, addTemporaryVisit, applyDirectory, assignDirectoryHousehold, assignTemporaryHousehold, completeTemporaryVisit, logConsistentVisit, moveDirectoryPerson, parseDirectory, removeDirectoryMember, removeDirectoryVisit, removeMinistryPerson, removeTemporaryHousehold, scheduleConsistentVisit, scheduleDirectoryTemporaryVisit, scheduleTemporaryVisit, setDirectoryCompanion, setDirectoryMan, setTemporaryCompanion, setTemporaryFamily, setYouthDay, setYouthHome, syncDirectoryMen, updateDirectoryHousehold } from "./lib/directory.js";
 import { completeLeaderOuting, removeLeaderOuting, scheduleLeaderOuting, scheduleMinisterOuting } from "./lib/leader-outings.js";
 import { createStore } from "./lib/store.js";
@@ -176,6 +178,7 @@ export function createPortalHandler(store, options = {}) {
   const authRequired = options.requireAuth === true || process.env.REQUIRE_AUTH === "1";
   const allow = options.allow || parseAllowlist(process.env.ALLOWED_EMAILS);
   const authenticate = options.authenticate || verifyGoogleToken;
+  const env = options.env || process.env;
   return async function portalHandler(request, response) {
     const expectsBody = request.method === "POST" || request.method === "PUT" || request.method === "PATCH";
     let bodyError = null;
@@ -208,13 +211,35 @@ export function createPortalHandler(store, options = {}) {
         return;
       }
 
+      let actor = "";
       if (authRequired && pathname.startsWith("/api/")) {
-        const email = await authenticate(request);
-        if (!emailAllowed(email, allow)) throw new PortalError("This Google account cannot open this portal", 403);
+        actor = String(await authenticate(request) || "");
+        if (!emailAllowed(actor, allow)) throw new PortalError("This Google account cannot open this portal", 403);
       }
+      const view = (state, month, viewOptions = {}) => presentState(state, month, {
+        ...viewOptions,
+        freeze: freezePowers(actor, env),
+      });
 
       if (request.method === "POST" && pathname === "/api/reset" && authRequired) {
         throw new PortalError("Clearing the shared portal is turned off", 403);
+      }
+
+      if (request.method === "POST" && pathname === "/api/freeze") {
+        const body = await bodyPromise;
+        if (bodyError) throw bodyError;
+        const powers = freezePowers(actor, env);
+        const on = body.on === true;
+        if (on && !powers.canEnable) throw new PortalError("Only Mark can turn Freeze on", 403);
+        if (!on && !powers.canDisable) throw new PortalError("Only Andy can turn Freeze off", 403);
+        const next = await store.update((state) => setFrozen(state, on));
+        sendJson(response, 200, view(next, body.month || currentMonth(), { includePrivate: body.includePrivate === true }));
+        return;
+      }
+
+      if (request.method === "POST" && freezeLocked(pathname)) {
+        const current = await store.read();
+        if (current?.frozen === true) throw new PortalError("The portal is frozen", 403);
       }
 
       if (request.method === "GET" && pathname === "/api/state") {
@@ -222,13 +247,13 @@ export function createPortalHandler(store, options = {}) {
         const state = await store.read();
         const synced = syncDirectoryMen(state);
         const ready = synced === state ? state : await store.update((current) => syncDirectoryMen(current));
-        sendJson(response, 200, presentState(ready, month, { includePrivate: url.searchParams.get("private") === "1" }));
+        sendJson(response, 200, view(ready, month, { includePrivate: url.searchParams.get("private") === "1" }));
         return;
       }
 
       if (request.method === "POST" && pathname === "/api/reset") {
         const next = await store.update(() => emptyState());
-        sendJson(response, 200, presentState(next, currentMonth()));
+        sendJson(response, 200, view(next, currentMonth()));
         return;
       }
 
@@ -241,28 +266,28 @@ export function createPortalHandler(store, options = {}) {
         const personReachOut = pathname.match(/^\/api\/people\/([^/]+)\/reach-out$/);
         if (personReachOut) {
           const next = await store.update((state) => setReachOutDate(state, decodeURIComponent(personReachOut[1]), body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         const personAppointment = pathname.match(/^\/api\/people\/([^/]+)\/appointment$/);
         if (personAppointment) {
           const next = await store.update((state) => setAppointment(state, decodeURIComponent(personAppointment[1]), body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         const personContact = pathname.match(/^\/api\/people\/([^/]+)\/contact$/);
         if (personContact) {
           const next = await store.update((state) => setPersonContact(state, decodeURIComponent(personContact[1]), body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         const personVisited = pathname.match(/^\/api\/people\/([^/]+)\/visited$/);
         if (personVisited) {
           const next = await store.update((state) => recordMinisteringVisit(state, decodeURIComponent(personVisited[1]), body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
@@ -272,85 +297,85 @@ export function createPortalHandler(store, options = {}) {
           if (Object.hasOwn(body, "mission")) options.mission = body.mission;
           if (Object.hasOwn(body, "visitedOn")) options.visitedOn = body.visitedOn;
           const next = await store.update((state) => setPersonStatus(state, decodeURIComponent(personStatus[1]), body.status, options));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         const personDelete = pathname.match(/^\/api\/people\/([^/]+)\/delete$/);
         if (personDelete) {
           const next = await store.update((state) => removePerson(state, decodeURIComponent(personDelete[1])));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/people") {
           const next = await store.update((state) => addPerson(state, body));
-          sendJson(response, 201, presentState(next, month, viewOptions));
+          sendJson(response, 201, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/presidency") {
           const next = await store.update((state) => setPresidency(state, body.members));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/youth/leadership") {
           const next = await store.update((state) => setYouthLeadership(state, body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         const outreachDelete = pathname.match(/^\/api\/outreach\/([^/]+)\/delete$/);
         if (outreachDelete) {
           const next = await store.update((state) => removeOutreach(state, decodeURIComponent(outreachDelete[1])));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         const outreachEdit = pathname.match(/^\/api\/outreach\/([^/]+)$/);
         if (outreachEdit) {
           const next = await store.update((state) => updateOutreach(state, decodeURIComponent(outreachEdit[1]), body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/outreach") {
           const next = await store.update((state) => logOutreach(state, body));
-          sendJson(response, 201, presentState(next, month, viewOptions));
+          sendJson(response, 201, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/schedule") {
           const next = await store.update((state) => scheduleVisit(state, body));
-          sendJson(response, 201, presentState(next, month, viewOptions));
+          sendJson(response, 201, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/comments") {
           const next = await store.update((state) => addComment(state, body));
-          sendJson(response, 201, presentState(next, month, viewOptions));
+          sendJson(response, 201, view(next, month, viewOptions));
           return;
         }
 
         const commentEdit = pathname.match(/^\/api\/comments\/([^/]+)$/);
         if (commentEdit) {
           const next = await store.update((state) => updateComment(state, decodeURIComponent(commentEdit[1]), body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         const commentResolve = pathname.match(/^\/api\/comments\/([^/]+)\/resolve$/);
         if (commentResolve) {
           const next = await store.update((state) => resolveComment(state, decodeURIComponent(commentResolve[1])));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         const commentDelete = pathname.match(/^\/api\/comments\/([^/]+)\/delete$/);
         if (commentDelete) {
           const next = await store.update((state) => deleteComment(state, decodeURIComponent(commentDelete[1])));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
@@ -358,175 +383,175 @@ export function createPortalHandler(store, options = {}) {
         if (complete) {
           const status = complete[2] === "complete" ? "completed" : "cancelled";
           const next = await store.update((state) => setVisitStatus(state, decodeURIComponent(complete[1]), status));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/directory/companion") {
           const next = await store.update((state) => setDirectoryCompanion(state, body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/directory/household") {
           const next = await store.update((state) => updateDirectoryHousehold(state, body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/directory/assign") {
           const next = await store.update((state) => assignDirectoryHousehold(state, body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/directory/visits") {
           const next = await store.update((state) => addDirectoryVisit(state, body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/directory/visits/remove") {
           const next = await store.update((state) => removeDirectoryVisit(state, body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/directory/ministry-person") {
           const next = await store.update((state) => addMinistryPerson(state, body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/directory/ministry-person/remove") {
           const next = await store.update((state) => removeMinistryPerson(state, body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/directory/consistent/schedule") {
           const next = await store.update((state) => scheduleConsistentVisit(state, body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/directory/consistent/visit") {
           const next = await store.update((state) => logConsistentVisit(state, body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/youth/temporary/household") {
           const next = await store.update((state) => assignTemporaryHousehold(state, body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/youth/temporary/household/schedule") {
           const next = await store.update((state) => scheduleDirectoryTemporaryVisit(state, body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/youth/temporary/household/remove") {
           const next = await store.update((state) => removeTemporaryHousehold(state, body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/directory/move") {
           const next = await store.update((state) => moveDirectoryPerson(state, body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/directory/member") {
           const next = await store.update((state) => addDirectoryMember(state, body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/directory/man") {
           const next = await store.update((state) => setDirectoryMan(state, body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/directory/remove") {
           const next = await store.update((state) => removeDirectoryMember(state, body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/directory/youth-home") {
           const next = await store.update((state) => setYouthHome(state, body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/directory/youth-day") {
           const next = await store.update((state) => setYouthDay(state, body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/youth/temporary/companion") {
           const next = await store.update((state) => setTemporaryCompanion(state, body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/youth/temporary/family") {
           const next = await store.update((state) => setTemporaryFamily(state, body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/youth/temporary") {
           const next = await store.update((state) => addTemporaryVisit(state, body));
-          sendJson(response, 201, presentState(next, month, viewOptions));
+          sendJson(response, 201, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/youth/temporary/schedule") {
           const next = await store.update((state) => scheduleTemporaryVisit(state, body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/youth/temporary/complete") {
           const next = await store.update((state) => completeTemporaryVisit(state, body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/youth/leader-outing") {
           const next = await store.update((state) => scheduleLeaderOuting(state, body));
-          sendJson(response, 201, presentState(next, month, viewOptions));
+          sendJson(response, 201, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/ministering/temporary") {
           const next = await store.update((state) => scheduleMinisterOuting(state, body));
-          sendJson(response, 201, presentState(next, month, viewOptions));
+          sendJson(response, 201, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/youth/leader-outing/complete") {
           const next = await store.update((state) => completeLeaderOuting(state, body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/youth/leader-outing/remove") {
           const next = await store.update((state) => removeLeaderOuting(state, body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
         if (pathname === "/api/notify") {
           const next = await store.update((state) => markVisitNotified(state, body));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
@@ -534,7 +559,7 @@ export function createPortalHandler(store, options = {}) {
           const records = parseDirectory(body.text || "");
           if (!records.length) throw new PortalError("Directory text has no households");
           const next = await store.update((state) => applyDirectory(state, records));
-          sendJson(response, 200, presentState(next, month, viewOptions));
+          sendJson(response, 200, view(next, month, viewOptions));
           return;
         }
 
@@ -560,7 +585,7 @@ export function createPortalHandler(store, options = {}) {
             return imported.state;
           });
           sendJson(response, 201, {
-            ...presentState(result, month, viewOptions),
+            ...view(result, month, viewOptions),
             importResult: summary,
           });
           return;

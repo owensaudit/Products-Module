@@ -1445,7 +1445,19 @@ async function refresh() {
   render();
 }
 
+function changesAreFrozen(path) {
+  if (state?.frozen !== true) return false;
+  const clean = String(path || "").split("?")[0];
+  if (clean === "/api/freeze" || clean === "/api/presidency" || clean === "/api/import/preview" || clean.startsWith("/api/comments")) return false;
+  return true;
+}
+
 function post(path, body) {
+  if (changesAreFrozen(path)) {
+    const error = new Error("The portal is frozen");
+    showError(error);
+    return Promise.reject(error);
+  }
   clearError();
   return api(path, {
     method: "POST",
@@ -1631,6 +1643,7 @@ presidencyHost?.addEventListener("input", (event) => {
   if (!(event.target instanceof HTMLInputElement) || !/^(name|phone|email)-/.test(name)) return;
   clearTimeout(presidencySaveTimer);
   const memberId = memberField(name);
+  if (state?.frozen === true && (memberId || youthFieldName(name))) return;
   if (memberId) {
     presidencySaveTimer = setTimeout(() => saveYouthMember(memberId), 400);
     return;
@@ -1643,6 +1656,7 @@ presidencyHost?.addEventListener("focusout", (event) => {
   if (!(event.target instanceof HTMLInputElement) || !/^(name|phone|email)-/.test(name)) return;
   clearTimeout(presidencySaveTimer);
   const memberId = memberField(name);
+  if (state?.frozen === true && (memberId || youthFieldName(name))) return;
   if (memberId) saveYouthMember(memberId);
   else if (youthFieldName(name)) saveYouthLeadership();
   else savePresidencyNames();
@@ -1696,6 +1710,30 @@ document.querySelector("#open-youth")?.addEventListener("click", () => openPage(
 document.querySelector("#open-youth-title")?.addEventListener("click", () => openPage("youth"));
 document.querySelector("[data-page-header='youth'] .eyebrow")?.addEventListener("click", () => openPage("youth"));
 document.querySelector("#open-directory")?.addEventListener("click", () => openPage("directory"));
+
+document.querySelector("#open-freeze")?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  if (state?.freeze?.canOpen !== true) return;
+  const panel = document.querySelector("#freeze-panel");
+  if (panel) panel.hidden = !panel.hidden;
+});
+
+document.addEventListener("click", (event) => {
+  const panel = document.querySelector("#freeze-panel");
+  if (!panel || panel.hidden) return;
+  if (event.target.closest("#freeze-panel, #open-freeze")) return;
+  panel.hidden = true;
+});
+
+document.querySelector("#freeze-toggle")?.addEventListener("click", () => {
+  const toggle = document.querySelector("#freeze-toggle");
+  post("/api/freeze", { on: toggle?.dataset.on === "true" }).then((next) => {
+    state = next;
+    render();
+    const panel = document.querySelector("#freeze-panel");
+    if (panel && state?.freeze?.canOpen) panel.hidden = false;
+  }).catch(showError);
+});
 
 document.querySelector("#message-inbox")?.addEventListener("click", () => {
   toggleInbox("elders");
@@ -2007,6 +2045,39 @@ function renderPageChrome() {
     button.setAttribute("aria-pressed", button.dataset.pageLink === page ? "true" : "false");
   });
   presidencyHost?.setAttribute("aria-label", page === "youth" ? "Youth quorums" : "EQ Presidency");
+  syncFreeze();
+}
+
+function syncFreeze() {
+  const frozen = state?.frozen === true;
+  const access = state?.freeze || {};
+  document.body.classList.toggle("is-frozen", frozen);
+  const banner = document.querySelector("#freeze-banner");
+  if (banner) banner.hidden = !frozen;
+  const opener = document.querySelector("#open-freeze");
+  const mark = document.querySelector("#angel-mark");
+  if (opener) opener.hidden = access.canOpen !== true;
+  if (mark) mark.hidden = access.canOpen === true;
+  const panel = document.querySelector("#freeze-panel");
+  if (access.canOpen !== true && panel) panel.hidden = true;
+  const label = document.querySelector("#freeze-state-label");
+  if (label) label.textContent = frozen ? "The portal is frozen." : "The portal is open.";
+  const note = document.querySelector("#freeze-note");
+  if (note) {
+    let text = "";
+    if (access.canOpen && frozen && !access.canDisable) text = "Only Andy can turn this off.";
+    else if (access.canOpen && !frozen && !access.canEnable) text = "Only Mark can turn this on.";
+    note.textContent = text;
+    note.hidden = !text;
+  }
+  const toggle = document.querySelector("#freeze-toggle");
+  if (toggle) {
+    const turnOn = access.canEnable === true && !frozen;
+    const turnOff = access.canDisable === true && frozen;
+    toggle.hidden = !(turnOn || turnOff);
+    toggle.textContent = turnOff ? "Turn freeze off" : "Freeze";
+    toggle.dataset.on = turnOff ? "false" : "true";
+  }
 }
 
 function isYouthMember(person) {

@@ -2620,3 +2620,101 @@ test("a minister temporary visit keeps the consistent companion and households",
   assert.deepEqual(state.leaderOutings[0].visitors, ["Lane, Sue", "Keeper, Anthony"]);
   assert.deepEqual(state.directory, before);
 });
+
+test("freeze keeps the member list and only Mark can turn it on", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "portal-freeze-"));
+  const store = createStore(path.join(directory, "portal.json"));
+  const seed = {
+    ...emptyState(),
+    people: [{
+      id: "per_1",
+      displayName: "Ada Example",
+      phone: "",
+      email: "",
+      household: "",
+      notes: "",
+      sheetColumns: { Brother: "Ada Example" },
+      createdAt: "2026-10-01T00:00:00.000Z",
+      updatedAt: "2026-10-01T00:00:00.000Z",
+    }],
+    directory: [{ id: "dir_ada", name: "Example", members: ["Ada"], phone: "", email: "", address: "" }],
+  };
+  await store.write(seed);
+  const server = createPortalServer(store, {
+    requireAuth: true,
+    allow: parseAllowlist("mark@example.com,andy@example.com,leader@example.com"),
+    env: {
+      FREEZE_ENABLE_EMAILS: "mark@example.com",
+      FREEZE_DISABLE_EMAILS: "andy@example.com",
+    },
+    authenticate(request) {
+      const header = String(request.headers.authorization || "");
+      if (header === "Bearer mark") return "mark@example.com";
+      if (header === "Bearer andy") return "andy@example.com";
+      if (header === "Bearer leader") return "leader@example.com";
+      throw new PortalError("Sign in required", 401);
+    },
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const send = (token, path, body) => fetch(`${base}${path}`, {
+    method: body ? "POST" : "GET",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  try {
+    const before = await store.read();
+    assert.equal(before.frozen, false);
+    const opened = await send("mark", "/api/state");
+    assert.equal(opened.status, 200);
+    const openView = await opened.json();
+    assert.equal(openView.frozen, false);
+    assert.equal(openView.freeze.canOpen, true);
+    assert.equal(openView.freeze.canEnable, true);
+    assert.equal(openView.freeze.canDisable, false);
+    assert.equal(JSON.stringify(openView.freeze).includes("@"), false);
+    const andyOn = await send("andy", "/api/freeze", { on: true });
+    assert.equal(andyOn.status, 403);
+    const strangerOn = await send("leader", "/api/freeze", { on: true });
+    assert.equal(strangerOn.status, 403);
+    const frozen = await send("mark", "/api/freeze", { on: true });
+    assert.equal(frozen.status, 200);
+    const frozenView = await frozen.json();
+    assert.equal(frozenView.frozen, true);
+    assert.equal(frozenView.people[0].displayName, "Ada Example");
+    assert.equal(frozenView.directory[0].name, "Example");
+    const saved = await store.read();
+    assert.equal(saved.frozen, true);
+    assert.deepEqual(saved.people, seed.people);
+    assert.deepEqual(saved.directory, seed.directory);
+    const seen = await send("leader", "/api/state");
+    const leaderView = await seen.json();
+    assert.equal(leaderView.frozen, true);
+    assert.equal(leaderView.freeze.canOpen, false);
+    assert.equal(leaderView.people.length, 1);
+    const status = await send("leader", "/api/people/per_1/status", { status: "Visited" });
+    assert.equal(status.status, 403);
+    const youth = await send("leader", "/api/youth/leadership", { priests: [], teachers: [] });
+    assert.equal(youth.status, 403);
+    const household = await send("leader", "/api/directory/member", { directoryId: "dir_ada", name: "Bea" });
+    assert.equal(household.status, 403);
+    const comment = await send("leader", "/api/comments", { targetType: "person", targetId: "per_1", body: "Still here", authorName: "Ada Example" });
+    assert.equal(comment.status, 201);
+    const markOff = await send("mark", "/api/freeze", { on: false });
+    assert.equal(markOff.status, 403);
+    const thawed = await send("andy", "/api/freeze", { on: false });
+    assert.equal(thawed.status, 200);
+    assert.equal((await thawed.json()).frozen, false);
+    const after = await store.read();
+    assert.equal(after.frozen, false);
+    assert.deepEqual(after.people, seed.people);
+    assert.deepEqual(after.directory, seed.directory);
+    const visited = await send("leader", "/api/people/per_1/status", { status: "Visited" });
+    assert.equal(visited.status, 200);
+    const round = stateFromRecord({ ...seed, frozen: true });
+    assert.equal(round.frozen, true);
+    assert.equal(round.people[0].displayName, "Ada Example");
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

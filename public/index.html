@@ -4,20 +4,34 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ministering Visit Portal</title>
-    <link rel="stylesheet" href="/styles.css?v=146">
+    <link rel="stylesheet" href="/styles.css?v=147">
   </head>
   <body>
     <a class="skip" href="#app">Skip to the portal</a>
     <div class="church-bar">
       <div class="church-bar-inner">
         <div class="church-brand">
-          <svg class="church-mark" viewBox="0 0 64 88" aria-hidden="true">
+          <button type="button" id="open-freeze" class="angel-button" hidden aria-haspopup="dialog" aria-controls="freeze-panel" aria-label="Freeze">
+            <svg class="church-mark" viewBox="0 0 64 88" aria-hidden="true">
+              <path d="M16 84 V38 A16 16 0 0 1 48 38 V84" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+              <path d="M12 84 H52" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+              <circle cx="32" cy="30" r="4.6" fill="currentColor"/>
+              <path d="M11 43 L20 38 L32 42 L44 38 L53 43 L47 48 L32 45 L17 48 Z" fill="currentColor"/>
+              <path d="M25 44 H39 L42 78 H22 Z" fill="currentColor"/>
+            </svg>
+          </button>
+          <svg class="church-mark" id="angel-mark" viewBox="0 0 64 88" aria-hidden="true">
             <path d="M16 84 V38 A16 16 0 0 1 48 38 V84" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
             <path d="M12 84 H52" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
             <circle cx="32" cy="30" r="4.6" fill="currentColor"/>
             <path d="M11 43 L20 38 L32 42 L44 38 L53 43 L47 48 L32 45 L17 48 Z" fill="currentColor"/>
             <path d="M25 44 H39 L42 78 H22 Z" fill="currentColor"/>
           </svg>
+          <div id="freeze-panel" class="freeze-panel" hidden role="dialog" aria-label="Freeze">
+            <p id="freeze-state-label"></p>
+            <p id="freeze-note" class="freeze-note" hidden></p>
+            <button type="button" id="freeze-toggle" hidden>Freeze</button>
+          </div>
         </div>
         <nav class="quorum-nav" aria-label="Quorum">
           <button type="button" id="sign-out" class="tiny sign-out" hidden>Sign out</button>
@@ -27,6 +41,7 @@
         </nav>
       </div>
     </div>
+    <p id="freeze-banner" class="freeze-banner" hidden>The portal is frozen. Visits, the directory, and youth assignments cannot be changed.</p>
     <header class="site-header">
       <div class="quorum-titles">
         <div class="title-block" data-page-header="elders">
@@ -67,6 +82,6 @@
       </div>
     </section>
     <main id="app" tabindex="-1"><p class="empty">Loading the portal…</p></main>
-    <script src="/app.js?v=181" type="module"></script>
+    <script src="/app.js?v=182" type="module"></script>
   </body>
 </html>
