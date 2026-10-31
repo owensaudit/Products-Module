@@ -1713,7 +1713,7 @@ document.querySelector("#open-directory")?.addEventListener("click", () => openP
 
 document.querySelector("#open-freeze")?.addEventListener("click", (event) => {
   event.stopPropagation();
-  if (state?.freeze?.canOpen !== true) return;
+  if (!state) return;
   const panel = document.querySelector("#freeze-panel");
   if (panel) panel.hidden = !panel.hidden;
 });
@@ -1727,11 +1727,12 @@ document.addEventListener("click", (event) => {
 
 document.querySelector("#freeze-toggle")?.addEventListener("click", () => {
   const toggle = document.querySelector("#freeze-toggle");
-  post("/api/freeze", { on: toggle?.dataset.on === "true" }).then((next) => {
+  if (!toggle || toggle.disabled) return;
+  post("/api/freeze", { on: toggle.dataset.on === "true" }).then((next) => {
     state = next;
     render();
     const panel = document.querySelector("#freeze-panel");
-    if (panel && state?.freeze?.canOpen) panel.hidden = false;
+    if (panel) panel.hidden = false;
   }).catch(showError);
 });
 
@@ -2049,6 +2050,7 @@ function renderPageChrome() {
 }
 
 function syncFreeze() {
+  const signedIn = Boolean(state);
   const frozen = state?.frozen === true;
   const access = state?.freeze || {};
   document.body.classList.toggle("is-frozen", frozen);
@@ -2056,25 +2058,16 @@ function syncFreeze() {
   if (banner) banner.hidden = !frozen;
   const opener = document.querySelector("#open-freeze");
   const mark = document.querySelector("#angel-mark");
-  if (opener) opener.hidden = access.canOpen !== true;
-  if (mark) mark.hidden = access.canOpen === true;
+  if (opener) opener.hidden = !signedIn;
+  if (mark) mark.hidden = signedIn;
   const panel = document.querySelector("#freeze-panel");
-  if (access.canOpen !== true && panel) panel.hidden = true;
-  const label = document.querySelector("#freeze-state-label");
-  if (label) label.textContent = frozen ? "The portal is frozen." : "The portal is open.";
-  const note = document.querySelector("#freeze-note");
-  if (note) {
-    let text = "";
-    if (access.canOpen && frozen && !access.canDisable) text = "Only Andy can turn this off.";
-    else if (access.canOpen && !frozen && !access.canEnable) text = "Only Mark can turn this on.";
-    note.textContent = text;
-    note.hidden = !text;
-  }
+  if (!signedIn && panel) panel.hidden = true;
   const toggle = document.querySelector("#freeze-toggle");
   if (toggle) {
-    const turnOn = access.canEnable === true && !frozen;
     const turnOff = access.canDisable === true && frozen;
-    toggle.hidden = !(turnOn || turnOff);
+    const turnOn = access.canEnable === true && !frozen;
+    toggle.hidden = false;
+    toggle.disabled = !(turnOn || turnOff);
     toggle.textContent = turnOff ? "Turn freeze off" : "Freeze";
     toggle.dataset.on = turnOff ? "false" : "true";
   }

@@ -2621,7 +2621,7 @@ test("a minister temporary visit keeps the consistent companion and households",
   assert.deepEqual(state.directory, before);
 });
 
-test("freeze keeps the member list and only Mark can turn it on", async () => {
+test("freeze keeps the member list and only Andy or Mark can turn it on", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "portal-freeze-"));
   const store = createStore(path.join(directory, "portal.json"));
   const seed = {
@@ -2644,7 +2644,7 @@ test("freeze keeps the member list and only Mark can turn it on", async () => {
     requireAuth: true,
     allow: parseAllowlist("mark@example.com,andy@example.com,leader@example.com"),
     env: {
-      FREEZE_ENABLE_EMAILS: "mark@example.com",
+      FREEZE_ENABLE_EMAILS: "mark@example.com,andy@example.com",
       FREEZE_DISABLE_EMAILS: "andy@example.com",
     },
     authenticate(request) {
@@ -2673,10 +2673,16 @@ test("freeze keeps the member list and only Mark can turn it on", async () => {
     assert.equal(openView.freeze.canEnable, true);
     assert.equal(openView.freeze.canDisable, false);
     assert.equal(JSON.stringify(openView.freeze).includes("@"), false);
-    const andyOn = await send("andy", "/api/freeze", { on: true });
-    assert.equal(andyOn.status, 403);
+    const andyView = await (await send("andy", "/api/state")).json();
+    assert.equal(andyView.freeze.canEnable, true);
+    assert.equal(andyView.freeze.canDisable, true);
     const strangerOn = await send("leader", "/api/freeze", { on: true });
     assert.equal(strangerOn.status, 403);
+    const andyOn = await send("andy", "/api/freeze", { on: true });
+    assert.equal(andyOn.status, 200);
+    const andyOff = await send("andy", "/api/freeze", { on: false });
+    assert.equal(andyOff.status, 200);
+    assert.deepEqual((await store.read()).people, seed.people);
     const frozen = await send("mark", "/api/freeze", { on: true });
     assert.equal(frozen.status, 200);
     const frozenView = await frozen.json();
@@ -2690,7 +2696,9 @@ test("freeze keeps the member list and only Mark can turn it on", async () => {
     const seen = await send("leader", "/api/state");
     const leaderView = await seen.json();
     assert.equal(leaderView.frozen, true);
-    assert.equal(leaderView.freeze.canOpen, false);
+    assert.equal(leaderView.freeze.canOpen, true);
+    assert.equal(leaderView.freeze.canEnable, false);
+    assert.equal(leaderView.freeze.canDisable, false);
     assert.equal(leaderView.people.length, 1);
     const status = await send("leader", "/api/people/per_1/status", { status: "Visited" });
     assert.equal(status.status, 403);

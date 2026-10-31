@@ -86,18 +86,20 @@ body {
   gap: 8px;
 }
 
-.freeze-panel p { margin: 0; }
-
-.freeze-note { color: var(--muted); font-size: 13px; }
-
-.freeze-panel button {
+.freeze-panel button,
+.freeze-panel button:disabled {
   justify-self: start;
-  background: var(--church);
+  background: #c62828;
   color: white;
   border: 0;
   border-radius: 999px;
-  padding: 6px 12px;
+  padding: 8px 14px;
   font-weight: 700;
+  opacity: 1;
+}
+
+.freeze-panel button:disabled {
+  cursor: default;
 }
 
 .freeze-banner {

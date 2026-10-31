@@ -230,7 +230,7 @@ export function createPortalHandler(store, options = {}) {
         if (bodyError) throw bodyError;
         const powers = freezePowers(actor, env);
         const on = body.on === true;
-        if (on && !powers.canEnable) throw new PortalError("Only Mark can turn Freeze on", 403);
+        if (on && !powers.canEnable) throw new PortalError("Only Andy or Mark can turn Freeze on", 403);
         if (!on && !powers.canDisable) throw new PortalError("Only Andy can turn Freeze off", 403);
         const next = await store.update((state) => setFrozen(state, on));
         sendJson(response, 200, view(next, body.month || currentMonth(), { includePrivate: body.includePrivate === true }));
