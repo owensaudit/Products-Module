@@ -1715,14 +1715,14 @@ document.querySelector("#open-freeze")?.addEventListener("click", (event) => {
   event.stopPropagation();
   if (!state) return;
   const panel = document.querySelector("#freeze-panel");
-  if (panel) panel.hidden = !panel.hidden;
+  setFreezeOpen(Boolean(panel?.hidden));
 });
 
 document.addEventListener("click", (event) => {
   const panel = document.querySelector("#freeze-panel");
   if (!panel || panel.hidden) return;
   if (event.target.closest("#freeze-panel, #open-freeze")) return;
-  panel.hidden = true;
+  setFreezeOpen(false);
 });
 
 document.querySelector("#freeze-toggle")?.addEventListener("click", () => {
@@ -1731,8 +1731,7 @@ document.querySelector("#freeze-toggle")?.addEventListener("click", () => {
   post("/api/freeze", { on: toggle.dataset.on === "true" }).then((next) => {
     state = next;
     render();
-    const panel = document.querySelector("#freeze-panel");
-    if (panel) panel.hidden = false;
+    setFreezeOpen(true);
   }).catch(showError);
 });
 
@@ -2049,6 +2048,13 @@ function renderPageChrome() {
   syncFreeze();
 }
 
+function setFreezeOpen(open) {
+  const panel = document.querySelector("#freeze-panel");
+  const opener = document.querySelector("#open-freeze");
+  if (panel) panel.hidden = !open;
+  if (opener) opener.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
 function syncFreeze() {
   const signedIn = Boolean(state);
   const frozen = state?.frozen === true;
@@ -2057,11 +2063,9 @@ function syncFreeze() {
   const banner = document.querySelector("#freeze-banner");
   if (banner) banner.hidden = !frozen;
   const opener = document.querySelector("#open-freeze");
-  const mark = document.querySelector("#angel-mark");
-  if (opener) opener.hidden = !signedIn;
-  if (mark) mark.hidden = signedIn;
   const panel = document.querySelector("#freeze-panel");
   if (!signedIn && panel) panel.hidden = true;
+  if (opener) opener.setAttribute("aria-expanded", panel && !panel.hidden ? "true" : "false");
   const toggle = document.querySelector("#freeze-toggle");
   if (toggle) {
     const turnOff = access.canDisable === true && frozen;

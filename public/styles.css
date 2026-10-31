@@ -71,6 +71,10 @@ body {
 }
 
 .freeze-panel {
+  display: none;
+}
+
+.freeze-panel:not([hidden]) {
   position: absolute;
   z-index: 30;
   top: calc(100% + 8px);
