@@ -460,6 +460,12 @@ button.tiny[data-action="group-text"] {
   margin-left: 0;
 }
 
+.group-texts a.tiny.group-text.sent {
+  background: var(--church-deep);
+  color: white;
+  border-color: var(--church-deep);
+}
+
 .reply-form textarea { min-height: 44px; }
 
 .comment-text { white-space: pre-wrap; }

@@ -197,6 +197,8 @@ let officeFilter = "all";
 let search = "";
 let dayFilter = "";
 let viewAll = false;
+let sentElderTexts = new Set();
+let sentElderTextKey = "";
 let notifyList = false;
 let assigneeFilter = "";
 let preserveListScroll = true;
@@ -541,6 +543,13 @@ app.addEventListener("click", (event) => {
     if (!href.startsWith("sms:")) {
       event.preventDefault();
       showError(new Error("Add a phone number on the card before texting"));
+      return;
+    }
+    if (textLink.closest(".group-texts") && textLink.dataset.group != null) {
+      sentElderTexts.add(Number(textLink.dataset.group));
+      textLink.classList.add("sent");
+      textLink.setAttribute("aria-pressed", "true");
+      textLink.setAttribute("aria-label", `${textLink.textContent.trim()}, sent`);
     }
     return;
   }
@@ -1991,6 +2000,10 @@ function saveContactFields() {
 }
 
 function render() {
+  if (!elderTextScreen()) {
+    sentElderTexts = new Set();
+    sentElderTextKey = "";
+  }
   if (youthList === "temporary") youthList = "all";
   if (youthList !== "companions") selectedCompanionName = "";
   if (blankPlanFor && blankPlanFor !== selectedPersonId) blankPlanFor = "";
@@ -2949,8 +2962,15 @@ function elderGroupPhones() {
   return numbers;
 }
 
+function elderTextScreen() {
+  return page !== "youth" && page !== "directory" && view === "people" && !inbox && viewAll && officeFilter === "Elder" && !cardSolo && !notifyList;
+}
+
 function groupTextControls(numbers) {
   if (!numbers.length) return `<button type="button" class="tiny" data-action="group-text">Text</button>`;
+  const key = numbers.join(",");
+  if (sentElderTextKey && key !== sentElderTextKey) sentElderTexts = new Set();
+  sentElderTextKey = key;
   const batches = [];
   for (let index = 0; index < numbers.length; index += SMS_GROUP_RECIPIENTS) {
     batches.push(numbers.slice(index, index + SMS_GROUP_RECIPIENTS));
@@ -2959,7 +2979,9 @@ function groupTextControls(numbers) {
     const href = groupTextHref(batch);
     const label = batches.length === 1 ? "Text" : `Text ${index + 1}`;
     const count = batch.length;
-    return `<a class="tiny group-text" data-contact="text" href="${esc(href)}" aria-label="${esc(label)}, ${count} ${count === 1 ? "person" : "people"}">${label}</a>`;
+    const sent = sentElderTexts.has(index);
+    const detail = sent ? "sent" : `${count} ${count === 1 ? "person" : "people"}`;
+    return `<a class="tiny group-text${sent ? " sent" : ""}" data-contact="text" data-group="${index}" href="${esc(href)}" aria-pressed="${sent}" aria-label="${esc(`${label}, ${detail}`)}">${label}</a>`;
   }).join("");
   return `<span class="group-texts">${links}</span>`;
 }
