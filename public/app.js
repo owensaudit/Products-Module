@@ -2620,6 +2620,7 @@ function peopleView() {
       <div class="row">
         <h2>${esc(title)}</h2>
         ${youthGroupTextControl()}
+        ${elderGroupTextControl()}
       </div>
       <p class="muted">${total} ${state.rosterMode ? noun : "in this list"}</p>
       <input id="search" class="search" type="search" placeholder="Search by name" value="${esc(search)}" aria-label="Search by name">
@@ -2917,6 +2918,27 @@ function youthGroupTextControl() {
   const href = groupTextHref(youthGroupPhones());
   if (!href) return `<button type="button" class="tiny" data-action="group-text">Text</button>`;
   const count = youthGroupPhones().length;
+  return `<a class="tiny group-text" data-contact="text" href="${esc(href)}" aria-label="Text ${count} ${count === 1 ? "person" : "people"}">Text</a>`;
+}
+
+function elderGroupPhones() {
+  const seen = new Set();
+  const numbers = [];
+  for (const person of filteredPeople()) {
+    const number = phoneForName(nameKey(person), person.phone);
+    if (!number || seen.has(number)) continue;
+    seen.add(number);
+    numbers.push(number);
+  }
+  return numbers;
+}
+
+function elderGroupTextControl() {
+  if (page === "youth" || !viewAll || officeFilter !== "Elder" || !filteredPeople().length) return "";
+  const numbers = elderGroupPhones();
+  const href = groupTextHref(numbers);
+  if (!href) return `<button type="button" class="tiny" data-action="group-text">Text</button>`;
+  const count = numbers.length;
   return `<a class="tiny group-text" data-contact="text" href="${esc(href)}" aria-label="Text ${count} ${count === 1 ? "person" : "people"}">Text</a>`;
 }
 
