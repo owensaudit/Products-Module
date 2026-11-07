@@ -447,6 +447,19 @@ button.tiny[data-action="group-text"] {
   line-height: 1.2;
 }
 
+.group-texts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.group-texts a.tiny.group-text,
+.group-texts button.tiny[data-action="group-text"] {
+  margin-left: 0;
+}
+
 .reply-form textarea { min-height: 44px; }
 
 .comment-text { white-space: pre-wrap; }

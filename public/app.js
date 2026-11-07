@@ -87,10 +87,20 @@ function phoneForName(name, explicit = "") {
   return smsNumber(explicit) || smsNumber(personBySpokenName(name)?.phone);
 }
 
+const SMS_GROUP_RECIPIENTS = 9;
+
+function smsAddress(phone) {
+  const digits = smsNumber(phone);
+  const national = digits.length === 11 ? digits.slice(1) : digits;
+  if (national.length !== 10) return "";
+  return `${national.slice(0, 3)}-${national.slice(3, 6)}-${national.slice(6)}`;
+}
+
 function groupTextHref(numbers) {
-  if (!numbers.length) return "";
+  const addresses = numbers.map(smsAddress).filter(Boolean);
+  if (!addresses.length) return "";
   const ios = typeof navigator !== "undefined" && /iPhone|iPad|iPod/i.test(navigator.userAgent || "");
-  const list = numbers.join(",");
+  const list = addresses.join(",");
   if (ios) return `sms://open?addresses=${list}&body=`;
   return `sms:${list}?&body=`;
 }
@@ -2921,11 +2931,17 @@ function youthGroupTextControl() {
   return `<a class="tiny group-text" data-contact="text" href="${esc(href)}" aria-label="Text ${count} ${count === 1 ? "person" : "people"}">Text</a>`;
 }
 
+function elderPhone(person) {
+  return phoneForName(nameKey(person), person.phone)
+    || smsNumber(directoryPhoneForName(nameKey(person)))
+    || smsNumber(directoryPhoneForName(person.displayName));
+}
+
 function elderGroupPhones() {
   const seen = new Set();
   const numbers = [];
   for (const person of filteredPeople()) {
-    const number = phoneForName(nameKey(person), person.phone);
+    const number = elderPhone(person);
     if (!number || seen.has(number)) continue;
     seen.add(number);
     numbers.push(number);
@@ -2933,13 +2949,24 @@ function elderGroupPhones() {
   return numbers;
 }
 
+function groupTextControls(numbers) {
+  if (!numbers.length) return `<button type="button" class="tiny" data-action="group-text">Text</button>`;
+  const batches = [];
+  for (let index = 0; index < numbers.length; index += SMS_GROUP_RECIPIENTS) {
+    batches.push(numbers.slice(index, index + SMS_GROUP_RECIPIENTS));
+  }
+  const links = batches.map((batch, index) => {
+    const href = groupTextHref(batch);
+    const label = batches.length === 1 ? "Text" : `Text ${index + 1}`;
+    const count = batch.length;
+    return `<a class="tiny group-text" data-contact="text" href="${esc(href)}" aria-label="${esc(label)}, ${count} ${count === 1 ? "person" : "people"}">${label}</a>`;
+  }).join("");
+  return `<span class="group-texts">${links}</span>`;
+}
+
 function elderGroupTextControl() {
   if (page === "youth" || !viewAll || officeFilter !== "Elder" || !filteredPeople().length) return "";
-  const numbers = elderGroupPhones();
-  const href = groupTextHref(numbers);
-  if (!href) return `<button type="button" class="tiny" data-action="group-text">Text</button>`;
-  const count = numbers.length;
-  return `<a class="tiny group-text" data-contact="text" href="${esc(href)}" aria-label="Text ${count} ${count === 1 ? "person" : "people"}">Text</a>`;
+  return groupTextControls(elderGroupPhones());
 }
 
 function youthListTitle() {
