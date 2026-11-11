@@ -1857,14 +1857,17 @@ function restoreContactDraft(draft) {
   if (household) household.value = draft.household;
   if (address) address.value = draft.address;
   if (priesthood) priesthood.value = draft.priesthood;
+  const field = draft.field === "notes"
+    ? card.querySelector(".special-notes [name=notes]")
+    : card.querySelector(`[name="${CSS.escape(draft.field)}"]`);
+  if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement) {
+    field.focus();
+    if ((field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) && typeof draft.start === "number" && typeof draft.end === "number") {
+      field.setSelectionRange(draft.start, draft.end);
+    }
+  }
   const contact = card.querySelector("form[data-form='contact']");
   if (contact) syncContactLinks(contact);
-  const field = card.querySelector(`[name="${draft.field}"]`);
-  if (!(field instanceof HTMLInputElement) && !(field instanceof HTMLTextAreaElement) && !(field instanceof HTMLSelectElement)) return;
-  field.focus();
-  if ((field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) && typeof draft.start === "number" && typeof draft.end === "number") {
-    field.setSelectionRange(draft.start, draft.end);
-  }
 }
 
 function saveYouthCompanion(youthId, companion, options = {}) {
@@ -5364,6 +5367,8 @@ function syncContactLinks(form) {
     mail.href = email ? gmailHref(email, "") : "";
     mail.target = "_blank";
   }
+  const card = form.closest(".card");
+  if (!card) return;
   for (const link of card.querySelectorAll("a[data-reminder]")) {
     const script = link.dataset.script || "";
     if (link.dataset.reminder === "call") {
